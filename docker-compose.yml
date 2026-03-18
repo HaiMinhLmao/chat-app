@@ -1,0 +1,7 @@
+services:
+  chat-app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
