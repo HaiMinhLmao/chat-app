@@ -1,14 +1,14 @@
 package com.myclass.chat_app.controller;
 
+import com.myclass.chat_app.service.UserService;
 import com.myclass.chat_app.service.SupabaseAuthService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -16,46 +16,145 @@ import java.util.Map;
 @CrossOrigin(origins = "*", maxAge = 3600)
 public class AuthController {
 
-    private final SupabaseAuthService supabaseAuthService;
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
-    public AuthController(SupabaseAuthService supabaseAuthService) {
+    private final SupabaseAuthService supabaseAuthService;
+    private final UserService userService;
+
+    public AuthController(SupabaseAuthService supabaseAuthService, UserService userService) {
         this.supabaseAuthService = supabaseAuthService;
+        this.userService = userService;
     }
 
+    // ================= REGISTER =================
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> register(@RequestBody Map<String, String> request) {
         try {
+            if (request == null) {
+                return badRequest("Request body is required");
+            }
             String email = request.get("email");
             String password = request.get("password");
             String fullName = request.getOrDefault("fullName", "");
 
-            if (email == null || email.isBlank() || password == null || password.isBlank()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Email and password are required"));
+            if (isBlank(email) || isBlank(password)) {
+                return badRequest("Email and password are required");
             }
 
-            Map<String, Object> supabaseResponse = supabaseAuthService.register(email.trim(), password, fullName);
-            return ResponseEntity.status(HttpStatus.CREATED).body(supabaseResponse);
+            Map<String, Object> sb = supabaseAuthService.register(email.trim(), password, fullName);
+
+            safeUpsertLocalUser(sb, email, fullName);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(sb);
+
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return badRequest(e.getMessage());
         }
     }
 
+    // ================= LOGIN =================
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
         try {
+            if (request == null) {
+                return badRequest("Request body is required");
+            }
             String email = request.get("email");
             String password = request.get("password");
 
-            if (email == null || email.isBlank() || password == null || password.isBlank()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Email and password are required"));
+            if (isBlank(email) || isBlank(password)) {
+                return badRequest("Email and password are required");
             }
 
-            Map<String, Object> supabaseSession = supabaseAuthService.login(email.trim(), password);
-            return ResponseEntity.ok(supabaseSession);
+            Map<String, Object> sb = supabaseAuthService.login(email.trim(), password);
+
+            // 🔥 chuẩn hoá response
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("access_token", sb.get("access_token"));
+            response.put("refresh_token", sb.get("refresh_token"));
+            response.put("user", sb.get("user"));
+
+            safeUpsertLocalUser(sb, email, null);
+
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Invalid credentials: " + e.getMessage()));
         }
     }
-}
 
+    // ================= REFRESH TOKEN =================
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> request) {
+        try {
+            if (request == null) {
+                return badRequest("Request body is required");
+            }
+            String refreshToken = request.get("refresh_token");
+
+            if (isBlank(refreshToken)) {
+                return badRequest("Missing refresh_token");
+            }
+
+            Map<String, Object> sb = supabaseAuthService.refresh(refreshToken);
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("access_token", sb.get("access_token"));
+            response.put("refresh_token", sb.get("refresh_token"));
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Refresh failed: " + e.getMessage()));
+        }
+    }
+
+    // ================= HELPER =================
+
+    private ResponseEntity<?> badRequest(String msg) {
+        return ResponseEntity.badRequest().body(Map.of("error", msg));
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void upsertLocalUser(Map<String, Object> sb, String fallbackEmail, String fallbackFullName) {
+        if (sb == null) {
+            userService.upsertByEmail(fallbackEmail, fallbackFullName);
+            return;
+        }
+
+        Object userObj = sb.get("user");
+
+        if (!(userObj instanceof Map<?, ?> userMap)) {
+            userService.upsertByEmail(fallbackEmail, fallbackFullName);
+            return;
+        }
+
+        String email = (String) ((Map<String, Object>) userMap)
+                .getOrDefault("email", fallbackEmail);
+
+        String fullName = fallbackFullName;
+
+        Object metaObj = ((Map<String, Object>) userMap).get("user_metadata");
+        if (metaObj instanceof Map<?, ?> metaMap) {
+            Object fn = ((Map<String, Object>) metaMap).get("full_name");
+            if (fn instanceof String s && !s.isBlank()) {
+                fullName = s;
+            }
+        }
+
+        userService.upsertByEmail(email, fullName);
+    }
+
+    private void safeUpsertLocalUser(Map<String, Object> sb, String fallbackEmail, String fallbackFullName) {
+        try {
+            upsertLocalUser(sb, fallbackEmail, fallbackFullName);
+        } catch (RuntimeException e) {
+            log.warn("Skipping local user sync because the database is unavailable: {}", e.getMessage());
+        }
+    }
+}

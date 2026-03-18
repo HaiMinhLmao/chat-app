@@ -7,806 +7,1024 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
     <style>
+        :root {
+            --sidebar: #18212f;
+            --sidebar-soft: #223146;
+            --surface: #f6f8fc;
+            --card: #ffffff;
+            --line: #e4e9f2;
+            --text: #18212f;
+            --muted: #6b768a;
+            --accent: #315efb;
+            --accent-strong: #1d45cf;
+            --accent-soft: rgba(49, 94, 251, 0.12);
+            --success: #0a7b58;
+            --danger: #c43d4b;
+            --warning: #f2a93b;
+        }
+
         * {
-            margin: 0;
-            padding: 0;
             box-sizing: border-box;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f0f2f5;
-            height: 100vh;
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(180deg, #eef3fb 0%, #f8fafc 100%);
+            color: var(--text);
+            min-height: 100vh;
         }
 
-        .container {
-            display: flex;
-            height: 100vh;
+        .app {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 310px 1fr;
         }
 
-        /* Sidebar */
         .sidebar {
-            width: 280px;
-            background: #2c2f33;
+            background: linear-gradient(180deg, var(--sidebar) 0%, #101722 100%);
             color: #fff;
             display: flex;
             flex-direction: column;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid #40444b;
+            padding: 24px 22px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .app-name {
             font-size: 24px;
-            font-weight: bold;
-            color: #fff;
+            font-weight: 800;
+            letter-spacing: -0.03em;
         }
 
-        .user-info {
-            padding: 15px 20px;
+        .app-copy {
+            margin-top: 8px;
+            color: rgba(255, 255, 255, 0.68);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .user-card {
+            margin: 18px 18px 0;
+            padding: 16px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, rgba(49, 94, 251, 0.28), rgba(255, 255, 255, 0.08));
+            border: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
-            align-items: center;
             gap: 12px;
-            border-bottom: 1px solid #40444b;
+            align-items: center;
         }
 
         .user-avatar {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            display: grid;
+            place-items: center;
+            background: rgba(255, 255, 255, 0.16);
+            font-weight: 800;
             font-size: 18px;
         }
 
-        .user-details {
-            flex: 1;
-        }
-
-        .username {
+        .user-name {
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         .user-status {
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.72);
             font-size: 12px;
-            color: #b0bec5;
         }
 
-        .new-group-btn {
-            margin: 15px 20px;
-            padding: 10px;
-            background: #667eea;
-            border: none;
-            color: white;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: background 0.3s;
-        }
-
-        .new-group-btn:hover {
-            background: #764ba2;
-        }
-
-        /* Conversations List */
-        .conversations {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px 0;
-        }
-
-        .conversation-item {
-            padding: 12px 15px;
-            cursor: pointer;
-            border-left: 3px solid transparent;
-            transition: all 0.2s;
-            display: flex;
+        .sidebar-actions {
+            padding: 18px;
+            display: grid;
             gap: 10px;
         }
 
+        .new-group-btn,
+        .secondary-btn {
+            width: 100%;
+            border: 0;
+            border-radius: 14px;
+            padding: 13px 16px;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.18s ease, opacity 0.18s ease;
+        }
+
+        .new-group-btn {
+            background: linear-gradient(135deg, var(--accent), #5f83ff);
+            color: #fff;
+        }
+
+        .secondary-btn {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        .new-group-btn:hover,
+        .secondary-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .sidebar-section {
+            padding: 0 18px 12px;
+        }
+
+        .section-title {
+            margin: 0 0 10px;
+            color: rgba(255, 255, 255, 0.64);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .conversation-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .conversation-item {
+            width: 100%;
+            border: 0;
+            border-radius: 18px;
+            background: transparent;
+            color: inherit;
+            padding: 14px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.18s ease, transform 0.18s ease;
+        }
+
         .conversation-item:hover {
-            background: #40444b;
+            background: rgba(255, 255, 255, 0.06);
+            transform: translateX(2px);
         }
 
         .conversation-item.active {
-            background: #36393f;
-            border-left-color: #667eea;
+            background: rgba(255, 255, 255, 0.11);
         }
 
         .conversation-avatar {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.12);
+            display: grid;
+            place-items: center;
             flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-size: 14px;
-            font-weight: bold;
-        }
-
-        .conversation-details {
-            flex: 1;
-            min-width: 0;
+            font-weight: 800;
         }
 
         .conversation-name {
             font-size: 14px;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-weight: 700;
         }
 
         .conversation-preview {
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.6);
             font-size: 12px;
-            color: #9da5af;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-top: 2px;
+            line-height: 1.4;
         }
 
-        /* Main Chat Area */
-        .chat-area {
-            flex: 1;
+        .group-note {
+            margin: 10px 18px 0;
+            padding: 12px 14px;
+            border-radius: 16px;
+            font-size: 12px;
+            line-height: 1.55;
+            color: rgba(255, 255, 255, 0.78);
+            background: rgba(255, 255, 255, 0.06);
+            display: none;
+        }
+
+        .group-note.show {
+            display: block;
+        }
+
+        .main {
             display: flex;
             flex-direction: column;
-            background: white;
+            min-width: 0;
         }
 
-        /* Chat Header */
-        .chat-header {
-            padding: 20px;
-            background: white;
-            border-bottom: 1px solid #e1e8ed;
+        .main-header {
+            padding: 22px 28px;
+            background: rgba(255, 255, 255, 0.86);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--line);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 16px;
         }
 
-        .chat-title {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
+        .main-title {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
         }
 
-        .chat-name {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
+        .main-subtitle {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 14px;
         }
 
-        .chat-role {
+        .status-pill {
+            padding: 10px 14px;
+            border-radius: 999px;
             font-size: 12px;
-            color: #667eea;
-            font-weight: 500;
-            background: #f0f2f5;
-            padding: 2px 8px;
-            border-radius: 12px;
-            display: inline-block;
-            width: fit-content;
+            font-weight: 800;
+            background: var(--accent-soft);
+            color: var(--accent-strong);
+            white-space: nowrap;
         }
 
-        .chat-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .icon-btn {
-            width: 36px;
-            height: 36px;
-            border: none;
-            background: #f0f2f5;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #667eea;
-            font-size: 18px;
-            transition: all 0.3s;
-        }
-
-        .icon-btn:hover {
-            background: #667eea;
-            color: white;
-        }
-
-        /* Messages Area */
-        .messages-container {
+        .messages-area {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 28px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 14px;
         }
 
-        .message {
+        .empty-state {
+            max-width: 560px;
+            margin: auto;
+            padding: 28px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid var(--line);
+            text-align: center;
+            box-shadow: 0 18px 40px rgba(31, 46, 85, 0.08);
+        }
+
+        .empty-state h2 {
+            margin: 0 0 10px;
+            font-size: 26px;
+            letter-spacing: -0.03em;
+        }
+
+        .empty-state p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.65;
+        }
+
+        .message-row {
             display: flex;
             gap: 10px;
-            animation: slideIn 0.3s ease-in-out;
-            align-items: flex-start;
+            align-items: flex-end;
             max-width: 100%;
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .message.sent {
+        .message-row.sent {
             justify-content: flex-end;
         }
 
-        .message.received {
+        .message-row.received {
             justify-content: flex-start;
         }
-        .message.system {
-            justify-content: center;
-        }
+
         .message-avatar {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--accent), #6f8dff);
+            color: #fff;
+            display: grid;
+            place-items: center;
             font-size: 12px;
-            font-weight: bold;
-            color: white;
+            font-weight: 800;
             flex-shrink: 0;
         }
 
-        .message-content {
+        .message-stack {
+            max-width: min(70%, 680px);
+        }
+
+        .message-author {
+            margin: 0 0 4px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .message-bubble {
+            border-radius: 18px;
             padding: 12px 15px;
-            border-radius: 15px;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            line-height: 1.4;
-            max-width: 100%;
-            text-align: left;
+            line-height: 1.5;
+            word-break: break-word;
+            box-shadow: 0 12px 24px rgba(31, 46, 85, 0.06);
         }
 
-        .sent .message-content {
-            background: #667eea;
-            color: white;
-            border-bottom-right-radius: 4px;
+        .sent .message-bubble {
+            background: linear-gradient(135deg, var(--accent), #5f83ff);
+            color: #fff;
+            border-bottom-right-radius: 6px;
         }
 
-        .received .message-content {
-            background: #f0f2f5;
-            color: #333;
-            border-bottom-left-radius: 4px;
+        .received .message-bubble {
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-bottom-left-radius: 6px;
         }
 
         .message-time {
+            margin-top: 5px;
             font-size: 11px;
-            color: #999;
-            margin-top: 4px;
+            color: var(--muted);
         }
 
-        /* Input Area */
-        .input-area {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid #e1e8ed;
+        .composer {
+            padding: 18px 24px 24px;
+            border-top: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(16px);
+        }
+
+        .composer-form {
             display: flex;
-            gap: 10px;
-            align-items: flex-end;
-        }
-
-        #messageForm {
-            display: flex !important;
-            gap: 10px;
-            align-items: flex-end;
-            width: 100%;
-        }
-
-        .input-wrapper {
-            flex: 1;
-            display: flex;
-            gap: 8px;
+            gap: 12px;
             align-items: center;
         }
 
-        .message-input {
+        .composer input {
             flex: 1;
-            padding: 12px 15px;
-            border: 1px solid #e1e8ed;
-            border-radius: 20px;
-            font-size: 14px;
+            border: 1px solid var(--line);
+            background: #fff;
+            border-radius: 18px;
+            padding: 15px 16px;
+            font: inherit;
+            color: var(--text);
+        }
+
+        .composer input:focus {
             outline: none;
-            transition: border-color 0.3s;
-            font-family: inherit;
-        }
-
-        .message-input:focus {
-            border-color: #667eea;
-        }
-
-        .upload-btn {
-            width: 36px;
-            height: 36px;
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            font-size: 18px;
-            color: #667eea;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            border-radius: 50%;
-        }
-
-        .upload-btn:hover {
-            background: #f0f2f5;
+            border-color: rgba(49, 94, 251, 0.45);
+            box-shadow: 0 0 0 4px var(--accent-soft);
         }
 
         .send-btn {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 50%;
-            color: white;
+            border: 0;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--accent), #5f83ff);
+            color: #fff;
+            padding: 14px 18px;
+            font: inherit;
+            font-weight: 800;
             cursor: pointer;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s;
         }
 
-        .send-btn:hover {
-            transform: scale(1.08);
+        .send-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
         }
 
-        .send-btn:active {
-            transform: scale(0.95);
-        }
+        @media (max-width: 900px) {
+            .app {
+                grid-template-columns: 1fr;
+            }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
+            .sidebar {
+                border-right: 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            }
 
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #ccc;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #999;
-        }
-
-        .sidebar ::-webkit-scrollbar-thumb {
-            background: #40444b;
-        }
-
-        .sidebar ::-webkit-scrollbar-thumb:hover {
-            background: #72767d;
+            .messages-area,
+            .main-header {
+                padding-left: 18px;
+                padding-right: 18px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <div class="app-name">📚 MyClassRoom</div>
-            </div>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="app-name">MyClassRoom</div>
+            <div class="app-copy">Chat first. Create study groups only when you actually need them.</div>
+        </div>
 
-            <div class="user-info">
-                <div class="user-avatar">MA</div>
-                <div class="user-details">
-                    <div class="username">Your Name</div>
-                    <div class="user-status">Online</div>
-                </div>
-            </div>
-
-            <button class="new-group-btn">
-                <span>➕</span> New Group
-            </button>
-
-            <div class="conversations">
-                <!-- Test Group Chat -->
-                <div class="conversation-item active">
-                    <div class="conversation-avatar">T</div>
-                    <div class="conversation-details">
-                        <div class="conversation-name">test</div>
-                        <div class="conversation-preview">Click để chat...</div>
-                    </div>
-                </div>
+        <div class="user-card">
+            <div class="user-avatar" id="userAvatar">U</div>
+            <div>
+                <div class="user-name" id="userName">User</div>
+                <div class="user-status" id="userStatus">Connecting...</div>
             </div>
         </div>
 
-        <!-- Chat Area -->
-        <div class="chat-area">
-            <!-- Chat Header -->
-            <div class="chat-header">
-                <div class="chat-title">
-                    <div class="chat-name">test</div>
-                    <div class="chat-role">Group Chat</div>
-                </div>
-                <div class="chat-actions">
-                    <button class="icon-btn" title="Search">🔍</button>
-                    <button class="icon-btn" title="Info">ℹ️</button>
-                </div>
-            </div>
-
-            <!-- Messages -->
-            <div class="messages-container">
-            </div>
-
-            <!-- Input Area -->
-            <div class="input-area">
-                <form id="messageForm" style="display: flex; width: 100%; gap: 10px;">
-                    <div class="input-wrapper">
-                        <button class="upload-btn" type="button" title="Upload Image">🖼️</button>
-                        <button class="upload-btn" type="button" title="Upload Video">🎥</button>
-                        <button class="upload-btn" type="button" title="Upload File">📎</button>
-                        <input type="text" class="message-input" id="messageInput" placeholder="Type a message..." disabled>
-                    </div>
-                    <button class="send-btn" id="sendBtn" type="submit" title="Send" disabled>✈️</button>
-                </form>
-            </div>
+        <div class="sidebar-actions">
+            <button class="new-group-btn" id="newGroupBtn" type="button">Create Group</button>
+            <button class="secondary-btn" id="logoutBtn" type="button">Log Out</button>
         </div>
-    </div>
 
-    <script>
-        // Global variables
-        const messagesContainer = document.querySelector('.messages-container');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const messageForm = document.getElementById('messageForm');
-        const chatName = document.querySelector('.chat-name');
-        
-        let stompClient = null;
-        let userName = 'User';
-        let currentRoom = 'general';
+        <div class="sidebar-section">
+            <h2 class="section-title">Main Chat</h2>
+            <div class="conversation-list" id="primaryConversation"></div>
+        </div>
 
-        // Check if user is logged in
-        function checkAuth() {
-            const currentUser = sessionStorage.getItem('currentUser');
-            if (!currentUser) {
-                // User not logged in, redirect to login
-                window.location.href = '/login.html';
-                return null;
-            }
-            return JSON.parse(currentUser);
+        <div class="sidebar-section">
+            <h2 class="section-title">Study Groups</h2>
+            <div class="conversation-list" id="groupsList"></div>
+        </div>
+
+        <div class="group-note" id="groupsNote"></div>
+    </aside>
+
+    <main class="main">
+        <header class="main-header">
+            <div>
+                <h1 class="main-title" id="chatTitle">Lobby Chat</h1>
+                <p class="main-subtitle" id="chatSubtitle">Talk right away. Group conversations can be added when the group list is available.</p>
+            </div>
+            <div class="status-pill" id="connectionStatus">Connecting...</div>
+        </header>
+
+        <section class="messages-area" id="messagesContainer">
+            <div class="empty-state" id="emptyState">
+                <h2>Start the conversation</h2>
+                <p>Use the lobby for general messages. Your study groups will appear in the sidebar when they are available.</p>
+            </div>
+        </section>
+
+        <footer class="composer">
+            <form class="composer-form" id="messageForm">
+                <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" disabled>
+                <button class="send-btn" id="sendBtn" type="submit" disabled>Send</button>
+            </form>
+        </footer>
+    </main>
+</div>
+
+<script>
+    const primaryConversation = document.getElementById('primaryConversation');
+    const groupsList = document.getElementById('groupsList');
+    const groupsNote = document.getElementById('groupsNote');
+    const chatTitle = document.getElementById('chatTitle');
+    const chatSubtitle = document.getElementById('chatSubtitle');
+    const messagesContainer = document.getElementById('messagesContainer');
+    const emptyState = document.getElementById('emptyState');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const userAvatar = document.getElementById('userAvatar');
+    const userName = document.getElementById('userName');
+    const userStatus = document.getElementById('userStatus');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const newGroupBtn = document.getElementById('newGroupBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    let stompClient = null;
+    let activeSubscription = null;
+    let activeChannel = { type: 'lobby', id: 'lobby', name: 'Lobby Chat' };
+    let currentUser = null;
+    let reconnectTimer = null;
+
+    function parseJson(value) {
+        try {
+            return JSON.parse(value);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function getSession() {
+        return parseJson(sessionStorage.getItem('supabaseSession'));
+    }
+
+    function persistSession(session) {
+        sessionStorage.setItem('supabaseSession', JSON.stringify(session));
+        const user = session && session.user ? session.user : null;
+        if (!user) {
+            return;
+        }
+        const username =
+            (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.username)) ||
+            (user.email ? user.email.split('@')[0] : 'User');
+        sessionStorage.setItem('currentUser', JSON.stringify({
+            username,
+            email: user.email || ''
+        }));
+    }
+
+    function clearSession() {
+        sessionStorage.removeItem('supabaseSession');
+        sessionStorage.removeItem('currentUser');
+        sessionStorage.removeItem('recentlyCreatedGroup');
+        localStorage.removeItem('recentlyCreatedGroup');
+    }
+
+    function storeRecentGroup(group) {
+        if (!group || !group.id) {
+            return;
+        }
+        const serialized = JSON.stringify(group);
+        sessionStorage.setItem('recentlyCreatedGroup', serialized);
+        localStorage.setItem('recentlyCreatedGroup', serialized);
+    }
+
+    function clearRecentGroup() {
+        sessionStorage.removeItem('recentlyCreatedGroup');
+        localStorage.removeItem('recentlyCreatedGroup');
+    }
+
+    function getRecentGroupFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('createdGroupId');
+        if (!id) {
+            return null;
+        }
+        const recentGroup = {
+            id,
+            name: params.get('createdGroupName') || 'New Group',
+            category: params.get('createdGroupCategory') || '',
+            role: params.get('createdGroupRole') || 'ADMIN'
+        };
+        storeRecentGroup(recentGroup);
+        const nextUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, '', nextUrl);
+        return recentGroup;
+    }
+
+    function getRecentlyCreatedGroup() {
+        const fromUrl = getRecentGroupFromUrl();
+        if (fromUrl) {
+            return fromUrl;
+        }
+        return parseJson(sessionStorage.getItem('recentlyCreatedGroup'))
+            || parseJson(localStorage.getItem('recentlyCreatedGroup'));
+    }
+
+    function mergeRecentGroup(groups) {
+        const recentGroup = getRecentlyCreatedGroup();
+        if (!recentGroup) {
+            return groups;
         }
 
-        function connect() {
-            const socket = new SockJS('/ws');
-            stompClient = Stomp.over(socket);
-            
-            stompClient.connect({}, onConnected, onError);
+        const merged = Array.isArray(groups) ? [...groups] : [];
+        const alreadyExists = merged.some((group) => String(group.id) === String(recentGroup.id));
+        if (!alreadyExists) {
+            merged.unshift(recentGroup);
+        } else {
+            clearRecentGroup();
+        }
+        return merged;
+    }
+
+    function decodeJwtPayload(token) {
+        if (!token || token.split('.').length < 2) {
+            return null;
+        }
+        try {
+            const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+            return JSON.parse(atob(padded));
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function isTokenExpired(token, skewSeconds = 30) {
+        const payload = decodeJwtPayload(token);
+        if (!payload || typeof payload.exp !== 'number') {
+            return false;
+        }
+        return payload.exp <= Math.floor(Date.now() / 1000) + skewSeconds;
+    }
+
+    async function refreshSession() {
+        const session = getSession();
+        const refreshToken = session && session.refresh_token ? session.refresh_token : null;
+        if (!refreshToken) {
+            return null;
         }
 
-        function onConnected() {
-            console.log('✅ WebSocket Connected');
+        const response = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.access_token) {
+            return null;
+        }
+
+        const nextSession = {
+            ...session,
+            ...data,
+            user: session && session.user ? session.user : null
+        };
+
+        persistSession(nextSession);
+        return nextSession.access_token;
+    }
+
+    async function getValidAccessToken() {
+        const session = getSession();
+        if (!session || !session.access_token) {
+            return null;
+        }
+
+        if (!isTokenExpired(session.access_token)) {
+            return session.access_token;
+        }
+
+        return refreshSession();
+    }
+
+    function getCurrentUser() {
+        const saved = parseJson(sessionStorage.getItem('currentUser'));
+        if (saved) {
+            return saved;
+        }
+
+        const session = getSession();
+        const user = session && session.user ? session.user : null;
+        if (!user) {
+            return null;
+        }
+
+        return {
+            username:
+                (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.username)) ||
+                (user.email ? user.email.split('@')[0] : 'User'),
+            email: user.email || ''
+        };
+    }
+
+    function requireAuth() {
+        const user = getCurrentUser();
+        if (!user) {
+            window.location.href = '/login.html';
+            return null;
+        }
+        return user;
+    }
+
+    function setConnectionState(label, online) {
+        connectionStatus.textContent = label;
+        userStatus.textContent = label;
+        connectionStatus.style.background = online ? 'rgba(10, 123, 88, 0.12)' : 'rgba(242, 169, 59, 0.16)';
+        connectionStatus.style.color = online ? 'var(--success)' : '#8a5a00';
+    }
+
+    function clearMessages() {
+        messagesContainer.innerHTML = '';
+        messagesContainer.appendChild(emptyState);
+    }
+
+    function ensureMessageSurface() {
+        if (messagesContainer.contains(emptyState)) {
+            emptyState.remove();
+        }
+    }
+
+    function formatTime(value) {
+        const date = value ? new Date(value) : new Date();
+        if (Number.isNaN(date.getTime())) {
+            return '';
+        }
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function addMessage(content, isSent, sender, timestamp) {
+        ensureMessageSurface();
+
+        const row = document.createElement('div');
+        row.className = 'message-row ' + (isSent ? 'sent' : 'received');
+
+        if (!isSent) {
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = (sender || 'U').substring(0, 1).toUpperCase();
+            row.appendChild(avatar);
+        }
+
+        const stack = document.createElement('div');
+        stack.className = 'message-stack';
+
+        if (!isSent) {
+            const author = document.createElement('div');
+            author.className = 'message-author';
+            author.textContent = sender || 'User';
+            stack.appendChild(author);
+        }
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.textContent = content;
+        stack.appendChild(bubble);
+
+        const time = document.createElement('div');
+        time.className = 'message-time';
+        time.textContent = formatTime(timestamp);
+        stack.appendChild(time);
+
+        row.appendChild(stack);
+        messagesContainer.appendChild(row);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function showGroupsNote(message) {
+        groupsNote.textContent = message;
+        groupsNote.classList.add('show');
+    }
+
+    function hideGroupsNote() {
+        groupsNote.classList.remove('show');
+        groupsNote.textContent = '';
+    }
+
+    function buildConversationButton({ id, name, preview, type }) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'conversation-item';
+        button.dataset.channelId = String(id);
+        button.dataset.channelType = type;
+        button.innerHTML = `
+            <div class="conversation-avatar">${(name || 'C').substring(0, 1).toUpperCase()}</div>
+            <div>
+                <div class="conversation-name">${name}</div>
+                <div class="conversation-preview">${preview}</div>
+            </div>
+        `;
+        return button;
+    }
+
+    function setActiveButton(button) {
+        document.querySelectorAll('.conversation-item').forEach((item) => item.classList.remove('active'));
+        if (button) {
+            button.classList.add('active');
+        }
+    }
+
+    function renderPrimaryConversation() {
+        primaryConversation.innerHTML = '';
+        const button = buildConversationButton({
+            id: 'lobby',
+            name: 'Lobby Chat',
+            preview: 'General chat for everyone who is online.',
+            type: 'lobby'
+        });
+        button.classList.add('active');
+        button.addEventListener('click', () => {
+            selectLobby(button);
+        });
+        primaryConversation.appendChild(button);
+    }
+
+    function selectLobby(button) {
+        activeChannel = { type: 'lobby', id: 'lobby', name: 'Lobby Chat' };
+        chatTitle.textContent = 'Lobby Chat';
+        chatSubtitle.textContent = 'General conversation for everyone currently online.';
+        clearMessages();
+        setActiveButton(button || primaryConversation.querySelector('.conversation-item'));
+        subscribeToLobby();
+    }
+
+    function selectGroup(group, button) {
+        activeChannel = { type: 'group', id: group.id, name: group.name || 'Group' };
+        chatTitle.textContent = group.name || 'Group';
+        chatSubtitle.textContent = group.category
+            ? group.category + ' · ' + (group.role || 'Group chat')
+            : (group.role || 'Group chat');
+        clearMessages();
+        setActiveButton(button);
+        subscribeToGroup(group.id);
+    }
+
+    function connectWs() {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+        stompClient.debug = null;
+        stompClient.connect({}, () => {
+            setConnectionState('Connected', true);
             messageInput.disabled = false;
             sendBtn.disabled = false;
-            
-            // Subscribe to messages
-            stompClient.subscribe('/topic/messages', onMessageReceived);
-            
-            // Notify others
-            const joinMessage = {
-                sender: userName,
-                content: userName + ' đã tham gia phòng chat!',
-                timestamp: new Date().toISOString()
-            };
-            stompClient.send('/app/chat.join', {}, JSON.stringify(joinMessage));
-        }
-
-        function onError(error) {
-            console.error('❌ WebSocket Error:', error);
+            if (activeChannel.type === 'group' && activeChannel.id) {
+                subscribeToGroup(activeChannel.id);
+            } else {
+                subscribeToLobby();
+            }
+        }, () => {
+            setConnectionState('Reconnecting...', false);
             messageInput.disabled = true;
             sendBtn.disabled = true;
-            
-            addSystemMessage('Lỗi kết nối. Thử lại...', true);
-            setTimeout(connect, 5000);
-        }
+            reconnectTimer = setTimeout(connectWs, 3000);
+        });
+    }
 
-        function onMessageReceived(payload) {
-            const message = JSON.parse(payload.body);
-            
-            if (message.content.includes('đã tham gia') || message.content.includes('đã rời')) {
-                addSystemMessage(message.content, false);
-            } else if (message.sender === userName) {
-                addMessage(message.content, true, message.sender);
-            } else {
-                addMessage(message.content, false, message.sender);
-            }
+    function subscribeToLobby() {
+        if (!stompClient || !stompClient.connected) {
+            return;
         }
-
-        function addMessage(content, isSent, sender) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-            
-            if (!isSent) {
-                const avatar = document.createElement('div');
-                avatar.className = 'message-avatar';
-                avatar.textContent = sender.substring(0, 1).toUpperCase();
-                messageDiv.appendChild(avatar);
-            }
-            
-            const messageContent = document.createElement('div');
-            messageContent.className = 'message-content';
-            messageContent.textContent = content;
-            messageDiv.appendChild(messageContent);
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            const now = new Date();
-            timeDiv.textContent = now.getHours().toString().padStart(2, '0') + ':' + 
-                                 now.getMinutes().toString().padStart(2, '0');
-            messageDiv.appendChild(timeDiv);
-            
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if (activeSubscription) {
+            activeSubscription.unsubscribe();
         }
-
-        function addSystemMessage(content, isError = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message system';
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.style.background = isError ? '#f44336' : '#ffc107';
-            contentDiv.style.color = isError ? 'white' : '#333';
-            contentDiv.textContent = content;
-            
-            messageDiv.appendChild(contentDiv);
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function sendMessage(event) {
-            if (event) event.preventDefault();
-            
-            const content = messageInput.value.trim();
-            console.log('Sending message:', content);
-            
-            if (content === '' || !stompClient || !stompClient.connected) {
-                console.log('Cannot send: empty content or not connected');
+        activeSubscription = stompClient.subscribe('/topic/messages', (payload) => {
+            if (!payload || !payload.body) {
                 return;
             }
-            
-            const message = {
-                sender: userName,
-                content: content,
-                room: currentRoom,
-                timestamp: new Date().toISOString()
-            };
-            
-            stompClient.send('/app/chat.send', {}, JSON.stringify(message));
-            addMessage(content, true, userName);
-            messageInput.value = '';
-            messageInput.focus();
-        }
-
-        // Form submit
-        messageForm.addEventListener('submit', sendMessage);
-
-        // Conversation item click
-        document.querySelectorAll('.conversation-item').forEach(item => {
-            item.addEventListener('click', function() {
-                document.querySelectorAll('.conversation-item').forEach(i => i.classList.remove('active'));
-                this.classList.add('active');
-                
-                const conversationName = this.querySelector('.conversation-name').textContent;
-                chatName.textContent = conversationName;
-                messagesContainer.innerHTML = '';
-                
-                currentRoom = conversationName.toLowerCase();
-            });
-        });
-
-        // Initialize on page load
-        window.addEventListener('load', function() {
-            const user = checkAuth();
-            if (!user) return; // Already redirected to login
-            
-            // Update UI with user info
-            document.querySelector('.user-avatar').textContent = (user.username || 'U').substring(0, 1).toUpperCase();
-            document.querySelector('.username').textContent = user.username || 'User';
-            
-            // Set username for chat
-            userName = user.username || 'User';
-            
-            // Connect to WebSocket and start chat
-            connect();
-            addSystemMessage('Phòng chat sẵn sàng. Bắt đầu nhắn tin!');
-        });
-
-        // Cleanup on page close
-        window.addEventListener('beforeunload', function() {
-            if (stompClient && stompClient.connected) {
-                const leaveMessage = {
-                    sender: userName,
-                    content: userName + ' đã rời khỏi!',
-                    timestamp: new Date().toISOString()
-                };
-                stompClient.send('/app/chat.leave', {}, JSON.stringify(leaveMessage));
-                stompClient.disconnect();
-            }
-        });
-    </script>
-
-        function connect() {
-            const socket = new SockJS('/ws');
-            stompClient = Stomp.over(socket);
-            
-            stompClient.connect({}, onConnected, onError);
-        }
-
-        function onConnected() {
-            console.log('✅ WebSocket Connected');
-            messageInput.disabled = false;
-            sendBtn.disabled = false;
-            
-            // Subscribe to messages
-            stompClient.subscribe('/topic/messages', onMessageReceived);
-            
-            // Notify others
-            const joinMessage = {
-                sender: userName,
-                content: userName + ' đã tham gia phòng chat!',
-                timestamp: new Date().toISOString()
-            };
-            stompClient.send('/app/chat.join', {}, JSON.stringify(joinMessage));
-        }
-
-        function onError(error) {
-            console.error('❌ WebSocket Error:', error);
-            messageInput.disabled = true;
-            sendBtn.disabled = true;
-            
-            addSystemMessage('Lỗi kết nối. Thử lại...', true);
-            setTimeout(connect, 5000);
-        }
-
-        function onMessageReceived(payload) {
             const message = JSON.parse(payload.body);
-            
-            if (message.content.includes('đã tham gia') || message.content.includes('đã rời')) {
-                addSystemMessage(message.content, false);
-            } else if (message.sender === userName) {
-                addMessage(message.content, true, message.sender);
-            } else {
-                addMessage(message.content, false, message.sender);
-            }
-        }
-
-        function addMessage(content, isSent, sender) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-            
-            if (!isSent) {
-                const avatar = document.createElement('div');
-                avatar.className = 'message-avatar';
-                avatar.textContent = sender.substring(0, 1).toUpperCase();
-                messageDiv.appendChild(avatar);
-            }
-            
-            const messageContent = document.createElement('div');
-            messageContent.className = 'message-content';
-            messageContent.textContent = content;
-            messageDiv.appendChild(messageContent);
-            
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'message-time';
-            const now = new Date();
-            timeDiv.textContent = now.getHours().toString().padStart(2, '0') + ':' + 
-                                 now.getMinutes().toString().padStart(2, '0');
-            messageDiv.appendChild(timeDiv);
-            
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function addSystemMessage(content, isError = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message system';
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.style.background = isError ? '#f44336' : '#ffc107';
-            contentDiv.style.color = isError ? 'white' : '#333';
-            contentDiv.textContent = content;
-            
-            messageDiv.appendChild(contentDiv);
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function sendMessage(event) {
-            if (event) event.preventDefault();
-            
-            const content = messageInput.value.trim();
-            console.log('Sending message:', content);
-            
-            if (content === '' || !stompClient || !stompClient.connected) {
-                console.log('Cannot send: empty content or not connected');
+            if (!message || !message.content) {
                 return;
             }
-            
-            const message = {
-                sender: userName,
-                content: content,
-                room: currentRoom,
-                timestamp: new Date().toISOString()
-            };
-            
-            stompClient.send('/app/chat.send', {}, JSON.stringify(message));
-            addMessage(content, true, userName);
-            messageInput.value = '';
-            messageInput.focus();
+            const mySender = currentUser.username || currentUser.email || 'User';
+            addMessage(message.content, message.sender === mySender, message.sender || 'User', message.timestamp);
+        });
+    }
+
+    function subscribeToGroup(groupId) {
+        if (!stompClient || !stompClient.connected) {
+            return;
+        }
+        if (activeSubscription) {
+            activeSubscription.unsubscribe();
+        }
+        activeSubscription = stompClient.subscribe('/topic/groups/' + groupId, (payload) => {
+            if (!payload || !payload.body) {
+                return;
+            }
+            const message = JSON.parse(payload.body);
+            if (!message || !message.content) {
+                return;
+            }
+            const myEmail = currentUser.email || '';
+            const isSent = myEmail && message.senderEmail && myEmail.toLowerCase() === message.senderEmail.toLowerCase();
+            addMessage(message.content, isSent, message.senderName || message.senderEmail || 'User', message.timestamp);
+        });
+    }
+
+    async function loadGroups() {
+        groupsList.innerHTML = '';
+        hideGroupsNote();
+        const recentGroup = getRecentlyCreatedGroup();
+
+        if (recentGroup) {
+            renderGroups([recentGroup]);
         }
 
-        // Form submit
-        messageForm.addEventListener('submit', sendMessage);
+        let token = await getValidAccessToken();
+        if (!token) {
+            if (recentGroup) {
+                renderGroups([recentGroup]);
+                showGroupsNote('Your new group is shown locally. Sign in again to refresh the full list.');
+                return;
+            }
+            showGroupsNote('Sign in again to load your groups. Lobby chat still works.');
+            return;
+        }
 
-        // Conversation item click
-        document.querySelectorAll('.conversation-item').forEach(item => {
-            item.addEventListener('click', function() {
-                document.querySelectorAll('.conversation-item').forEach(i => i.classList.remove('active'));
-                this.classList.add('active');
-                
-                const conversationName = this.querySelector('.conversation-name').textContent;
-                chatName.textContent = conversationName;
-                messagesContainer.innerHTML = '';
-                
-                currentRoom = conversationName.toLowerCase();
+        let response = await fetch('/api/groups/mine', {
+            headers: { Authorization: 'Bearer ' + token }
+        });
+
+        if (response.status === 401) {
+            token = await refreshSession();
+            if (!token) {
+                showGroupsNote('Your session expired. Lobby chat still works, but groups need a fresh sign-in.');
+                return;
+            }
+            response = await fetch('/api/groups/mine', {
+                headers: { Authorization: 'Bearer ' + token }
             });
-        });
+        }
 
-        // Connect on page load
-        window.addEventListener('load', function() {
-            connect();
-            addSystemMessage('Phòng chat sẵn sàng. Bắt đầu nhắn tin!');
-        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            if (recentGroup) {
+                renderGroups([recentGroup]);
+                showGroupsNote('Your new group is shown locally while the full group list refreshes.');
+                return;
+            }
+            showGroupsNote(data.error || 'Groups are temporarily unavailable. You can keep using the lobby chat.');
+            return;
+        }
 
-        // Cleanup on page close
-        window.addEventListener('beforeunload', function() {
+        const groups = mergeRecentGroup(Array.isArray(data) ? data : []);
+        if (groups.length === 0) {
+            showGroupsNote('No groups yet. You can keep chatting in the lobby or create one when needed.');
+            return;
+        }
+
+        renderGroups(groups);
+    }
+
+    function renderGroups(groups) {
+        groupsList.innerHTML = '';
+        groups.forEach((group) => {
+            const button = buildConversationButton({
+                id: group.id,
+                name: group.name || 'Group',
+                preview: group.category || group.role || 'Study group',
+                type: 'group'
+            });
+            button.addEventListener('click', () => {
+                selectGroup(group, button);
+            });
+            groupsList.appendChild(button);
+        });
+    }
+
+    function sendLobbyMessage(content) {
+        const sender = currentUser.username || currentUser.email || 'User';
+        stompClient.send('/app/chat.send', {}, JSON.stringify({
+            sender,
+            content,
+            room: 'lobby'
+        }));
+    }
+
+    function sendGroupMessage(content) {
+        stompClient.send('/app/groups/' + activeChannel.id + '/send', {}, JSON.stringify({
+            groupId: activeChannel.id,
+            senderEmail: currentUser.email,
+            senderName: currentUser.username || currentUser.email || 'User',
+            content
+        }));
+    }
+
+    messageForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const content = messageInput.value.trim();
+        if (!content || !stompClient || !stompClient.connected) {
+            return;
+        }
+
+        if (activeChannel.type === 'group') {
+            if (!currentUser.email) {
+                showGroupsNote('Your email is missing from the current session, so group chat cannot be sent yet.');
+                return;
+            }
+            sendGroupMessage(content);
+        } else {
+            sendLobbyMessage(content);
+        }
+
+        messageInput.value = '';
+        messageInput.focus();
+    });
+
+    newGroupBtn.addEventListener('click', () => {
+        window.location.href = '/create-group.html';
+    });
+
+    logoutBtn.addEventListener('click', () => {
+        clearSession();
+        window.location.href = '/login.html';
+    });
+
+    window.addEventListener('load', async () => {
+        currentUser = requireAuth();
+        if (!currentUser) {
+            return;
+        }
+
+        userAvatar.textContent = (currentUser.username || currentUser.email || 'U').substring(0, 1).toUpperCase();
+        userName.textContent = currentUser.username || currentUser.email || 'User';
+
+        renderPrimaryConversation();
+        selectLobby();
+        connectWs();
+        await loadGroups();
+    });
+
+    window.addEventListener('beforeunload', () => {
+        try {
+            if (activeSubscription) {
+                activeSubscription.unsubscribe();
+            }
             if (stompClient && stompClient.connected) {
-                const leaveMessage = {
-                    sender: userName,
-                    content: userName + ' đã rời khỏi!',
-                    timestamp: new Date().toISOString()
-                };
-                stompClient.send('/app/chat.leave', {}, JSON.stringify(leaveMessage));
                 stompClient.disconnect();
             }
-        });
-    </script>
+        } catch (_) {
+            // no-op
+        }
+    });
+</script>
 </body>
 </html>

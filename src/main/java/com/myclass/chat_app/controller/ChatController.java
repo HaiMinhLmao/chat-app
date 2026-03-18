@@ -6,10 +6,12 @@ import org.springframework.lang.NonNull;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.stereotype.Controller;
 
 // NOTE: This project previously persisted messages via JPA.
 // JPA/DataSource auto-config is currently disabled to allow running without DB connectivity.
 // If you re-enable DB later, restore the repository-based persistence.
+@Controller
 @RequiredArgsConstructor
 public class ChatController {
 

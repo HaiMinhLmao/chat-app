@@ -9,6 +9,7 @@
 ```powershell
 cd d:\chat-app
 $env:SUPABASE_ANON_KEY="sb_publishable_..."
+$env:SUPABASE_DB_PASSWORD="your-db-password"
 docker compose up --build
 ```
 
@@ -19,6 +20,7 @@ Open `http://localhost:8080/login.html`.
 ```powershell
 cd d:\chat-app
 $env:SUPABASE_ANON_KEY="sb_publishable_..."
+$env:SUPABASE_DB_PASSWORD="your-db-password"
 .\mvnw.cmd spring-boot:run
 ```
 
