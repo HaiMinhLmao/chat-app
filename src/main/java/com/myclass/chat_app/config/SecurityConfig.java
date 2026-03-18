@@ -35,7 +35,7 @@ public class SecurityConfig {
                                 "/ws/**",
                                 "/api/auth/**"
                         ).permitAll()
-                        .requestMatchers("/api/groups/**").authenticated()
+                        .requestMatchers("/api/groups/**", "/api/messages/**", "/api/users/**").authenticated()
                         .anyRequest().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
                 .httpBasic(basic -> basic.disable());

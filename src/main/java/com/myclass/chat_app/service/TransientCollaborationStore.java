@@ -63,6 +63,12 @@ public class TransientCollaborationStore {
         return Optional.ofNullable(usersByEmail.get(normalized));
     }
 
+    public List<User> listUsers() {
+        return usersByEmail.values().stream()
+                .sorted((left, right) -> left.getEmail().compareToIgnoreCase(right.getEmail()))
+                .toList();
+    }
+
     public synchronized GroupResponse createGroup(String creatorEmail, CreateGroupRequest request) {
         String creator = normalizeEmail(creatorEmail);
         if (creator == null) {

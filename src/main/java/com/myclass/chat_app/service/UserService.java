@@ -1,9 +1,11 @@
 package com.myclass.chat_app.service;
 
+import com.myclass.chat_app.dto.UserResponse;
 import com.myclass.chat_app.entity.User;
 import com.myclass.chat_app.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -50,6 +52,44 @@ public class UserService {
         } catch (RuntimeException ignored) {
             return transientStore.upsertUser(normalizedEmail, fullName);
         }
+    }
+
+    public List<UserResponse> listUsers(String excludeEmail) {
+        String normalizedExclude = excludeEmail == null ? "" : excludeEmail.trim().toLowerCase();
+        try {
+            List<User> users = userRepository.findAll();
+            users.forEach(user -> transientStore.upsertUser(user.getEmail(), user.getFullName()));
+            return users.stream()
+                    .filter(user -> !user.getEmail().equalsIgnoreCase(normalizedExclude))
+                    .map(this::toResponse)
+                    .toList();
+        } catch (RuntimeException ignored) {
+            return transientStore.listUsers().stream()
+                    .filter(user -> !user.getEmail().equalsIgnoreCase(normalizedExclude))
+                    .map(this::toResponse)
+                    .toList();
+        }
+    }
+
+    private UserResponse toResponse(User user) {
+        String fullName = user.getFullName();
+        String username = (fullName != null && !fullName.isBlank())
+                ? fullName
+                : defaultDisplayName(user.getEmail());
+        return new UserResponse(
+                user.getId(),
+                username,
+                user.getEmail(),
+                fullName
+        );
+    }
+
+    private String defaultDisplayName(String email) {
+        if (email == null) {
+            return "User";
+        }
+        int index = email.indexOf('@');
+        return index > 0 ? email.substring(0, index) : email;
     }
 }
 
