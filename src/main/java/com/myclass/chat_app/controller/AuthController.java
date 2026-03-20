@@ -62,22 +62,12 @@ public class AuthController {
 
         } catch (Exception e) {
             String message = e.getMessage() == null ? "" : e.getMessage();
-            if (message.contains("email_address_invalid")
-                    || message.contains("validation_failed")
-                    || message.contains("invalid format")) {
+            if (isInvalidEmailError(message)) {
                 return badRequest("Email is invalid. Please enter a real email address like name@gmail.com, not just a username.");
             }
-            if (message.contains("over_email_send_rate_limit")) {
-                AuthSessionResponse fallbackResponse = localUserAuthService.register(
-                        request == null ? null : request.trimmedIdentifier(),
-                        request == null ? null : request.password(),
-                        request == null ? "" : request.safeFullName()
-                );
-                safeUpsertLocalUser(
-                        fallbackResponse,
-                        request == null ? null : request.trimmedIdentifier(),
-                        request == null ? "" : request.safeFullName()
-                );
+            if (shouldUseLocalRegistrationFallback(message)) {
+                AuthSessionResponse fallbackResponse = registerLocally(request);
+                safeUpsertLocalUser(fallbackResponse, request == null ? null : request.trimmedIdentifier(), request == null ? "" : request.safeFullName());
                 return ResponseEntity.status(HttpStatus.CREATED).body(fallbackResponse);
             }
             if (message.contains("user_already_exists")) {
@@ -126,6 +116,11 @@ public class AuthController {
 
         } catch (Exception e) {
             String message = e.getMessage() == null ? "" : e.getMessage();
+            if (isInvalidSupabaseApiKeyError(message)) {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse(
+                        "Supabase Auth is misconfigured on this deployment. Update SUPABASE_ANON_KEY so it matches the current supabase.url, or register again and the app will use local database auth for that email."
+                ));
+            }
             if (message.contains("Unable to acquire JDBC Connection")
                     || message.contains("Connection is not available")
                     || message.contains("request timed out after")) {
@@ -176,6 +171,32 @@ public class AuthController {
 
     private AuthErrorResponse errorResponse(String message) {
         return new AuthErrorResponse(message);
+    }
+
+    private AuthSessionResponse registerLocally(AuthRequest request) {
+        return localUserAuthService.register(
+                request == null ? null : request.trimmedIdentifier(),
+                request == null ? null : request.password(),
+                request == null ? "" : request.safeFullName()
+        );
+    }
+
+    private boolean shouldUseLocalRegistrationFallback(String message) {
+        return message.contains("over_email_send_rate_limit")
+                || isInvalidSupabaseApiKeyError(message)
+                || message.contains("Missing Supabase anon key");
+    }
+
+    private boolean isInvalidEmailError(String message) {
+        return message.contains("email_address_invalid")
+                || message.contains("validation_failed")
+                || message.contains("invalid format");
+    }
+
+    private boolean isInvalidSupabaseApiKeyError(String message) {
+        return message.contains("Invalid API key")
+                || message.contains("invalid api key")
+                || message.contains("\"Invalid API key\"");
     }
 
     private void upsertLocalUser(AuthSessionResponse authResponse, String fallbackEmail, String fallbackFullName) {
