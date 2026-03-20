@@ -66,12 +66,13 @@ public class AuthController {
                 return badRequest("Email is invalid. Please enter a real email address like name@gmail.com, not just a username.");
             }
             if (shouldUseLocalRegistrationFallback(message)) {
-                AuthSessionResponse fallbackResponse = registerLocally(request);
-                safeUpsertLocalUser(fallbackResponse, request == null ? null : request.trimmedIdentifier(), request == null ? "" : request.safeFullName());
-                return ResponseEntity.status(HttpStatus.CREATED).body(fallbackResponse);
+                return registerUsingLocalFallback(request);
             }
             if (message.contains("user_already_exists")) {
                 return badRequest("This email is already registered in the current Supabase project. Please sign in instead.");
+            }
+            if (isDatabaseUnavailable(message)) {
+                return databaseUnavailableResponse();
             }
             return badRequest(message);
         }
@@ -103,15 +104,15 @@ public class AuthController {
                 return ResponseEntity.ok(supabaseResponse);
             } catch (Exception supabaseLoginError) {
                 try {
-                    if (localUserAuthService.supportsIdentifier(identifier)) {
-                        AuthSessionResponse localResponse = localUserAuthService.login(identifier, password);
-                        safeUpsertLocalUser(localResponse, identifier, null);
-                        return ResponseEntity.ok(localResponse);
-                    }
+                    AuthSessionResponse localResponse = localUserAuthService.login(identifier, password);
+                    safeUpsertLocalUser(localResponse, identifier, null);
+                    return ResponseEntity.ok(localResponse);
+                } catch (IllegalArgumentException ignored) {
+                    throw supabaseLoginError;
                 } catch (RuntimeException localDbError) {
                     log.warn("Skipping local user auth fallback because the database is unavailable: {}", localDbError.getMessage());
+                    throw localDbError;
                 }
-                throw supabaseLoginError;
             }
 
         } catch (Exception e) {
@@ -121,12 +122,8 @@ public class AuthController {
                         "Supabase Auth is misconfigured on this deployment. This build already has a fallback publishable key, so a stale SUPABASE_ANON_KEY environment variable is likely overriding it. Replace or remove that env var and redeploy, or register again and the app will use local database auth for that email."
                 ));
             }
-            if (message.contains("Unable to acquire JDBC Connection")
-                    || message.contains("Connection is not available")
-                    || message.contains("request timed out after")) {
-                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse(
-                        "The app cannot reach the database right now. On deployment, point Spring Boot at the Supabase session pooler on port 5432 and redeploy."
-                ));
+            if (isDatabaseUnavailable(message)) {
+                return databaseUnavailableResponse();
             }
             if (message.contains("invalid_credentials")) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse(
@@ -181,10 +178,30 @@ public class AuthController {
         );
     }
 
+    private ResponseEntity<?> registerUsingLocalFallback(AuthRequest request) {
+        try {
+            AuthSessionResponse fallbackResponse = registerLocally(request);
+            safeUpsertLocalUser(
+                    fallbackResponse,
+                    request == null ? null : request.trimmedIdentifier(),
+                    request == null ? "" : request.safeFullName()
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(fallbackResponse);
+        } catch (IllegalArgumentException validationError) {
+            return badRequest(validationError.getMessage());
+        } catch (RuntimeException databaseError) {
+            if (isDatabaseUnavailable(databaseError.getMessage())) {
+                return databaseUnavailableResponse();
+            }
+            throw databaseError;
+        }
+    }
+
     private boolean shouldUseLocalRegistrationFallback(String message) {
         return message.contains("over_email_send_rate_limit")
                 || isInvalidSupabaseApiKeyError(message)
-                || message.contains("Missing Supabase anon key");
+                || message.contains("Missing Supabase anon key")
+                || isSupabaseTemporaryFailure(message);
     }
 
     private boolean isInvalidEmailError(String message) {
@@ -197,6 +214,34 @@ public class AuthController {
         return message.contains("Invalid API key")
                 || message.contains("invalid api key")
                 || message.contains("\"Invalid API key\"");
+    }
+
+    private boolean isSupabaseTemporaryFailure(String message) {
+        return message.contains("Supabase signup error")
+                && (message.contains("HTTP 5")
+                || message.contains("timed out")
+                || message.contains("Connection reset")
+                || message.contains("Connection refused")
+                || message.contains("Name or service not known")
+                || message.contains("UnknownHostException")
+                || message.contains("Temporary failure"));
+    }
+
+    private boolean isDatabaseUnavailable(String message) {
+        if (message == null) {
+            return false;
+        }
+        return message.contains("Unable to acquire JDBC Connection")
+                || message.contains("Connection is not available")
+                || message.contains("request timed out after")
+                || message.contains("Communications link failure")
+                || message.contains("Connection refused");
+    }
+
+    private ResponseEntity<AuthErrorResponse> databaseUnavailableResponse() {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse(
+                "The app cannot reach the database right now. On deployment, point Spring Boot at the Supabase session pooler on port 5432 and redeploy."
+        ));
     }
 
     private void upsertLocalUser(AuthSessionResponse authResponse, String fallbackEmail, String fallbackFullName) {

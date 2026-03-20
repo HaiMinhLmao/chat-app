@@ -205,18 +205,6 @@
 
             <form id="registerForm">
                 <div class="form-group">
-                    <label for="username">Username</label>
-                    <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        placeholder="Enter your username"
-                        required
-                        autocomplete="username"
-                    >
-                </div>
-
-                <div class="form-group">
                     <label for="email">Email</label>
                     <input
                         type="email"
@@ -266,7 +254,6 @@
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
         const registerBtn = document.getElementById('registerBtn');
-        const usernameInput = document.getElementById('username');
         const emailInput = document.getElementById('email');
         const fullNameInput = document.getElementById('fullName');
         const passwordInput = document.getElementById('password');
@@ -274,12 +261,11 @@
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const username = usernameInput.value.trim();
             const email = emailInput.value.trim();
             const fullName = fullNameInput.value.trim();
             const password = passwordInput.value;
 
-            if (!username || !email || !fullName || !password) {
+            if (!email || !fullName || !password) {
                 showError('Please fill in all fields');
                 return;
             }
@@ -300,7 +286,6 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        username: username,
                         email: email,
                         fullName: fullName,
                         password: password
@@ -353,7 +338,7 @@
         }
 
         // Clear error when user starts typing
-        [usernameInput, emailInput, fullNameInput, passwordInput].forEach(input => {
+        [emailInput, fullNameInput, passwordInput].forEach(input => {
             input.addEventListener('focus', () => {
                 errorMessage.classList.remove('show');
             });
