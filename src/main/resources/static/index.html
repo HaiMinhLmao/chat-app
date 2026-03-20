@@ -54,6 +54,9 @@
       }
 
       .app-shell {
+        width: 100%;
+        max-width: 1680px;
+        margin: 0 auto;
         min-height: 100vh;
         padding: 14px;
         display: grid;
@@ -211,6 +214,19 @@
       .notification-actions {
         display: flex;
         gap: 10px;
+      }
+
+      .friend-feedback {
+        min-height: 20px;
+        margin-top: 10px;
+      }
+
+      .friend-feedback.success {
+        color: var(--success);
+      }
+
+      .friend-feedback.error {
+        color: var(--danger);
       }
 
       .friend-form input,
@@ -536,7 +552,23 @@
         }
 
         .inbox {
-          grid-column: 2 / -1;
+          position: fixed;
+          top: 14px;
+          right: 14px;
+          bottom: 14px;
+          width: min(360px, calc(100vw - 110px));
+          z-index: 30;
+          overflow-y: auto;
+          transform: translateX(calc(100% + 20px));
+          opacity: 0;
+          pointer-events: none;
+          transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        body.inbox-open .inbox {
+          transform: translateX(0);
+          opacity: 1;
+          pointer-events: auto;
         }
       }
 
@@ -599,7 +631,7 @@
             <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
             <button class="btn" id="friendSubmitBtn" type="submit">Add</button>
           </form>
-          <div class="mini muted" id="friendRequestFeedback"></div>
+          <div class="mini friend-feedback" id="friendRequestFeedback"></div>
         </section>
 
         <section class="list-card" style="padding: 16px">
@@ -826,10 +858,13 @@
         if (!refreshToken) return null;
         const response = await fetch("/api/auth/refresh", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
           body: JSON.stringify({ refresh_token: refreshToken }),
         });
-        const data = await response.json().catch(() => ({}));
+        const data = await parseResponsePayload(response);
         if (!response.ok || !data.access_token) return null;
         sessionStorage.setItem(
           "supabaseSession",
@@ -852,6 +887,7 @@
         const buildOptions = (accessToken) => ({
           ...options,
           headers: {
+            Accept: "application/json",
             ...(options.headers || {}),
             Authorization: "Bearer " + accessToken,
           },
@@ -862,7 +898,7 @@
           if (!token) return { ok: false, data: { error: "Sign in again." } };
           response = await fetch(url, buildOptions(token));
         }
-        const data = await response.json().catch(() => ({}));
+        const data = await parseResponsePayload(response);
         return { ok: response.ok, data };
       }
 
@@ -930,6 +966,45 @@
         el.toast.classList.add("show");
         window.clearTimeout(showToast.timer);
         showToast.timer = window.setTimeout(() => el.toast.classList.remove("show"), 2400);
+      }
+
+      function setFriendFeedback(message, variant) {
+        el.friendRequestFeedback.textContent = message || "";
+        el.friendRequestFeedback.className = "mini friend-feedback";
+        if (!message) return;
+        el.friendRequestFeedback.classList.add(
+          variant === "error" ? "error" : "success",
+        );
+      }
+
+      async function parseResponsePayload(response) {
+        const text = await response.text();
+        if (!text) return {};
+        try {
+          return JSON.parse(text);
+        } catch (_) {
+          if (!response.ok) {
+            return {
+              error:
+                response.status === 401 || response.status === 403
+                  ? "Sign in again."
+                  : "Server returned an unexpected response.",
+            };
+          }
+          return {};
+        }
+      }
+
+      function openInboxPanel() {
+        if (window.innerWidth <= 1380) {
+          document.body.classList.add("inbox-open");
+          return;
+        }
+        el.utilityPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function closeInboxPanel() {
+        document.body.classList.remove("inbox-open");
       }
 
       function showBanner(message, variant) {
@@ -1248,7 +1323,7 @@
               ? "You have a new invitation."
               : "You have new invitations.",
           );
-          el.utilityPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          openInboxPanel();
         }
         notificationsPrimed = true;
         renderFriends();
@@ -1468,21 +1543,37 @@
       el.friendRequestForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const email = el.friendEmailInput.value.trim();
-        if (!email) return;
+        if (!email) {
+          setFriendFeedback("Enter an email before sending the invite.", "error");
+          return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          setFriendFeedback("Enter a valid email address.", "error");
+          return;
+        }
+        setFriendFeedback("", "success");
         el.friendSubmitBtn.disabled = true;
+        el.friendSubmitBtn.textContent = "Adding...";
         const result = await authorizedRequest("/api/social/friend-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
         });
         el.friendSubmitBtn.disabled = false;
-        el.friendRequestFeedback.textContent = result.ok
-          ? "Invite saved. The other person must sign in with that same email and open Inbox to accept."
-          : result.data.error || "Could not send friend request.";
+        el.friendSubmitBtn.textContent = "Add";
         if (result.ok) {
           el.friendEmailInput.value = "";
+          setFriendFeedback(
+            "Invite saved. The other person must sign in with that same email and open Inbox to accept.",
+            "success",
+          );
           showToast("Invite saved. The other person will see it inside MyClassRoom Inbox.");
           await loadSocialState();
+        } else {
+          setFriendFeedback(
+            result.data.error || "Could not send friend request.",
+            "error",
+          );
         }
       });
 
@@ -1508,15 +1599,9 @@
         "click",
         () => (window.location.href = "/create-group.html"),
       );
-      el.headerInboxButton.addEventListener("click", () =>
-        el.utilityPanel.scrollIntoView({ behavior: "smooth", block: "start" }),
-      );
-      el.notificationToggleButton.addEventListener("click", () =>
-        el.utilityPanel.scrollIntoView({ behavior: "smooth", block: "start" }),
-      );
-      el.closeInboxButton.addEventListener("click", () =>
-        window.scrollTo({ top: 0, behavior: "smooth" }),
-      );
+      el.headerInboxButton.addEventListener("click", openInboxPanel);
+      el.notificationToggleButton.addEventListener("click", openInboxPanel);
+      el.closeInboxButton.addEventListener("click", closeInboxPanel);
       el.logoutBtn.addEventListener("click", () => {
         clearSession();
         window.location.href = "/login.html";
@@ -1533,6 +1618,9 @@
       window.addEventListener("focus", refreshWorkspace);
       document.addEventListener("visibilitychange", () => {
         if (!document.hidden) refreshWorkspace();
+      });
+      window.addEventListener("resize", () => {
+        if (window.innerWidth > 1380) closeInboxPanel();
       });
       window.addEventListener("load", bootstrap);
     </script>
