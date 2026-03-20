@@ -593,11 +593,11 @@
           <div class="eyebrow">Add Friend</div>
           <div class="headline" style="margin-top: 8px">Invite by email</div>
           <p class="muted mini" style="line-height: 1.7">
-            Direct chat opens after the other person accepts your friend request.
+            This does not send a Gmail message. The invite appears in MyClassRoom Inbox after that person signs in with the same email.
           </p>
           <form class="friend-form" id="friendRequestForm">
             <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
-            <button class="btn" id="friendSubmitBtn" type="submit">Send</button>
+            <button class="btn" id="friendSubmitBtn" type="submit">Add</button>
           </form>
           <div class="mini muted" id="friendRequestFeedback"></div>
         </section>
@@ -675,7 +675,7 @@
         <div class="section-head">
           <div>
             <div class="headline">Inbox</div>
-            <div class="mini muted">Friend requests and group invites arrive here.</div>
+            <div class="mini muted">Friend requests and group invites appear here inside the app.</div>
           </div>
           <button class="btn secondary" id="closeInboxButton" type="button">Hide</button>
         </div>
@@ -698,14 +698,6 @@
           <div class="mini muted" id="groupInvitationsEmpty">No group invites right now.</div>
         </section>
 
-        <section class="inbox-card" style="padding: 16px">
-          <div class="section-head">
-            <strong>Sent Requests</strong>
-            <span class="count-pill" id="outgoingFriendsCount">0</span>
-          </div>
-          <div class="notification-list" id="outgoingFriendRequests"></div>
-          <div class="mini muted" id="outgoingFriendsEmpty">No pending requests sent yet.</div>
-        </section>
       </aside>
     </div>
     <div class="toast" id="toast"></div>
@@ -752,9 +744,6 @@
         groupInvitations: document.getElementById("groupInvitations"),
         groupInvitationsCount: document.getElementById("groupInvitationsCount"),
         groupInvitationsEmpty: document.getElementById("groupInvitationsEmpty"),
-        outgoingFriendRequests: document.getElementById("outgoingFriendRequests"),
-        outgoingFriendsCount: document.getElementById("outgoingFriendsCount"),
-        outgoingFriendsEmpty: document.getElementById("outgoingFriendsEmpty"),
         toast: document.getElementById("toast"),
       };
 
@@ -770,6 +759,8 @@
       let stompClient = null;
       let activeSubscription = null;
       let reconnectTimer = null;
+      let workspaceRefreshTimer = null;
+      let notificationsPrimed = false;
       const previews = new Map();
 
       function parseJson(value) {
@@ -1158,23 +1149,16 @@
         el.overviewNotifications.textContent = String(total);
         el.incomingFriendRequests.innerHTML = "";
         el.groupInvitations.innerHTML = "";
-        el.outgoingFriendRequests.innerHTML = "";
         el.incomingFriendsCount.textContent = String(
           socialState.incomingFriendRequests.length,
         );
         el.groupInvitationsCount.textContent = String(
           socialState.groupInvitations.length,
         );
-        el.outgoingFriendsCount.textContent = String(
-          socialState.outgoingFriendRequests.length,
-        );
         el.incomingFriendsEmpty.style.display = socialState.incomingFriendRequests.length
           ? "none"
           : "block";
         el.groupInvitationsEmpty.style.display = socialState.groupInvitations.length
-          ? "none"
-          : "block";
-        el.outgoingFriendsEmpty.style.display = socialState.outgoingFriendRequests.length
           ? "none"
           : "block";
 
@@ -1225,16 +1209,6 @@
             ),
           );
         });
-
-        socialState.outgoingFriendRequests.forEach((request) => {
-          el.outgoingFriendRequests.appendChild(
-            renderNotificationCard(
-              request.recipientName || defaultName(request.recipientEmail),
-              "Waiting for this person to accept your friend request.",
-              formatAgo(request.createdAt),
-            ),
-          );
-        });
       }
 
       function disconnectSubscription() {
@@ -1250,6 +1224,8 @@
       }
 
       async function loadSocialState() {
+        const previousTotal =
+          socialState.incomingFriendRequests.length + socialState.groupInvitations.length;
         const result = await authorizedRequest("/api/social/state");
         if (!result.ok) return;
         socialState = {
@@ -1264,8 +1240,24 @@
             ? result.data.groupInvitations
             : [],
         };
+        const nextTotal =
+          socialState.incomingFriendRequests.length + socialState.groupInvitations.length;
+        if (notificationsPrimed && nextTotal > previousTotal) {
+          showToast(
+            nextTotal - previousTotal === 1
+              ? "You have a new invitation."
+              : "You have new invitations.",
+          );
+          el.utilityPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        notificationsPrimed = true;
         renderFriends();
         renderNotifications();
+      }
+
+      async function refreshWorkspace() {
+        await loadSocialState();
+        await loadGroups();
       }
 
       async function loadGroups() {
@@ -1467,13 +1459,10 @@
         el.userEmail.textContent = currentUser.email;
         el.selfRailLabel.textContent = initials(name);
         selectHome();
-        await loadSocialState();
-        await loadGroups();
+        await refreshWorkspace();
         connectWs();
-        window.setInterval(async () => {
-          await loadSocialState();
-          await loadGroups();
-        }, 15000);
+        if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
+        workspaceRefreshTimer = window.setInterval(refreshWorkspace, 5000);
       }
 
       el.friendRequestForm.addEventListener("submit", async (event) => {
@@ -1488,11 +1477,11 @@
         });
         el.friendSubmitBtn.disabled = false;
         el.friendRequestFeedback.textContent = result.ok
-          ? "Friend request sent."
+          ? "Invite saved. The other person must sign in with that same email and open Inbox to accept."
           : result.data.error || "Could not send friend request.";
         if (result.ok) {
           el.friendEmailInput.value = "";
-          showToast("Friend request sent.");
+          showToast("Invite saved. The other person will see it inside MyClassRoom Inbox.");
           await loadSocialState();
         }
       });
@@ -1534,11 +1523,16 @@
       });
       window.addEventListener("beforeunload", () => {
         try {
+          if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
           disconnectSubscription();
           if (stompClient && stompClient.connected) stompClient.disconnect();
         } catch (_) {
           // no-op
         }
+      });
+      window.addEventListener("focus", refreshWorkspace);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) refreshWorkspace();
       });
       window.addEventListener("load", bootstrap);
     </script>

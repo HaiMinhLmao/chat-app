@@ -312,12 +312,16 @@
                 console.log('Register response:', data);
 
                 if (response.ok) {
+                    sessionStorage.removeItem('supabaseSession');
+                    sessionStorage.removeItem('currentUser');
+                    sessionStorage.setItem('registrationEmail', email);
+
                     console.log('Registration successful, redirecting to login...');
-                    showSuccess('Account created successfully! Redirecting to login...');
+                    showSuccess(data.message || 'Account created successfully! Redirecting to login...');
 
                     setTimeout(() => {
                         window.location.href = '/login.html';
-                    }, 2000);
+                    }, 1400);
                 } else {
                     const error = data.error || 'Registration failed';
                     console.log('Registration failed:', error);

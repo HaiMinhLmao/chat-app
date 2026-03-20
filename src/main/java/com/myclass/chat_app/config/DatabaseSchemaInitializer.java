@@ -81,6 +81,14 @@ public class DatabaseSchemaInitializer {
                         type varchar(20) not null default 'LOBBY'
                     )
                     """,
+                    """
+                    create table if not exists local_credentials (
+                        id bigserial primary key,
+                        user_id bigint not null unique references users(id) on delete cascade,
+                        password_hash varchar(200) not null,
+                        created_at timestamptz not null default now()
+                    )
+                    """,
                     "alter table messages add column if not exists sender_email varchar(320)",
                     "alter table messages add column if not exists recipient_email varchar(320)",
                     "alter table messages add column if not exists group_id bigint",

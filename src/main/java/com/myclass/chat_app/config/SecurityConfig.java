@@ -1,6 +1,7 @@
 package com.myclass.chat_app.config;
 
 import com.myclass.chat_app.service.LocalAdminAuthService;
+import com.myclass.chat_app.service.LocalUserAuthService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,7 +45,9 @@ public class SecurityConfig {
         return token -> {
             try {
                 Jwt jwt = localDecoder.decode(token);
-                if (jwt.getIssuer() != null && LocalAdminAuthService.LOCAL_ISSUER.equals(jwt.getIssuer().toString())) {
+                String issuer = jwt.getClaimAsString("iss");
+                if (LocalAdminAuthService.LOCAL_ISSUER.equals(issuer)
+                        || LocalUserAuthService.LOCAL_USER_ISSUER.equals(issuer)) {
                     return jwt;
                 }
             } catch (JwtException ignored) {

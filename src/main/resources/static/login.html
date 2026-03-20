@@ -89,6 +89,18 @@
         }
         .error-message.show { display: block; }
 
+        .success-message {
+            background: #efe;
+            color: #2f855a;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            font-size: 13px;
+            display: none;
+            border-left: 4px solid #2f855a;
+        }
+        .success-message.show { display: block; }
+
         .link {
             text-align: center;
             margin-top: 18px;
@@ -113,6 +125,7 @@
         </div>
 
         <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
 
         <form id="loginForm">
             <div class="form-group">
@@ -136,12 +149,23 @@
     const loginForm = document.getElementById('loginForm');
     const loginBtn = document.getElementById('loginBtn');
     const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
+
+    const registrationEmail = sessionStorage.getItem('registrationEmail');
+    if (registrationEmail) {
+        emailInput.value = registrationEmail;
+        successMessage.textContent = 'Account created successfully. Please sign in.';
+        successMessage.classList.add('show');
+        sessionStorage.removeItem('registrationEmail');
+        passwordInput.focus();
+    }
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         errorMessage.classList.remove('show');
+        successMessage.classList.remove('show');
 
         const email = emailInput.value.trim();
         const password = passwordInput.value;
