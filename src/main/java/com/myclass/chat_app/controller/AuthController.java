@@ -118,7 +118,7 @@ public class AuthController {
             String message = e.getMessage() == null ? "" : e.getMessage();
             if (isInvalidSupabaseApiKeyError(message)) {
                 return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse(
-                        "Supabase Auth is misconfigured on this deployment. Update SUPABASE_ANON_KEY so it matches the current supabase.url, or register again and the app will use local database auth for that email."
+                        "Supabase Auth is misconfigured on this deployment. This build already has a fallback publishable key, so a stale SUPABASE_ANON_KEY environment variable is likely overriding it. Replace or remove that env var and redeploy, or register again and the app will use local database auth for that email."
                 ));
             }
             if (message.contains("Unable to acquire JDBC Connection")
