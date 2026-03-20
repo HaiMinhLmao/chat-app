@@ -1,5 +1,8 @@
 package com.myclass.chat_app.service;
 
+import com.myclass.chat_app.dto.AuthSessionResponse;
+import com.myclass.chat_app.dto.AuthUserMetadataResponse;
+import com.myclass.chat_app.dto.AuthUserResponse;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -15,9 +18,7 @@ import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
 
 @Service
 public class LocalAdminAuthService {
@@ -61,7 +62,7 @@ public class LocalAdminAuthService {
                 || normalized.equals("admin@local.myclass");
     }
 
-    public Map<String, Object> login(String identifier, String password) {
+    public AuthSessionResponse login(String identifier, String password) {
         if (!supportsIdentifier(identifier) || !adminPassword.equals(password)) {
             throw new IllegalArgumentException("Invalid local admin credentials.");
         }
@@ -79,7 +80,7 @@ public class LocalAdminAuthService {
         }
     }
 
-    public Map<String, Object> refresh(String refreshToken) {
+    public AuthSessionResponse refresh(String refreshToken) {
         JWTClaimsSet claims = parseClaims(refreshToken);
         if (!LOCAL_ISSUER.equals(claims.getIssuer())) {
             throw new IllegalArgumentException("This refresh token does not belong to the local admin session.");
@@ -96,25 +97,18 @@ public class LocalAdminAuthService {
         return buildAuthResponse();
     }
 
-    private Map<String, Object> buildAuthResponse() {
+    private AuthSessionResponse buildAuthResponse() {
         String accessToken = issueToken("access");
         String refreshToken = issueToken("refresh");
 
-        Map<String, Object> userMetadata = new LinkedHashMap<>();
-        userMetadata.put("full_name", adminDisplayName);
-        userMetadata.put("username", primaryLogin);
-        userMetadata.put("local_auth", true);
-        userMetadata.put("role", "ADMIN");
-
-        Map<String, Object> user = new LinkedHashMap<>();
-        user.put("email", adminEmail);
-        user.put("user_metadata", userMetadata);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("access_token", accessToken);
-        response.put("refresh_token", refreshToken);
-        response.put("user", user);
-        return response;
+        AuthUserMetadataResponse userMetadata = new AuthUserMetadataResponse(
+                adminDisplayName,
+                primaryLogin,
+                true,
+                "ADMIN"
+        );
+        AuthUserResponse user = new AuthUserResponse(adminEmail, userMetadata);
+        return new AuthSessionResponse(accessToken, refreshToken, user, "local", null);
     }
 
     private String issueToken(String type) {

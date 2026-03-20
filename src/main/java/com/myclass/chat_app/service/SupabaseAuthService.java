@@ -1,5 +1,6 @@
 package com.myclass.chat_app.service;
 
+import com.myclass.chat_app.dto.AuthSessionResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -27,7 +28,7 @@ public class SupabaseAuthService {
                 .build();
     }
 
-    public Map<String, Object> register(String email, String password, String fullName) {
+    public AuthSessionResponse register(String email, String password, String fullName) {
         validateConfigured();
         return client.post()
                 .uri("/signup")
@@ -47,12 +48,12 @@ public class SupabaseAuthService {
                                         "HTTP " + response.statusCode().value() + " from Supabase: " + body
                                 )))
                 )
-                .bodyToMono(Map.class)
+                .bodyToMono(AuthSessionResponse.class)
                 .onErrorResume(e -> Mono.error(new RuntimeException("Supabase signup error: " + e.getMessage())))
                 .block();
     }
 
-    public Map<String, Object> login(String email, String password) {
+    public AuthSessionResponse login(String email, String password) {
         validateConfigured();
         return client.post()
                 .uri(uriBuilder -> uriBuilder
@@ -74,36 +75,36 @@ public class SupabaseAuthService {
                                         "HTTP " + response.statusCode().value() + " from Supabase: " + body
                                 )))
                 )
-                .bodyToMono(Map.class)
+                .bodyToMono(AuthSessionResponse.class)
                 .onErrorResume(e -> Mono.error(new RuntimeException("Supabase login error: " + e.getMessage())))
                 .block();
     }
 
-public Map<String, Object> refresh(String refreshToken) {
-    validateConfigured();
-    return client.post()
-            .uri(uriBuilder -> uriBuilder
-                    .path("/token")
-                    .queryParam("grant_type", "refresh_token")
-                    .build())
-            .header("apikey", anonKey)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + anonKey)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of(
-                    "refresh_token", refreshToken
-            ))
-            .retrieve()
-            .onStatus(
-                    status -> status.isError(),
-                    response -> response.bodyToMono(String.class).defaultIfEmpty("")
-                            .flatMap(body -> Mono.error(new RuntimeException(
-                                    "HTTP " + response.statusCode().value() + " from Supabase: " + body
-                            )))
-            )
-            .bodyToMono(Map.class)
-            .onErrorResume(e -> Mono.error(new RuntimeException("Supabase refresh error: " + e.getMessage())))
-            .block();
-        }
+    public AuthSessionResponse refresh(String refreshToken) {
+        validateConfigured();
+        return client.post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/token")
+                        .queryParam("grant_type", "refresh_token")
+                        .build())
+                .header("apikey", anonKey)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + anonKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of(
+                        "refresh_token", refreshToken
+                ))
+                .retrieve()
+                .onStatus(
+                        status -> status.isError(),
+                        response -> response.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(body -> Mono.error(new RuntimeException(
+                                        "HTTP " + response.statusCode().value() + " from Supabase: " + body
+                                )))
+                )
+                .bodyToMono(AuthSessionResponse.class)
+                .onErrorResume(e -> Mono.error(new RuntimeException("Supabase refresh error: " + e.getMessage())))
+                .block();
+    }
 
     private void validateConfigured() {
         if (anonKey == null || anonKey.isBlank()) {

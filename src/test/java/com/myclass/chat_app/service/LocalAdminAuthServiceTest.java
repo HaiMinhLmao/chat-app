@@ -1,8 +1,7 @@
 package com.myclass.chat_app.service;
 
+import com.myclass.chat_app.dto.AuthSessionResponse;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,12 +23,15 @@ class LocalAdminAuthServiceTest {
                 "admin123"
         );
 
-        Map<String, Object> loginResponse = service.login("user", "admin123");
-        Map<String, Object> refreshResponse = service.refresh((String) loginResponse.get("refresh_token"));
+        AuthSessionResponse loginResponse = service.login("user", "admin123");
+        AuthSessionResponse refreshResponse = service.refresh(loginResponse.refreshToken());
 
-        assertThat(loginResponse).containsKeys("access_token", "refresh_token", "user");
-        assertThat(refreshResponse).containsKeys("access_token", "refresh_token", "user");
-        assertThat(((Map<?, ?>) loginResponse.get("user")).get("email")).isEqualTo("user@local.myclass");
+        assertThat(loginResponse.accessToken()).isNotBlank();
+        assertThat(loginResponse.refreshToken()).isNotBlank();
+        assertThat(loginResponse.user()).isNotNull();
+        assertThat(refreshResponse.accessToken()).isNotBlank();
+        assertThat(refreshResponse.refreshToken()).isNotBlank();
+        assertThat(loginResponse.user().email()).isEqualTo("user@local.myclass");
         verify(userService, times(2)).upsertByEmail("user@local.myclass", "Admin");
     }
 

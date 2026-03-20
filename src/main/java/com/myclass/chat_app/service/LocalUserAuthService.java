@@ -1,5 +1,8 @@
 package com.myclass.chat_app.service;
 
+import com.myclass.chat_app.dto.AuthSessionResponse;
+import com.myclass.chat_app.dto.AuthUserMetadataResponse;
+import com.myclass.chat_app.dto.AuthUserResponse;
 import com.myclass.chat_app.entity.LocalCredential;
 import com.myclass.chat_app.entity.User;
 import com.myclass.chat_app.repository.LocalCredentialRepository;
@@ -20,9 +23,7 @@ import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -62,7 +63,7 @@ public class LocalUserAuthService {
         }
     }
 
-    public Map<String, Object> register(String email, String password, String fullName) {
+    public AuthSessionResponse register(String email, String password, String fullName) {
         String normalizedEmail = normalize(email);
         if (normalizedEmail == null) {
             throw new IllegalArgumentException("Email is required.");
@@ -83,7 +84,7 @@ public class LocalUserAuthService {
         return buildAuthResponse(user);
     }
 
-    public Map<String, Object> login(String email, String password) {
+    public AuthSessionResponse login(String email, String password) {
         LocalCredential credential = loadCredential(email)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid local credentials."));
 
@@ -105,7 +106,7 @@ public class LocalUserAuthService {
         }
     }
 
-    public Map<String, Object> refresh(String refreshToken) {
+    public AuthSessionResponse refresh(String refreshToken) {
         JWTClaimsSet claims = parseClaims(refreshToken);
         if (!LOCAL_USER_ISSUER.equals(claims.getIssuer())) {
             throw new IllegalArgumentException("This refresh token does not belong to a local user session.");
@@ -120,28 +121,25 @@ public class LocalUserAuthService {
         return buildAuthResponse(credential.getUser());
     }
 
-    private Map<String, Object> buildAuthResponse(User user) {
+    private AuthSessionResponse buildAuthResponse(User user) {
         String email = normalize(user.getEmail());
         String fullName = displayName(user);
         String username = defaultDisplayName(email);
 
-        Map<String, Object> userMetadata = new LinkedHashMap<>();
-        userMetadata.put("full_name", fullName);
-        userMetadata.put("username", username);
-        userMetadata.put("local_auth", true);
-        userMetadata.put("role", "USER");
-
-        Map<String, Object> userMap = new LinkedHashMap<>();
-        userMap.put("email", email);
-        userMap.put("user_metadata", userMetadata);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("access_token", issueToken(email, username, fullName, "access"));
-        response.put("refresh_token", issueToken(email, username, fullName, "refresh"));
-        response.put("user", userMap);
-        response.put("mode", "local");
-        response.put("message", "Supabase email auth is temporarily unavailable, so this account is using the project's local database auth.");
-        return response;
+        AuthUserMetadataResponse userMetadata = new AuthUserMetadataResponse(
+                fullName,
+                username,
+                true,
+                "USER"
+        );
+        AuthUserResponse userResponse = new AuthUserResponse(email, userMetadata);
+        return new AuthSessionResponse(
+                issueToken(email, username, fullName, "access"),
+                issueToken(email, username, fullName, "refresh"),
+                userResponse,
+                "local",
+                "Supabase email auth is temporarily unavailable, so this account is using the project's local database auth."
+        );
     }
 
     private String issueToken(String email, String username, String fullName, String type) {

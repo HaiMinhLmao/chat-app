@@ -1,12 +1,12 @@
 package com.myclass.chat_app.service;
 
+import com.myclass.chat_app.dto.AuthSessionResponse;
 import com.myclass.chat_app.entity.LocalCredential;
 import com.myclass.chat_app.entity.User;
 import com.myclass.chat_app.repository.LocalCredentialRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,14 +49,18 @@ class LocalUserAuthServiceTest {
                 "myclassroom-local-demo-secret-please-change-2026"
         );
 
-        Map<String, Object> registerResponse = service.register("student@example.com", "secret123", "Student");
-        Map<String, Object> loginResponse = service.login("student@example.com", "secret123");
-        Map<String, Object> refreshResponse = service.refresh((String) loginResponse.get("refresh_token"));
+        AuthSessionResponse registerResponse = service.register("student@example.com", "secret123", "Student");
+        AuthSessionResponse loginResponse = service.login("student@example.com", "secret123");
+        AuthSessionResponse refreshResponse = service.refresh(loginResponse.refreshToken());
 
-        assertThat(registerResponse).containsKeys("access_token", "refresh_token", "user", "mode");
-        assertThat(loginResponse).containsKeys("access_token", "refresh_token", "user", "mode");
-        assertThat(refreshResponse).containsKeys("access_token", "refresh_token", "user", "mode");
-        assertThat(((Map<?, ?>) loginResponse.get("user")).get("email")).isEqualTo("student@example.com");
+        assertThat(registerResponse.accessToken()).isNotBlank();
+        assertThat(registerResponse.refreshToken()).isNotBlank();
+        assertThat(registerResponse.user()).isNotNull();
+        assertThat(loginResponse.accessToken()).isNotBlank();
+        assertThat(loginResponse.refreshToken()).isNotBlank();
+        assertThat(refreshResponse.accessToken()).isNotBlank();
+        assertThat(refreshResponse.refreshToken()).isNotBlank();
+        assertThat(loginResponse.user().email()).isEqualTo("student@example.com");
     }
 
     @Test
