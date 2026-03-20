@@ -8,6 +8,7 @@ import com.myclass.chat_app.entity.GroupMember;
 import com.myclass.chat_app.entity.GroupRole;
 import com.myclass.chat_app.entity.User;
 import com.myclass.chat_app.repository.ChatGroupRepository;
+import com.myclass.chat_app.repository.GroupInvitationRepository;
 import com.myclass.chat_app.repository.GroupMemberRepository;
 import com.myclass.chat_app.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class GroupServiceTest {
     void createGroupFallsBackToTransientStoreWhenDatabaseWriteFails() {
         ChatGroupRepository groupRepository = mock(ChatGroupRepository.class);
         GroupMemberRepository memberRepository = mock(GroupMemberRepository.class);
+        GroupInvitationRepository groupInvitationRepository = mock(GroupInvitationRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
         TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
         TransientCollaborationStore transientStore = new TransientCollaborationStore();
@@ -48,6 +50,7 @@ class GroupServiceTest {
         GroupService service = new GroupService(
                 groupRepository,
                 memberRepository,
+                groupInvitationRepository,
                 userRepository,
                 transientStore,
                 transactionTemplate
@@ -69,13 +72,14 @@ class GroupServiceTest {
         assertThat(response.createdByEmail()).isEqualTo("creator@example.com");
         assertThat(response.members())
                 .extracting(GroupResponse.GroupMemberResponse::email)
-                .containsExactly("creator@example.com", "friend@example.com");
+                .containsExactly("creator@example.com");
     }
 
     @Test
     void listMyGroupsMergesTransientGroupsWithDatabaseGroups() {
         ChatGroupRepository groupRepository = mock(ChatGroupRepository.class);
         GroupMemberRepository memberRepository = mock(GroupMemberRepository.class);
+        GroupInvitationRepository groupInvitationRepository = mock(GroupInvitationRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
         TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
         TransientCollaborationStore transientStore = new TransientCollaborationStore();
@@ -107,6 +111,7 @@ class GroupServiceTest {
         GroupService service = new GroupService(
                 groupRepository,
                 memberRepository,
+                groupInvitationRepository,
                 userRepository,
                 transientStore,
                 transactionTemplate
@@ -128,6 +133,7 @@ class GroupServiceTest {
     void createGroupCreatesPlaceholderUsersForInvitedEmailsWhenDatabaseIsAvailable() {
         ChatGroupRepository groupRepository = mock(ChatGroupRepository.class);
         GroupMemberRepository memberRepository = mock(GroupMemberRepository.class);
+        GroupInvitationRepository groupInvitationRepository = mock(GroupInvitationRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
         TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
         TransientCollaborationStore transientStore = new TransientCollaborationStore();
@@ -160,6 +166,7 @@ class GroupServiceTest {
         GroupService service = new GroupService(
                 groupRepository,
                 memberRepository,
+                groupInvitationRepository,
                 userRepository,
                 transientStore,
                 transactionTemplate
@@ -177,6 +184,6 @@ class GroupServiceTest {
 
         assertThat(response.members())
                 .extracting(GroupResponse.GroupMemberResponse::email)
-                .containsExactly("creator@example.com", "friend@example.com");
+                .containsExactly("creator@example.com");
     }
 }

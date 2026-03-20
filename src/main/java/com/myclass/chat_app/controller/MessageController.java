@@ -5,6 +5,7 @@ import com.myclass.chat_app.dto.GroupChatMessage;
 import com.myclass.chat_app.entity.Message;
 import com.myclass.chat_app.service.GroupService;
 import com.myclass.chat_app.service.MessageService;
+import com.myclass.chat_app.service.SocialService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,10 +24,12 @@ public class MessageController {
 
     private final MessageService messageService;
     private final GroupService groupService;
+    private final SocialService socialService;
 
-    public MessageController(MessageService messageService, GroupService groupService) {
+    public MessageController(MessageService messageService, GroupService groupService, SocialService socialService) {
         this.messageService = messageService;
         this.groupService = groupService;
+        this.socialService = socialService;
     }
 
     @GetMapping("/lobby")
@@ -48,11 +51,15 @@ public class MessageController {
     }
 
     @GetMapping("/direct/{otherEmail}")
-    public ResponseEntity<List<DirectChatMessage>> directHistory(
+    public ResponseEntity<?> directHistory(
             @PathVariable String otherEmail,
             @AuthenticationPrincipal Jwt jwt
     ) {
         String currentEmail = jwt == null ? null : jwt.getClaimAsString("email");
+        if (!socialService.areFriends(currentEmail, otherEmail)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Direct messages unlock after the friend request is accepted."));
+        }
         return ResponseEntity.ok(messageService.getDirectMessages(currentEmail, otherEmail));
     }
 }

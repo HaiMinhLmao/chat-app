@@ -2,6 +2,7 @@ package com.myclass.chat_app.controller;
 
 import com.myclass.chat_app.service.UserService;
 import com.myclass.chat_app.service.SupabaseAuthService;
+import com.myclass.chat_app.service.LocalAdminAuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -19,10 +20,16 @@ public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final SupabaseAuthService supabaseAuthService;
+    private final LocalAdminAuthService localAdminAuthService;
     private final UserService userService;
 
-    public AuthController(SupabaseAuthService supabaseAuthService, UserService userService) {
+    public AuthController(
+            SupabaseAuthService supabaseAuthService,
+            LocalAdminAuthService localAdminAuthService,
+            UserService userService
+    ) {
         this.supabaseAuthService = supabaseAuthService;
+        this.localAdminAuthService = localAdminAuthService;
         this.userService = userService;
     }
 
@@ -66,6 +73,12 @@ public class AuthController {
                 return badRequest("Email and password are required");
             }
 
+            if (localAdminAuthService.supportsIdentifier(email)) {
+                Map<String, Object> localResponse = localAdminAuthService.login(email.trim(), password);
+                safeUpsertLocalUser(localResponse, "user@local.myclass", "Admin");
+                return ResponseEntity.ok(localResponse);
+            }
+
             Map<String, Object> sb = supabaseAuthService.login(email.trim(), password);
 
             // 🔥 chuẩn hoá response
@@ -79,8 +92,15 @@ public class AuthController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            String message = e.getMessage() == null ? "" : e.getMessage();
+            if (message.contains("invalid_credentials")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                        "error",
+                        "Invalid login credentials. This is a new Supabase project, so please register this email again here first, or use the local admin account user / admin123."
+                ));
+            }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid credentials: " + e.getMessage()));
+                    .body(Map.of("error", "Invalid credentials: " + message));
         }
     }
 
@@ -95,6 +115,10 @@ public class AuthController {
 
             if (isBlank(refreshToken)) {
                 return badRequest("Missing refresh_token");
+            }
+
+            if (localAdminAuthService.isLocalToken(refreshToken)) {
+                return ResponseEntity.ok(localAdminAuthService.refresh(refreshToken));
             }
 
             Map<String, Object> sb = supabaseAuthService.refresh(refreshToken);

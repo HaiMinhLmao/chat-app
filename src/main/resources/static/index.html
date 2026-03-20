@@ -1,1176 +1,1546 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyClassRoom - Lobby</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyClassRoom Workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
     <style>
-        :root {
-            --sidebar: #18212f;
-            --sidebar-soft: #223146;
-            --surface: #f6f8fc;
-            --card: #ffffff;
-            --line: #e4e9f2;
-            --text: #18212f;
-            --muted: #6b768a;
-            --accent: #315efb;
-            --accent-strong: #1d45cf;
-            --accent-soft: rgba(49, 94, 251, 0.12);
-            --success: #0a7b58;
-            --danger: #c43d4b;
-            --warning: #f2a93b;
+      :root {
+        --bg: #0d1117;
+        --panel: #161b24;
+        --line: rgba(148, 163, 184, 0.16);
+        --text: #f5f7fb;
+        --muted: #90a0ba;
+        --accent: #5aa7ff;
+        --accent-soft: rgba(90, 167, 255, 0.14);
+        --success: #33d69f;
+        --success-soft: rgba(51, 214, 159, 0.14);
+        --danger: #fb7185;
+        --danger-soft: rgba(251, 113, 133, 0.14);
+        --warning: #f3b33c;
+        --warning-soft: rgba(243, 179, 60, 0.16);
+        --radius-xl: 28px;
+        --radius-lg: 22px;
+        --radius-md: 16px;
+        --shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Manrope", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(90, 167, 255, 0.18), transparent 24%),
+          radial-gradient(circle at bottom right, rgba(51, 214, 159, 0.12), transparent 24%),
+          linear-gradient(160deg, #0b1017, #111827 48%, #0f172a);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .app-shell {
+        min-height: 100vh;
+        padding: 14px;
+        display: grid;
+        grid-template-columns: 78px 310px minmax(0, 1fr) 320px;
+        gap: 14px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)), var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .rail,
+      .sidebar,
+      .main,
+      .inbox {
+        min-height: 0;
+      }
+
+      .rail {
+        padding: 18px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .rail-group-list {
+        flex: 1;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        overflow-y: auto;
+      }
+
+      .rail-btn {
+        width: 54px;
+        height: 54px;
+        border: 0;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        display: grid;
+        place-items: center;
+        font-size: 13px;
+        font-weight: 800;
+        position: relative;
+        cursor: pointer;
+      }
+
+      .rail-btn.active,
+      .rail-btn:hover {
+        background: linear-gradient(135deg, rgba(90, 167, 255, 0.28), rgba(255, 255, 255, 0.08));
+      }
+
+      .rail-btn.brand {
+        color: #04101f;
+        background: linear-gradient(135deg, #7cb7ff, #59e0a8);
+      }
+
+      .badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--danger);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .badge[hidden] {
+        display: none;
+      }
+
+      .sidebar,
+      .inbox {
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .profile,
+      .card,
+      .list-card,
+      .inbox-card,
+      .stat,
+      .messages {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+      }
+
+      .profile {
+        padding: 16px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+
+      .avatar,
+      .channel-avatar {
+        background: linear-gradient(135deg, #7cb7ff, #59e0a8);
+        color: #04101f;
+        font-weight: 800;
+        display: grid;
+        place-items: center;
+      }
+
+      .avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 18px;
+      }
+
+      .headline,
+      .main-title {
+        font-family: "Space Grotesk", sans-serif;
+      }
+
+      .headline {
+        font-size: 22px;
+        letter-spacing: -0.04em;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .mini {
+        font-size: 12px;
+      }
+
+      .eyebrow {
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .friend-form,
+      .composer,
+      .notification-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .friend-form input,
+      .composer input {
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        background: rgba(8, 12, 20, 0.9);
+        color: var(--text);
+        padding: 14px 16px;
+      }
+
+      .friend-form input:focus,
+      .composer input:focus {
+        outline: none;
+        border-color: rgba(90, 167, 255, 0.5);
+        box-shadow: 0 0 0 4px rgba(90, 167, 255, 0.12);
+      }
+
+      .btn,
+      .tiny-btn {
+        border: 0;
+        cursor: pointer;
+      }
+
+      .btn {
+        min-height: 50px;
+        border-radius: 14px;
+        padding: 0 18px;
+        font-weight: 800;
+        color: #04101f;
+        background: linear-gradient(135deg, var(--accent), #2e84f4);
+      }
+
+      .btn.secondary,
+      .tiny-btn {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .tiny-btn {
+        min-height: 34px;
+        border-radius: 12px;
+        padding: 0 12px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .tiny-btn.accept {
+        color: var(--success);
+        background: var(--success-soft);
+      }
+
+      .tiny-btn.decline {
+        color: var(--danger);
+        background: var(--danger-soft);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .count-pill {
+        min-width: 26px;
+        height: 26px;
+        padding: 0 8px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .channel-list,
+      .notification-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .channel-item,
+      .notification-item {
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: inherit;
+      }
+
+      .channel-item {
+        width: 100%;
+        padding: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .channel-item:hover,
+      .channel-item.active {
+        border-color: rgba(90, 167, 255, 0.22);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .channel-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        flex-shrink: 0;
+        font-size: 12px;
+      }
+
+      .channel-main {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .channel-name {
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .channel-preview {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .main {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .main-top {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+      }
+
+      .main-title {
+        margin: 8px 0 0;
+        font-size: clamp(38px, 4vw, 56px);
+        line-height: 0.95;
+        letter-spacing: -0.06em;
+      }
+
+      .main-copy {
+        max-width: 720px;
+        margin-top: 12px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: var(--warning-soft);
+        color: var(--warning);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .status-pill.online {
+        color: var(--success);
+        background: var(--success-soft);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .stat {
+        padding: 16px;
+      }
+
+      .stat-value {
+        margin-top: 10px;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 34px;
+      }
+
+      .messages {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(8, 12, 20, 0.98), rgba(13, 20, 31, 0.98));
+      }
+
+      .banner {
+        display: none;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+      }
+
+      .banner.show {
+        display: block;
+      }
+
+      .banner.info {
+        background: rgba(90, 167, 255, 0.08);
+      }
+
+      .banner.error {
+        background: rgba(251, 113, 133, 0.12);
+      }
+
+      .messages-body {
+        flex: 1;
+        min-height: 480px;
+        overflow-y: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .empty-state {
+        max-width: 680px;
+        margin: auto;
+        padding: 34px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.05);
+        text-align: center;
+      }
+
+      .empty-state h2 {
+        margin: 14px 0 12px;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 42px;
+        letter-spacing: -0.06em;
+      }
+
+      .message-row {
+        display: flex;
+        gap: 12px;
+      }
+
+      .message-row.sent {
+        flex-direction: row-reverse;
+      }
+
+      .message-stack {
+        max-width: min(70%, 760px);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .message-row.sent .message-stack {
+        align-items: flex-end;
+      }
+
+      .message-meta {
+        display: flex;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .message-bubble {
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.06);
+        line-height: 1.6;
+      }
+
+      .message-row.sent .message-bubble {
+        background: linear-gradient(135deg, var(--accent), #2e84f4);
+        color: #04101f;
+      }
+
+      .composer {
+        padding: 16px;
+        border-top: 1px solid var(--line);
+      }
+
+      .notification-item {
+        padding: 14px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(8, 12, 20, 0.96);
+        transform: translateY(20px);
+        opacity: 0;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+      }
+
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 1380px) {
+        .app-shell {
+          grid-template-columns: 78px 290px minmax(0, 1fr);
         }
 
-        * {
-            box-sizing: border-box;
+        .inbox {
+          grid-column: 2 / -1;
+        }
+      }
+
+      @media (max-width: 980px) {
+        .app-shell {
+          grid-template-columns: 78px minmax(0, 1fr);
         }
 
-        body {
-            margin: 0;
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(180deg, #eef3fb 0%, #f8fafc 100%);
-            color: var(--text);
-            min-height: 100vh;
+        .sidebar,
+        .inbox {
+          grid-column: 2 / -1;
         }
 
-        .app {
-            min-height: 100vh;
-            display: grid;
-            grid-template-columns: 310px 1fr;
+        .stats,
+        .main-top,
+        .friend-form,
+        .composer,
+        .notification-actions {
+          grid-template-columns: 1fr;
+          flex-direction: column;
         }
-
-        .sidebar {
-            background: linear-gradient(180deg, var(--sidebar) 0%, #101722 100%);
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .sidebar-header {
-            padding: 24px 22px 18px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .app-name {
-            font-size: 24px;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-        }
-
-        .app-copy {
-            margin-top: 8px;
-            color: rgba(255, 255, 255, 0.68);
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
-        .user-card {
-            margin: 18px 18px 0;
-            padding: 16px;
-            border-radius: 20px;
-            background: linear-gradient(135deg, rgba(49, 94, 251, 0.28), rgba(255, 255, 255, 0.08));
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .user-avatar {
-            width: 44px;
-            height: 44px;
-            border-radius: 16px;
-            display: grid;
-            place-items: center;
-            background: rgba(255, 255, 255, 0.16);
-            font-weight: 800;
-            font-size: 18px;
-        }
-
-        .user-name {
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        .user-status {
-            margin-top: 4px;
-            color: rgba(255, 255, 255, 0.72);
-            font-size: 12px;
-        }
-
-        .sidebar-actions {
-            padding: 18px;
-            display: grid;
-            gap: 10px;
-        }
-
-        .new-group-btn,
-        .secondary-btn {
-            width: 100%;
-            border: 0;
-            border-radius: 14px;
-            padding: 13px 16px;
-            font: inherit;
-            font-weight: 800;
-            cursor: pointer;
-            transition: transform 0.18s ease, opacity 0.18s ease;
-        }
-
-        .new-group-btn {
-            background: linear-gradient(135deg, var(--accent), #5f83ff);
-            color: #fff;
-        }
-
-        .secondary-btn {
-            background: rgba(255, 255, 255, 0.08);
-            color: #fff;
-        }
-
-        .new-group-btn:hover,
-        .secondary-btn:hover {
-            transform: translateY(-1px);
-        }
-
-        .sidebar-section {
-            padding: 0 18px 12px;
-        }
-
-        .section-title {
-            margin: 0 0 10px;
-            color: rgba(255, 255, 255, 0.64);
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .conversation-list {
-            display: grid;
-            gap: 8px;
-        }
-
-        .conversation-item {
-            width: 100%;
-            border: 0;
-            border-radius: 18px;
-            background: transparent;
-            color: inherit;
-            padding: 14px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            text-align: left;
-            cursor: pointer;
-            transition: background 0.18s ease, transform 0.18s ease;
-        }
-
-        .conversation-item:hover {
-            background: rgba(255, 255, 255, 0.06);
-            transform: translateX(2px);
-        }
-
-        .conversation-item.active {
-            background: rgba(255, 255, 255, 0.11);
-        }
-
-        .conversation-avatar {
-            width: 38px;
-            height: 38px;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.12);
-            display: grid;
-            place-items: center;
-            flex-shrink: 0;
-            font-size: 14px;
-            font-weight: 800;
-        }
-
-        .conversation-name {
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        .conversation-preview {
-            margin-top: 4px;
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 12px;
-            line-height: 1.4;
-        }
-
-        .group-note {
-            margin: 10px 18px 0;
-            padding: 12px 14px;
-            border-radius: 16px;
-            font-size: 12px;
-            line-height: 1.55;
-            color: rgba(255, 255, 255, 0.78);
-            background: rgba(255, 255, 255, 0.06);
-            display: none;
-        }
-
-        .group-note.show {
-            display: block;
-        }
-
-        .main {
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-        }
-
-        .main-header {
-            padding: 22px 28px;
-            background: rgba(255, 255, 255, 0.86);
-            backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--line);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .main-title {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-        }
-
-        .main-subtitle {
-            margin: 6px 0 0;
-            color: var(--muted);
-            font-size: 14px;
-        }
-
-        .status-pill {
-            padding: 10px 14px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 800;
-            background: var(--accent-soft);
-            color: var(--accent-strong);
-            white-space: nowrap;
-        }
-
-        .messages-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 28px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .empty-state {
-            max-width: 560px;
-            margin: auto;
-            padding: 28px;
-            border-radius: 24px;
-            background: rgba(255, 255, 255, 0.88);
-            border: 1px solid var(--line);
-            text-align: center;
-            box-shadow: 0 18px 40px rgba(31, 46, 85, 0.08);
-        }
-
-        .empty-state h2 {
-            margin: 0 0 10px;
-            font-size: 26px;
-            letter-spacing: -0.03em;
-        }
-
-        .empty-state p {
-            margin: 0;
-            color: var(--muted);
-            line-height: 1.65;
-        }
-
-        .message-row {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-            max-width: 100%;
-        }
-
-        .message-row.sent {
-            justify-content: flex-end;
-        }
-
-        .message-row.received {
-            justify-content: flex-start;
-        }
-
-        .message-avatar {
-            width: 34px;
-            height: 34px;
-            border-radius: 14px;
-            background: linear-gradient(135deg, var(--accent), #6f8dff);
-            color: #fff;
-            display: grid;
-            place-items: center;
-            font-size: 12px;
-            font-weight: 800;
-            flex-shrink: 0;
-        }
-
-        .message-stack {
-            max-width: min(70%, 680px);
-        }
-
-        .message-author {
-            margin: 0 0 4px;
-            color: var(--muted);
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .message-bubble {
-            border-radius: 18px;
-            padding: 12px 15px;
-            line-height: 1.5;
-            word-break: break-word;
-            box-shadow: 0 12px 24px rgba(31, 46, 85, 0.06);
-        }
-
-        .sent .message-bubble {
-            background: linear-gradient(135deg, var(--accent), #5f83ff);
-            color: #fff;
-            border-bottom-right-radius: 6px;
-        }
-
-        .received .message-bubble {
-            background: #fff;
-            color: var(--text);
-            border: 1px solid var(--line);
-            border-bottom-left-radius: 6px;
-        }
-
-        .message-time {
-            margin-top: 5px;
-            font-size: 11px;
-            color: var(--muted);
-        }
-
-        .composer {
-            padding: 18px 24px 24px;
-            border-top: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.92);
-            backdrop-filter: blur(16px);
-        }
-
-        .composer-form {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .composer input {
-            flex: 1;
-            border: 1px solid var(--line);
-            background: #fff;
-            border-radius: 18px;
-            padding: 15px 16px;
-            font: inherit;
-            color: var(--text);
-        }
-
-        .composer input:focus {
-            outline: none;
-            border-color: rgba(49, 94, 251, 0.45);
-            box-shadow: 0 0 0 4px var(--accent-soft);
-        }
-
-        .send-btn {
-            border: 0;
-            border-radius: 16px;
-            background: linear-gradient(135deg, var(--accent), #5f83ff);
-            color: #fff;
-            padding: 14px 18px;
-            font: inherit;
-            font-weight: 800;
-            cursor: pointer;
-        }
-
-        .send-btn:disabled {
-            opacity: 0.65;
-            cursor: not-allowed;
-        }
-
-        @media (max-width: 900px) {
-            .app {
-                grid-template-columns: 1fr;
-            }
-
-            .sidebar {
-                border-right: 0;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            }
-
-            .messages-area,
-            .main-header {
-                padding-left: 18px;
-                padding-right: 18px;
-            }
-        }
+      }
     </style>
-</head>
-<body>
-<div class="app">
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <div class="app-name">MyClassRoom</div>
-            <div class="app-copy">Chat first. Create study groups only when you actually need them.</div>
-        </div>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="rail panel">
+        <button class="rail-btn brand" type="button">MC</button>
+        <button class="rail-btn active" id="homeRailButton" type="button">
+          <span id="selfRailLabel">ME</span>
+        </button>
+        <div class="rail-group-list" id="groupRailList"></div>
+        <button class="rail-btn" id="notificationToggleButton" type="button">
+          IN
+          <span class="badge" id="notificationBadge" hidden>0</span>
+        </button>
+        <button class="rail-btn" id="newGroupBtn" type="button">+</button>
+        <button class="rail-btn" id="logoutBtn" type="button">LO</button>
+      </aside>
 
-        <div class="user-card">
-            <div class="user-avatar" id="userAvatar">U</div>
-            <div>
-                <div class="user-name" id="userName">User</div>
-                <div class="user-status" id="userStatus">Connecting...</div>
+      <aside class="sidebar panel">
+        <div class="profile">
+          <div class="avatar" id="userAvatar">ME</div>
+          <div>
+            <div class="headline" id="userName">Your Workspace</div>
+            <div class="muted mini" id="userEmail">user@example.com</div>
+            <div class="mini" style="color: var(--success); margin-top: 6px">
+              Realtime session is active
             </div>
+          </div>
         </div>
 
-        <div class="sidebar-actions">
-            <button class="new-group-btn" id="newGroupBtn" type="button">Create Group</button>
-            <button class="secondary-btn" id="logoutBtn" type="button">Log Out</button>
-        </div>
-
-        <div class="sidebar-section">
-            <h2 class="section-title">Main Chat</h2>
-            <div class="conversation-list" id="primaryConversation"></div>
-        </div>
-
-        <div class="sidebar-section">
-            <h2 class="section-title">Direct Messages</h2>
-            <div class="conversation-list" id="directList"></div>
-        </div>
-
-        <div class="sidebar-section">
-            <h2 class="section-title">Study Groups</h2>
-            <div class="conversation-list" id="groupsList"></div>
-        </div>
-
-        <div class="group-note" id="groupsNote"></div>
-    </aside>
-
-    <main class="main">
-        <header class="main-header">
-            <div>
-                <h1 class="main-title" id="chatTitle">Lobby Chat</h1>
-                <p class="main-subtitle" id="chatSubtitle">Talk right away. Group conversations can be added when the group list is available.</p>
-            </div>
-            <div class="status-pill" id="connectionStatus">Connecting...</div>
-        </header>
-
-        <section class="messages-area" id="messagesContainer">
-            <div class="empty-state" id="emptyState">
-                <h2>Start the conversation</h2>
-                <p>Use the lobby for general messages. Your study groups will appear in the sidebar when they are available.</p>
-            </div>
+        <section class="card" style="padding: 16px">
+          <div class="eyebrow">Add Friend</div>
+          <div class="headline" style="margin-top: 8px">Invite by email</div>
+          <p class="muted mini" style="line-height: 1.7">
+            Direct chat opens after the other person accepts your friend request.
+          </p>
+          <form class="friend-form" id="friendRequestForm">
+            <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
+            <button class="btn" id="friendSubmitBtn" type="submit">Send</button>
+          </form>
+          <div class="mini muted" id="friendRequestFeedback"></div>
         </section>
 
-        <footer class="composer">
-            <form class="composer-form" id="messageForm">
-                <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" disabled>
-                <button class="send-btn" id="sendBtn" type="submit" disabled>Send</button>
-            </form>
-        </footer>
-    </main>
-</div>
+        <section class="list-card" style="padding: 16px">
+          <div class="section-head">
+            <strong>Friends</strong>
+            <span class="count-pill" id="friendsCount">0</span>
+          </div>
+          <div class="channel-list" id="friendsList"></div>
+          <div class="mini muted" id="friendsEmpty">No accepted friends yet.</div>
+        </section>
 
-<script>
-    const primaryConversation = document.getElementById('primaryConversation');
-    const directList = document.getElementById('directList');
-    const groupsList = document.getElementById('groupsList');
-    const groupsNote = document.getElementById('groupsNote');
-    const chatTitle = document.getElementById('chatTitle');
-    const chatSubtitle = document.getElementById('chatSubtitle');
-    const messagesContainer = document.getElementById('messagesContainer');
-    const emptyState = document.getElementById('emptyState');
-    const messageForm = document.getElementById('messageForm');
-    const messageInput = document.getElementById('messageInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const userAvatar = document.getElementById('userAvatar');
-    const userName = document.getElementById('userName');
-    const userStatus = document.getElementById('userStatus');
-    const connectionStatus = document.getElementById('connectionStatus');
-    const newGroupBtn = document.getElementById('newGroupBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
+        <section class="list-card" style="padding: 16px">
+          <div class="section-head">
+            <strong>Groups</strong>
+            <button class="tiny-btn" id="createGroupSidebarBtn" type="button">
+              Create
+            </button>
+          </div>
+          <div class="channel-list" id="groupsList"></div>
+          <div class="mini muted" id="groupsEmpty">
+            Accept a group invite or create a new room.
+          </div>
+        </section>
+      </aside>
 
-    let stompClient = null;
-    let activeSubscription = null;
-    let activeChannel = { type: 'lobby', id: 'lobby', name: 'Lobby Chat' };
-    let currentUser = null;
-    let reconnectTimer = null;
-
-    function parseJson(value) {
-        try {
-            return JSON.parse(value);
-        } catch (_) {
-            return null;
-        }
-    }
-
-    function getSession() {
-        return parseJson(sessionStorage.getItem('supabaseSession'));
-    }
-
-    function persistSession(session) {
-        sessionStorage.setItem('supabaseSession', JSON.stringify(session));
-        const user = session && session.user ? session.user : null;
-        if (!user) {
-            return;
-        }
-        const username =
-            (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.username)) ||
-            (user.email ? user.email.split('@')[0] : 'User');
-        sessionStorage.setItem('currentUser', JSON.stringify({
-            username,
-            email: user.email || ''
-        }));
-    }
-
-    function clearSession() {
-        sessionStorage.removeItem('supabaseSession');
-        sessionStorage.removeItem('currentUser');
-        sessionStorage.removeItem('recentlyCreatedGroup');
-        localStorage.removeItem('recentlyCreatedGroup');
-    }
-
-    function storeRecentGroup(group) {
-        if (!group || !group.id) {
-            return;
-        }
-        const serialized = JSON.stringify(group);
-        sessionStorage.setItem('recentlyCreatedGroup', serialized);
-        localStorage.setItem('recentlyCreatedGroup', serialized);
-    }
-
-    function clearRecentGroup() {
-        sessionStorage.removeItem('recentlyCreatedGroup');
-        localStorage.removeItem('recentlyCreatedGroup');
-    }
-
-    function getRecentGroupFromUrl() {
-        const params = new URLSearchParams(window.location.search);
-        const id = params.get('createdGroupId');
-        if (!id) {
-            return null;
-        }
-        const recentGroup = {
-            id,
-            name: params.get('createdGroupName') || 'New Group',
-            category: params.get('createdGroupCategory') || '',
-            role: params.get('createdGroupRole') || 'ADMIN'
-        };
-        storeRecentGroup(recentGroup);
-        const nextUrl = window.location.pathname + window.location.hash;
-        window.history.replaceState({}, '', nextUrl);
-        return recentGroup;
-    }
-
-    function getRecentlyCreatedGroup() {
-        const fromUrl = getRecentGroupFromUrl();
-        if (fromUrl) {
-            return fromUrl;
-        }
-        return parseJson(sessionStorage.getItem('recentlyCreatedGroup'))
-            || parseJson(localStorage.getItem('recentlyCreatedGroup'));
-    }
-
-    function mergeRecentGroup(groups) {
-        const recentGroup = getRecentlyCreatedGroup();
-        if (!recentGroup) {
-            return groups;
-        }
-
-        const merged = Array.isArray(groups) ? [...groups] : [];
-        const alreadyExists = merged.some((group) => String(group.id) === String(recentGroup.id));
-        if (!alreadyExists) {
-            merged.unshift(recentGroup);
-        } else {
-            clearRecentGroup();
-        }
-        return merged;
-    }
-
-    function decodeJwtPayload(token) {
-        if (!token || token.split('.').length < 2) {
-            return null;
-        }
-        try {
-            const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-            const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-            return JSON.parse(atob(padded));
-        } catch (_) {
-            return null;
-        }
-    }
-
-    function isTokenExpired(token, skewSeconds = 30) {
-        const payload = decodeJwtPayload(token);
-        if (!payload || typeof payload.exp !== 'number') {
-            return false;
-        }
-        return payload.exp <= Math.floor(Date.now() / 1000) + skewSeconds;
-    }
-
-    async function refreshSession() {
-        const session = getSession();
-        const refreshToken = session && session.refresh_token ? session.refresh_token : null;
-        if (!refreshToken) {
-            return null;
-        }
-
-        const response = await fetch('/api/auth/refresh', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken })
-        });
-
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.access_token) {
-            return null;
-        }
-
-        const nextSession = {
-            ...session,
-            ...data,
-            user: session && session.user ? session.user : null
-        };
-
-        persistSession(nextSession);
-        return nextSession.access_token;
-    }
-
-    async function getValidAccessToken() {
-        const session = getSession();
-        if (!session || !session.access_token) {
-            return null;
-        }
-
-        if (!isTokenExpired(session.access_token)) {
-            return session.access_token;
-        }
-
-        return refreshSession();
-    }
-
-    function getCurrentUser() {
-        const saved = parseJson(sessionStorage.getItem('currentUser'));
-        if (saved) {
-            return saved;
-        }
-
-        const session = getSession();
-        const user = session && session.user ? session.user : null;
-        if (!user) {
-            return null;
-        }
-
-        return {
-            username:
-                (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.username)) ||
-                (user.email ? user.email.split('@')[0] : 'User'),
-            email: user.email || ''
-        };
-    }
-
-    function normalizeEmail(email) {
-        if (!email) {
-            return '';
-        }
-        return email.trim().toLowerCase();
-    }
-
-    function conversationKey(firstEmail, secondEmail) {
-        const pair = [normalizeEmail(firstEmail), normalizeEmail(secondEmail)].sort().join('::');
-        return btoa(pair).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-    }
-
-    function displayNameForUser(user) {
-        if (!user) {
-            return 'User';
-        }
-        return user.fullName || user.username || user.email || 'User';
-    }
-
-    function requireAuth() {
-        const user = getCurrentUser();
-        if (!user) {
-            window.location.href = '/login.html';
-            return null;
-        }
-        return user;
-    }
-
-    function setConnectionState(label, online) {
-        connectionStatus.textContent = label;
-        userStatus.textContent = label;
-        connectionStatus.style.background = online ? 'rgba(10, 123, 88, 0.12)' : 'rgba(242, 169, 59, 0.16)';
-        connectionStatus.style.color = online ? 'var(--success)' : '#8a5a00';
-    }
-
-    function clearMessages() {
-        messagesContainer.innerHTML = '';
-        messagesContainer.appendChild(emptyState);
-    }
-
-    function ensureMessageSurface() {
-        if (messagesContainer.contains(emptyState)) {
-            emptyState.remove();
-        }
-    }
-
-    function formatTime(value) {
-        const date = value ? new Date(value) : new Date();
-        if (Number.isNaN(date.getTime())) {
-            return '';
-        }
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function addMessage(content, isSent, sender, timestamp) {
-        ensureMessageSurface();
-
-        const row = document.createElement('div');
-        row.className = 'message-row ' + (isSent ? 'sent' : 'received');
-
-        if (!isSent) {
-            const avatar = document.createElement('div');
-            avatar.className = 'message-avatar';
-            avatar.textContent = (sender || 'U').substring(0, 1).toUpperCase();
-            row.appendChild(avatar);
-        }
-
-        const stack = document.createElement('div');
-        stack.className = 'message-stack';
-
-        if (!isSent) {
-            const author = document.createElement('div');
-            author.className = 'message-author';
-            author.textContent = sender || 'User';
-            stack.appendChild(author);
-        }
-
-        const bubble = document.createElement('div');
-        bubble.className = 'message-bubble';
-        bubble.textContent = content;
-        stack.appendChild(bubble);
-
-        const time = document.createElement('div');
-        time.className = 'message-time';
-        time.textContent = formatTime(timestamp);
-        stack.appendChild(time);
-
-        row.appendChild(stack);
-        messagesContainer.appendChild(row);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-
-    async function authorizedJson(url) {
-        let token = await getValidAccessToken();
-        if (!token) {
-            return { ok: false, status: 401, data: { error: 'Sign in again to continue.' } };
-        }
-
-        let response = await fetch(url, {
-            headers: { Authorization: 'Bearer ' + token }
-        });
-
-        if (response.status === 401) {
-            token = await refreshSession();
-            if (!token) {
-                return { ok: false, status: 401, data: { error: 'Your session expired. Please sign in again.' } };
-            }
-            response = await fetch(url, {
-                headers: { Authorization: 'Bearer ' + token }
-            });
-        }
-
-        const data = await response.json().catch(() => ({}));
-        return { ok: response.ok, status: response.status, data };
-    }
-
-    async function loadLobbyHistory() {
-        clearMessages();
-        const result = await authorizedJson('/api/messages/lobby');
-        if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
-            return;
-        }
-
-        result.data.forEach((message) => {
-            const myEmail = normalizeEmail(currentUser.email);
-            const senderEmail = normalizeEmail(message.senderEmail);
-            const mySender = currentUser.username || currentUser.email || 'User';
-            const isSent = senderEmail ? senderEmail === myEmail : message.sender === mySender;
-            addMessage(message.content, isSent, message.sender || 'User', message.timestamp);
-        });
-    }
-
-    async function loadGroupHistory(groupId) {
-        clearMessages();
-        const result = await authorizedJson('/api/messages/groups/' + groupId);
-        if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
-            return;
-        }
-
-        result.data.forEach((message) => {
-            const isSent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-            addMessage(message.content, isSent, message.senderName || message.senderEmail || 'User', message.timestamp);
-        });
-    }
-
-    async function loadDirectHistory(otherEmail) {
-        clearMessages();
-        const result = await authorizedJson('/api/messages/direct/' + encodeURIComponent(otherEmail));
-        if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
-            return;
-        }
-
-        result.data.forEach((message) => {
-            const isSent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-            addMessage(message.content, isSent, message.senderName || message.senderEmail || 'User', message.timestamp);
-        });
-    }
-
-    function showGroupsNote(message) {
-        groupsNote.textContent = message;
-        groupsNote.classList.add('show');
-    }
-
-    function hideGroupsNote() {
-        groupsNote.classList.remove('show');
-        groupsNote.textContent = '';
-    }
-
-    function buildConversationButton({ id, name, preview, type }) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'conversation-item';
-        button.dataset.channelId = String(id);
-        button.dataset.channelType = type;
-        button.innerHTML = `
-            <div class="conversation-avatar">${(name || 'C').substring(0, 1).toUpperCase()}</div>
-            <div>
-                <div class="conversation-name">${name}</div>
-                <div class="conversation-preview">${preview}</div>
+      <main class="main panel">
+        <div class="main-top">
+          <div>
+            <div class="eyebrow" id="chatKicker">Workspace Overview</div>
+            <h1 class="main-title" id="chatTitle">MyClassRoom</h1>
+            <div class="main-copy" id="chatSubtitle">
+              Invite friends by email, accept requests in the inbox, and keep direct chats and study groups cleanly separated.
             </div>
-        `;
-        return button;
-    }
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end">
+            <div class="status-pill" id="connectionState">Reconnecting</div>
+            <button class="btn secondary" id="headerInboxButton" type="button">
+              Open Inbox
+            </button>
+          </div>
+        </div>
 
-    function setActiveButton(button) {
-        document.querySelectorAll('.conversation-item').forEach((item) => item.classList.remove('active'));
-        if (button) {
-            button.classList.add('active');
+        <section class="stats">
+          <article class="stat">
+            <div class="eyebrow">Accepted Friends</div>
+            <div class="stat-value" id="overviewFriends">0</div>
+          </article>
+          <article class="stat">
+            <div class="eyebrow">Pending Notifications</div>
+            <div class="stat-value" id="overviewNotifications">0</div>
+          </article>
+          <article class="stat">
+            <div class="eyebrow">Active Groups</div>
+            <div class="stat-value" id="overviewGroups">0</div>
+          </article>
+        </section>
+
+        <section class="messages">
+          <div class="banner info" id="surfaceBanner"></div>
+          <div class="messages-body" id="messagesArea"></div>
+          <form class="composer" id="messageForm">
+            <input
+              id="messageInput"
+              type="text"
+              placeholder="Choose a friend or accepted group before sending a message..."
+            />
+            <button class="btn" id="sendBtn" type="submit">Send</button>
+          </form>
+        </section>
+      </main>
+
+      <aside class="inbox panel" id="utilityPanel">
+        <div class="section-head">
+          <div>
+            <div class="headline">Inbox</div>
+            <div class="mini muted">Friend requests and group invites arrive here.</div>
+          </div>
+          <button class="btn secondary" id="closeInboxButton" type="button">Hide</button>
+        </div>
+
+        <section class="inbox-card" style="padding: 16px">
+          <div class="section-head">
+            <strong>Friend Requests</strong>
+            <span class="count-pill" id="incomingFriendsCount">0</span>
+          </div>
+          <div class="notification-list" id="incomingFriendRequests"></div>
+          <div class="mini muted" id="incomingFriendsEmpty">No friend requests right now.</div>
+        </section>
+
+        <section class="inbox-card" style="padding: 16px">
+          <div class="section-head">
+            <strong>Group Invitations</strong>
+            <span class="count-pill" id="groupInvitationsCount">0</span>
+          </div>
+          <div class="notification-list" id="groupInvitations"></div>
+          <div class="mini muted" id="groupInvitationsEmpty">No group invites right now.</div>
+        </section>
+
+        <section class="inbox-card" style="padding: 16px">
+          <div class="section-head">
+            <strong>Sent Requests</strong>
+            <span class="count-pill" id="outgoingFriendsCount">0</span>
+          </div>
+          <div class="notification-list" id="outgoingFriendRequests"></div>
+          <div class="mini muted" id="outgoingFriendsEmpty">No pending requests sent yet.</div>
+        </section>
+      </aside>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script>
+      const el = {
+        homeRailButton: document.getElementById("homeRailButton"),
+        selfRailLabel: document.getElementById("selfRailLabel"),
+        groupRailList: document.getElementById("groupRailList"),
+        notificationToggleButton: document.getElementById("notificationToggleButton"),
+        notificationBadge: document.getElementById("notificationBadge"),
+        newGroupBtn: document.getElementById("newGroupBtn"),
+        logoutBtn: document.getElementById("logoutBtn"),
+        userAvatar: document.getElementById("userAvatar"),
+        userName: document.getElementById("userName"),
+        userEmail: document.getElementById("userEmail"),
+        friendRequestForm: document.getElementById("friendRequestForm"),
+        friendEmailInput: document.getElementById("friendEmailInput"),
+        friendSubmitBtn: document.getElementById("friendSubmitBtn"),
+        friendRequestFeedback: document.getElementById("friendRequestFeedback"),
+        friendsList: document.getElementById("friendsList"),
+        friendsCount: document.getElementById("friendsCount"),
+        friendsEmpty: document.getElementById("friendsEmpty"),
+        groupsList: document.getElementById("groupsList"),
+        groupsEmpty: document.getElementById("groupsEmpty"),
+        createGroupSidebarBtn: document.getElementById("createGroupSidebarBtn"),
+        chatKicker: document.getElementById("chatKicker"),
+        chatTitle: document.getElementById("chatTitle"),
+        chatSubtitle: document.getElementById("chatSubtitle"),
+        connectionState: document.getElementById("connectionState"),
+        headerInboxButton: document.getElementById("headerInboxButton"),
+        overviewFriends: document.getElementById("overviewFriends"),
+        overviewNotifications: document.getElementById("overviewNotifications"),
+        overviewGroups: document.getElementById("overviewGroups"),
+        surfaceBanner: document.getElementById("surfaceBanner"),
+        messagesArea: document.getElementById("messagesArea"),
+        messageForm: document.getElementById("messageForm"),
+        messageInput: document.getElementById("messageInput"),
+        sendBtn: document.getElementById("sendBtn"),
+        utilityPanel: document.getElementById("utilityPanel"),
+        closeInboxButton: document.getElementById("closeInboxButton"),
+        incomingFriendRequests: document.getElementById("incomingFriendRequests"),
+        incomingFriendsCount: document.getElementById("incomingFriendsCount"),
+        incomingFriendsEmpty: document.getElementById("incomingFriendsEmpty"),
+        groupInvitations: document.getElementById("groupInvitations"),
+        groupInvitationsCount: document.getElementById("groupInvitationsCount"),
+        groupInvitationsEmpty: document.getElementById("groupInvitationsEmpty"),
+        outgoingFriendRequests: document.getElementById("outgoingFriendRequests"),
+        outgoingFriendsCount: document.getElementById("outgoingFriendsCount"),
+        outgoingFriendsEmpty: document.getElementById("outgoingFriendsEmpty"),
+        toast: document.getElementById("toast"),
+      };
+
+      let currentUser = null;
+      let groups = [];
+      let socialState = {
+        friends: [],
+        incomingFriendRequests: [],
+        outgoingFriendRequests: [],
+        groupInvitations: [],
+      };
+      let activeChannel = { type: "home" };
+      let stompClient = null;
+      let activeSubscription = null;
+      let reconnectTimer = null;
+      const previews = new Map();
+
+      function parseJson(value) {
+        try {
+          return JSON.parse(value);
+        } catch (_) {
+          return null;
         }
-    }
+      }
 
-    function renderPrimaryConversation() {
-        primaryConversation.innerHTML = '';
-        const button = buildConversationButton({
-            id: 'lobby',
-            name: 'Lobby Chat',
-            preview: 'General chat with saved history for everyone online.',
-            type: 'lobby'
-        });
-        button.classList.add('active');
-        button.addEventListener('click', () => {
-            selectLobby(button);
-        });
-        primaryConversation.appendChild(button);
-    }
+      function getSession() {
+        return parseJson(sessionStorage.getItem("supabaseSession"));
+      }
 
-    function selectLobby(button) {
-        activeChannel = { type: 'lobby', id: 'lobby', name: 'Lobby Chat' };
-        chatTitle.textContent = 'Lobby Chat';
-        chatSubtitle.textContent = 'General conversation with saved history for everyone currently online.';
-        setActiveButton(button || primaryConversation.querySelector('.conversation-item'));
-        loadLobbyHistory();
-        subscribeToLobby();
-    }
+      function clearSession() {
+        sessionStorage.removeItem("supabaseSession");
+        sessionStorage.removeItem("currentUser");
+      }
 
-    function selectDirect(user, button) {
-        activeChannel = {
-            type: 'direct',
-            id: normalizeEmail(user.email),
-            name: displayNameForUser(user),
-            email: user.email,
-            conversationKey: conversationKey(currentUser.email, user.email)
+      function getCurrentUser() {
+        const saved = parseJson(sessionStorage.getItem("currentUser"));
+        if (saved) return saved;
+        const session = getSession();
+        const user = session && session.user ? session.user : null;
+        if (!user) return null;
+        return {
+          username:
+            (user.user_metadata &&
+              (user.user_metadata.full_name || user.user_metadata.username)) ||
+            (user.email ? user.email.split("@")[0] : "User"),
+          email: user.email || "",
         };
-        chatTitle.textContent = displayNameForUser(user);
-        chatSubtitle.textContent = 'Direct messages with saved history.';
-        setActiveButton(button);
-        loadDirectHistory(user.email);
-        subscribeToDirect(user.email);
-    }
+      }
 
-    function selectGroup(group, button) {
-        activeChannel = { type: 'group', id: group.id, name: group.name || 'Group' };
-        chatTitle.textContent = group.name || 'Group';
-        chatSubtitle.textContent = group.category
-            ? group.category + ' · ' + (group.role || 'Group chat')
-            : (group.role || 'Group chat');
-        setActiveButton(button);
+      function requireAuth() {
+        const user = getCurrentUser();
+        if (user && user.email) return user;
+        window.location.href = "/login.html?returnTo=/index.html";
+        return null;
+      }
+
+      function decodeJwtPayload(token) {
+        if (!token || token.split(".").length < 2) return null;
+        try {
+          const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+          const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+          return JSON.parse(atob(padded));
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function isTokenExpired(token, skewSeconds = 30) {
+        const payload = decodeJwtPayload(token);
+        return payload && typeof payload.exp === "number"
+          ? payload.exp <= Math.floor(Date.now() / 1000) + skewSeconds
+          : false;
+      }
+
+      async function refreshSession() {
+        const session = getSession();
+        const refreshToken = session && session.refresh_token;
+        if (!refreshToken) return null;
+        const response = await fetch("/api/auth/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.access_token) return null;
+        sessionStorage.setItem(
+          "supabaseSession",
+          JSON.stringify({ ...session, ...data, user: session.user || null }),
+        );
+        return data.access_token;
+      }
+
+      async function getValidAccessToken() {
+        const session = getSession();
+        if (!session || !session.access_token) return null;
+        return isTokenExpired(session.access_token)
+          ? refreshSession()
+          : session.access_token;
+      }
+
+      async function authorizedRequest(url, options = {}) {
+        let token = await getValidAccessToken();
+        if (!token) return { ok: false, data: { error: "Sign in again." } };
+        const buildOptions = (accessToken) => ({
+          ...options,
+          headers: {
+            ...(options.headers || {}),
+            Authorization: "Bearer " + accessToken,
+          },
+        });
+        let response = await fetch(url, buildOptions(token));
+        if (response.status === 401) {
+          token = await refreshSession();
+          if (!token) return { ok: false, data: { error: "Sign in again." } };
+          response = await fetch(url, buildOptions(token));
+        }
+        const data = await response.json().catch(() => ({}));
+        return { ok: response.ok, data };
+      }
+
+      function normalizeEmail(value) {
+        return String(value || "").trim().toLowerCase();
+      }
+
+      function defaultName(email) {
+        const text = String(email || "");
+        const atIndex = text.indexOf("@");
+        return atIndex > 0 ? text.slice(0, atIndex) : text || "User";
+      }
+
+      function displayName(user) {
+        return user && (user.username || user.fullName || defaultName(user.email))
+          ? user.username || user.fullName || defaultName(user.email)
+          : "User";
+      }
+
+      function initials(value) {
+        const words = String(value || "")
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
+        if (!words.length) return "MC";
+        if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+        return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+      }
+
+      function formatAgo(timestamp) {
+        if (!timestamp) return "Just now";
+        const minutes = Math.max(1, Math.round((Date.now() - new Date(timestamp)) / 60000));
+        if (minutes < 60) return minutes + "m ago";
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) return hours + "h ago";
+        return Math.round(hours / 24) + "d ago";
+      }
+
+      function formatTime(timestamp) {
+        if (!timestamp) return "Now";
+        return new Intl.DateTimeFormat("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        }).format(new Date(timestamp));
+      }
+
+      function previewKey(type, id) {
+        return type + ":" + String(id);
+      }
+
+      function setPreview(type, id, value) {
+        previews.set(previewKey(type, id), value);
+        const node = document.querySelector(
+          '.channel-item[data-type="' + type + '"][data-id="' + String(id) + '"] .channel-preview',
+        );
+        if (node) node.textContent = value;
+      }
+
+      function getPreview(type, id, fallback) {
+        return previews.get(previewKey(type, id)) || fallback;
+      }
+
+      function showToast(message) {
+        el.toast.textContent = message;
+        el.toast.classList.add("show");
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => el.toast.classList.remove("show"), 2400);
+      }
+
+      function showBanner(message, variant) {
+        if (!message) {
+          el.surfaceBanner.className = "banner";
+          el.surfaceBanner.textContent = "";
+          return;
+        }
+        el.surfaceBanner.className = "banner " + variant + " show";
+        el.surfaceBanner.textContent = message;
+      }
+
+      function syncComposer() {
+        const enabled =
+          activeChannel.type !== "home" && stompClient && stompClient.connected;
+        el.messageInput.disabled = !enabled;
+        el.sendBtn.disabled = !enabled;
+      }
+
+      function setConnectionState(text, online) {
+        el.connectionState.textContent = text;
+        el.connectionState.className = "status-pill" + (online ? " online" : "");
+        syncComposer();
+      }
+
+      function clearMessages(title, copy, kicker) {
+        el.messagesArea.innerHTML =
+          '<div class="empty-state"><div class="eyebrow">' +
+          kicker +
+          "</div><h2>" +
+          title +
+          '</h2><div class="muted">' +
+          copy +
+          "</div></div>";
+      }
+
+      function addMessage(content, sent, sender, timestamp) {
+        if (el.messagesArea.querySelector(".empty-state")) el.messagesArea.innerHTML = "";
+        const row = document.createElement("div");
+        row.className = "message-row" + (sent ? " sent" : "");
+        row.innerHTML =
+          '<div class="channel-avatar">' +
+          initials(sender) +
+          '</div><div class="message-stack"><div class="message-meta"><strong>' +
+          sender +
+          "</strong><span>" +
+          formatTime(timestamp) +
+          '</span></div><div class="message-bubble"></div></div>';
+        row.querySelector(".message-bubble").textContent = content;
+        el.messagesArea.appendChild(row);
+        el.messagesArea.scrollTop = el.messagesArea.scrollHeight;
+      }
+
+      function selectHome() {
+        activeChannel = { type: "home" };
+        el.chatKicker.textContent = "Workspace Overview";
+        el.chatTitle.textContent = currentUser.username || defaultName(currentUser.email);
+        el.chatSubtitle.textContent =
+          "Use accepted friends for direct chat and accept group invites from the inbox before rooms appear.";
+        showBanner(
+          "Friend requests unlock direct chat. Group invitations unlock rooms after you accept them.",
+          "info",
+        );
+        disconnectSubscription();
+        highlightSelection();
+        clearMessages(
+          "Choose a conversation",
+          "Send a friend request by email or accept a group invite from the inbox to begin chatting.",
+          "No Channel Selected",
+        );
+        syncComposer();
+      }
+
+      function selectDirect(friend) {
+        activeChannel = {
+          type: "direct",
+          id: normalizeEmail(friend.email),
+          email: friend.email,
+          name: displayName(friend),
+        };
+        el.chatKicker.textContent = "Direct Message";
+        el.chatTitle.textContent = displayName(friend);
+        el.chatSubtitle.textContent =
+          "Direct chat is active because this friend request was accepted.";
+        showBanner("", "info");
+        highlightSelection();
+        syncComposer();
+        loadDirectHistory(friend.email);
+        subscribeToDirect(friend.email);
+      }
+
+      function selectGroup(group) {
+        activeChannel = { type: "group", id: group.id, name: group.name || "Study Group" };
+        el.chatKicker.textContent = "Study Group";
+        el.chatTitle.textContent = group.name || "Study Group";
+        el.chatSubtitle.textContent =
+          (group.category ? group.category + " | " : "") + "Accepted room for shared work.";
+        showBanner("", "info");
+        highlightSelection();
+        syncComposer();
         loadGroupHistory(group.id);
         subscribeToGroup(group.id);
-    }
+      }
 
-    function connectWs() {
-        if (reconnectTimer) {
-            clearTimeout(reconnectTimer);
-            reconnectTimer = null;
+      function highlightSelection() {
+        document.querySelectorAll(".channel-item").forEach((item) => {
+          item.classList.toggle(
+            "active",
+            item.dataset.type === activeChannel.type &&
+              item.dataset.id === String(activeChannel.id || ""),
+          );
+        });
+        el.homeRailButton.classList.toggle(
+          "active",
+          activeChannel.type === "home" || activeChannel.type === "direct",
+        );
+        document.querySelectorAll(".rail-group").forEach((item) => {
+          item.classList.toggle(
+            "active",
+            activeChannel.type === "group" &&
+              item.dataset.id === String(activeChannel.id || ""),
+          );
+        });
+      }
+
+      function renderChannel(type, id, name, preview, role, onClick) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "channel-item";
+        button.dataset.type = type;
+        button.dataset.id = String(id);
+        button.innerHTML =
+          '<div class="channel-avatar">' +
+          initials(name) +
+          '</div><div class="channel-main"><div class="channel-name">' +
+          name +
+          '</div><div class="channel-preview"></div></div>' +
+          (role ? '<div class="mini muted">' + role + "</div>" : "");
+        button.querySelector(".channel-preview").textContent = preview;
+        button.addEventListener("click", onClick);
+        return button;
+      }
+
+      function renderFriends() {
+        el.friendsList.innerHTML = "";
+        el.friendsCount.textContent = String(socialState.friends.length);
+        el.friendsEmpty.style.display = socialState.friends.length ? "none" : "block";
+        socialState.friends.forEach((friend) => {
+          const email = normalizeEmail(friend.email);
+          el.friendsList.appendChild(
+            renderChannel(
+              "direct",
+              email,
+              displayName(friend),
+              getPreview("direct", email, friend.email || "Accepted friend"),
+              "DM",
+              () => selectDirect(friend),
+            ),
+          );
+        });
+        highlightSelection();
+      }
+
+      function renderGroups() {
+        el.groupsList.innerHTML = "";
+        el.groupRailList.innerHTML = "";
+        el.groupsEmpty.style.display = groups.length ? "none" : "block";
+        groups.forEach((group) => {
+          el.groupsList.appendChild(
+            renderChannel(
+              "group",
+              group.id,
+              group.name || "Study Group",
+              getPreview("group", group.id, group.category || "Accepted room"),
+              group.role || "",
+              () => selectGroup(group),
+            ),
+          );
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "rail-btn rail-group";
+          button.dataset.id = String(group.id);
+          button.textContent = initials(group.name || "Group");
+          button.addEventListener("click", () => selectGroup(group));
+          el.groupRailList.appendChild(button);
+        });
+        el.overviewGroups.textContent = String(groups.length);
+        highlightSelection();
+      }
+
+      function renderNotificationCard(title, body, time, actions) {
+        const card = document.createElement("div");
+        card.className = "notification-item";
+        card.innerHTML =
+          "<strong>" +
+          title +
+          '</strong><div class="mini muted" style="margin-top:6px">' +
+          body +
+          '</div><div class="mini muted" style="margin-top:8px">' +
+          time +
+          "</div>";
+        if (actions && actions.length) {
+          const wrap = document.createElement("div");
+          wrap.className = "notification-actions";
+          actions.forEach((button) => wrap.appendChild(button));
+          card.appendChild(wrap);
         }
+        return card;
+      }
 
-        const socket = new SockJS('/ws');
+      function renderNotifications() {
+        const total =
+          socialState.incomingFriendRequests.length + socialState.groupInvitations.length;
+        el.notificationBadge.hidden = total === 0;
+        el.notificationBadge.textContent = total > 9 ? "9+" : String(total);
+        el.overviewFriends.textContent = String(socialState.friends.length);
+        el.overviewNotifications.textContent = String(total);
+        el.incomingFriendRequests.innerHTML = "";
+        el.groupInvitations.innerHTML = "";
+        el.outgoingFriendRequests.innerHTML = "";
+        el.incomingFriendsCount.textContent = String(
+          socialState.incomingFriendRequests.length,
+        );
+        el.groupInvitationsCount.textContent = String(
+          socialState.groupInvitations.length,
+        );
+        el.outgoingFriendsCount.textContent = String(
+          socialState.outgoingFriendRequests.length,
+        );
+        el.incomingFriendsEmpty.style.display = socialState.incomingFriendRequests.length
+          ? "none"
+          : "block";
+        el.groupInvitationsEmpty.style.display = socialState.groupInvitations.length
+          ? "none"
+          : "block";
+        el.outgoingFriendsEmpty.style.display = socialState.outgoingFriendRequests.length
+          ? "none"
+          : "block";
+
+        socialState.incomingFriendRequests.forEach((request) => {
+          const accept = Object.assign(document.createElement("button"), {
+            type: "button",
+            className: "tiny-btn accept",
+            textContent: "Accept",
+          });
+          const decline = Object.assign(document.createElement("button"), {
+            type: "button",
+            className: "tiny-btn decline",
+            textContent: "Decline",
+          });
+          accept.addEventListener("click", () => respondFriendRequest(request.id, "accept"));
+          decline.addEventListener("click", () => respondFriendRequest(request.id, "decline"));
+          el.incomingFriendRequests.appendChild(
+            renderNotificationCard(
+              request.requesterName || defaultName(request.requesterEmail),
+              "Sent a friend request to unlock direct chat.",
+              formatAgo(request.createdAt),
+              [accept, decline],
+            ),
+          );
+        });
+
+        socialState.groupInvitations.forEach((invite) => {
+          const accept = Object.assign(document.createElement("button"), {
+            type: "button",
+            className: "tiny-btn accept",
+            textContent: "Join",
+          });
+          const decline = Object.assign(document.createElement("button"), {
+            type: "button",
+            className: "tiny-btn decline",
+            textContent: "Decline",
+          });
+          accept.addEventListener("click", () => respondGroupInvitation(invite.id, "accept"));
+          decline.addEventListener("click", () => respondGroupInvitation(invite.id, "decline"));
+          el.groupInvitations.appendChild(
+            renderNotificationCard(
+              invite.groupName || "Study Group",
+              "Invited by " +
+                (invite.invitedByName || defaultName(invite.invitedByEmail)) +
+                (invite.groupCategory ? " for " + invite.groupCategory + "." : "."),
+              formatAgo(invite.createdAt),
+              [accept, decline],
+            ),
+          );
+        });
+
+        socialState.outgoingFriendRequests.forEach((request) => {
+          el.outgoingFriendRequests.appendChild(
+            renderNotificationCard(
+              request.recipientName || defaultName(request.recipientEmail),
+              "Waiting for this person to accept your friend request.",
+              formatAgo(request.createdAt),
+            ),
+          );
+        });
+      }
+
+      function disconnectSubscription() {
+        if (activeSubscription) activeSubscription.unsubscribe();
+        activeSubscription = null;
+      }
+
+      function conversationKey(firstEmail, secondEmail) {
+        const pair = [normalizeEmail(firstEmail), normalizeEmail(secondEmail)]
+          .sort()
+          .join("::");
+        return btoa(pair).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      }
+
+      async function loadSocialState() {
+        const result = await authorizedRequest("/api/social/state");
+        if (!result.ok) return;
+        socialState = {
+          friends: Array.isArray(result.data.friends) ? result.data.friends : [],
+          incomingFriendRequests: Array.isArray(result.data.incomingFriendRequests)
+            ? result.data.incomingFriendRequests
+            : [],
+          outgoingFriendRequests: Array.isArray(result.data.outgoingFriendRequests)
+            ? result.data.outgoingFriendRequests
+            : [],
+          groupInvitations: Array.isArray(result.data.groupInvitations)
+            ? result.data.groupInvitations
+            : [],
+        };
+        renderFriends();
+        renderNotifications();
+      }
+
+      async function loadGroups() {
+        const result = await authorizedRequest("/api/groups/mine");
+        groups = result.ok && Array.isArray(result.data) ? result.data : [];
+        renderGroups();
+      }
+
+      async function loadDirectHistory(otherEmail) {
+        clearMessages("Loading direct chat", "Pulling the latest direct conversation.", "Direct");
+        const result = await authorizedRequest(
+          "/api/messages/direct/" + encodeURIComponent(otherEmail),
+        );
+        if (!result.ok) {
+          clearMessages(
+            "Direct chat locked",
+            result.data.error || "Direct messaging unlocks after a friend request is accepted.",
+            "Direct",
+          );
+          showBanner(
+            result.data.error || "Direct messaging unlocks after a friend request is accepted.",
+            "error",
+          );
+          return;
+        }
+        showBanner("", "info");
+        const messages = Array.isArray(result.data) ? result.data : [];
+        if (!messages.length) {
+          clearMessages("Say hello", "Start a one-to-one conversation here.", "Direct");
+          return;
+        }
+        el.messagesArea.innerHTML = "";
+        messages.forEach((message) => {
+          const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
+          addMessage(
+            message.content,
+            sent,
+            message.senderName || message.senderEmail || "User",
+            message.timestamp,
+          );
+        });
+        const last = messages[messages.length - 1];
+        if (last) {
+          setPreview(
+            "direct",
+            normalizeEmail(otherEmail),
+            (normalizeEmail(last.senderEmail) === normalizeEmail(currentUser.email)
+              ? "You"
+              : last.senderName || last.senderEmail || "User") +
+              ": " +
+              last.content,
+          );
+        }
+      }
+
+      async function loadGroupHistory(groupId) {
+        clearMessages("Loading room", "Pulling the latest group conversation.", "Group");
+        const result = await authorizedRequest("/api/messages/groups/" + groupId);
+        if (!result.ok) {
+          clearMessages(
+            "Group unavailable",
+            result.data.error || "You cannot open this room right now.",
+            "Group",
+          );
+          showBanner(result.data.error || "Group history is unavailable.", "error");
+          return;
+        }
+        showBanner("", "info");
+        const messages = Array.isArray(result.data) ? result.data : [];
+        if (!messages.length) {
+          clearMessages("This room is ready", "Kick off the first group message.", "Group");
+          return;
+        }
+        el.messagesArea.innerHTML = "";
+        messages.forEach((message) => {
+          const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
+          addMessage(
+            message.content,
+            sent,
+            message.senderName || message.senderEmail || "User",
+            message.timestamp,
+          );
+        });
+        const last = messages[messages.length - 1];
+        if (last) {
+          setPreview(
+            "group",
+            groupId,
+            (normalizeEmail(last.senderEmail) === normalizeEmail(currentUser.email)
+              ? "You"
+              : last.senderName || last.senderEmail || "User") +
+              ": " +
+              last.content,
+          );
+        }
+      }
+
+      function connectWs() {
+        if (reconnectTimer) window.clearTimeout(reconnectTimer);
+        const socket = new SockJS("/ws");
         stompClient = Stomp.over(socket);
         stompClient.debug = null;
-        stompClient.connect({}, () => {
-            setConnectionState('Connected', true);
-            messageInput.disabled = false;
-            sendBtn.disabled = false;
-            if (activeChannel.type === 'group' && activeChannel.id) {
-                subscribeToGroup(activeChannel.id);
-            } else if (activeChannel.type === 'direct' && activeChannel.email) {
-                subscribeToDirect(activeChannel.email);
-            } else {
-                subscribeToLobby();
-            }
-        }, () => {
-            setConnectionState('Reconnecting...', false);
-            messageInput.disabled = true;
-            sendBtn.disabled = true;
-            reconnectTimer = setTimeout(connectWs, 3000);
-        });
-    }
+        stompClient.connect(
+          {},
+          () => {
+            setConnectionState("Connected", true);
+            if (activeChannel.type === "group") subscribeToGroup(activeChannel.id);
+            if (activeChannel.type === "direct") subscribeToDirect(activeChannel.email);
+          },
+          () => {
+            setConnectionState("Reconnecting", false);
+            reconnectTimer = window.setTimeout(connectWs, 3000);
+          },
+        );
+      }
 
-    function subscribeToLobby() {
-        if (!stompClient || !stompClient.connected) {
-            return;
-        }
-        if (activeSubscription) {
-            activeSubscription.unsubscribe();
-        }
-        activeSubscription = stompClient.subscribe('/topic/messages', (payload) => {
-            if (!payload || !payload.body) {
-                return;
-            }
-            const message = JSON.parse(payload.body);
-            if (!message || !message.content) {
-                return;
-            }
-            const myEmail = normalizeEmail(currentUser.email);
-            const senderEmail = normalizeEmail(message.senderEmail);
-            const mySender = currentUser.username || currentUser.email || 'User';
-            const isSent = senderEmail ? senderEmail === myEmail : message.sender === mySender;
-            addMessage(message.content, isSent, message.sender || 'User', message.timestamp);
+      function subscribeToGroup(groupId) {
+        if (!stompClient || !stompClient.connected) return;
+        disconnectSubscription();
+        activeSubscription = stompClient.subscribe("/topic/groups/" + groupId, (payload) => {
+          const message = JSON.parse(payload.body || "{}");
+          if (!message.content) return;
+          const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
+          const sender = message.senderName || message.senderEmail || "User";
+          setPreview("group", groupId, (sent ? "You" : sender) + ": " + message.content);
+          addMessage(message.content, sent, sender, message.timestamp);
         });
-    }
+      }
 
-    function subscribeToGroup(groupId) {
-        if (!stompClient || !stompClient.connected) {
-            return;
-        }
-        if (activeSubscription) {
-            activeSubscription.unsubscribe();
-        }
-        activeSubscription = stompClient.subscribe('/topic/groups/' + groupId, (payload) => {
-            if (!payload || !payload.body) {
-                return;
-            }
-            const message = JSON.parse(payload.body);
-            if (!message || !message.content) {
-                return;
-            }
-            const myEmail = currentUser.email || '';
-            const isSent = myEmail && message.senderEmail && myEmail.toLowerCase() === message.senderEmail.toLowerCase();
-            addMessage(message.content, isSent, message.senderName || message.senderEmail || 'User', message.timestamp);
-        });
-    }
-
-    function subscribeToDirect(otherEmail) {
-        if (!stompClient || !stompClient.connected) {
-            return;
-        }
-        if (activeSubscription) {
-            activeSubscription.unsubscribe();
-        }
+      function subscribeToDirect(otherEmail) {
+        if (!stompClient || !stompClient.connected) return;
+        disconnectSubscription();
         const key = conversationKey(currentUser.email, otherEmail);
-        activeSubscription = stompClient.subscribe('/topic/direct/' + key, (payload) => {
-            if (!payload || !payload.body) {
-                return;
-            }
-            const message = JSON.parse(payload.body);
-            if (!message || !message.content) {
-                return;
-            }
-            const isSent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-            addMessage(message.content, isSent, message.senderName || message.senderEmail || 'User', message.timestamp);
+        activeSubscription = stompClient.subscribe("/topic/direct/" + key, (payload) => {
+          const message = JSON.parse(payload.body || "{}");
+          if (!message.content) return;
+          const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
+          const sender = message.senderName || message.senderEmail || "User";
+          setPreview("direct", normalizeEmail(otherEmail), (sent ? "You" : sender) + ": " + message.content);
+          addMessage(message.content, sent, sender, message.timestamp);
         });
-    }
+      }
 
-    async function loadGroups() {
-        groupsList.innerHTML = '';
-        hideGroupsNote();
-        const recentGroup = getRecentlyCreatedGroup();
-
-        if (recentGroup) {
-            renderGroups([recentGroup]);
-        }
-
-        const result = await authorizedJson('/api/groups/mine');
-        if (!result.ok) {
-            if (recentGroup) {
-                renderGroups([recentGroup]);
-                showGroupsNote('Your new group is shown locally while the full group list refreshes.');
-                return;
-            }
-            showGroupsNote(result.data.error || 'Groups are temporarily unavailable. You can keep using the lobby chat.');
-            return;
-        }
-
-        const groups = mergeRecentGroup(Array.isArray(result.data) ? result.data : []);
-        if (groups.length === 0) {
-            showGroupsNote('No groups yet. You can keep chatting in the lobby, DM someone, or create a group when needed.');
-            return;
-        }
-
-        renderGroups(groups);
-    }
-
-    async function loadUsers() {
-        directList.innerHTML = '';
-        const result = await authorizedJson('/api/users');
-        if (!result.ok) {
-            return;
-        }
-        const users = Array.isArray(result.data) ? result.data : [];
-        users.forEach((user) => {
-            const button = buildConversationButton({
-                id: user.email,
-                name: displayNameForUser(user),
-                preview: user.email || 'Direct message',
-                type: 'direct'
-            });
-            button.addEventListener('click', () => {
-                selectDirect(user, button);
-            });
-            directList.appendChild(button);
-        });
-    }
-
-    function renderGroups(groups) {
-        groupsList.innerHTML = '';
-        groups.forEach((group) => {
-            const button = buildConversationButton({
-                id: group.id,
-                name: group.name || 'Group',
-                preview: group.category || group.role || 'Study group',
-                type: 'group'
-            });
-            button.addEventListener('click', () => {
-                selectGroup(group, button);
-            });
-            groupsList.appendChild(button);
-        });
-    }
-
-    function sendLobbyMessage(content) {
-        const sender = currentUser.username || currentUser.email || 'User';
-        stompClient.send('/app/chat.send', {}, JSON.stringify({
-            sender,
-            senderEmail: currentUser.email,
-            content,
-            room: 'lobby'
-        }));
-    }
-
-    function sendGroupMessage(content) {
-        stompClient.send('/app/groups/' + activeChannel.id + '/send', {}, JSON.stringify({
+      function sendGroupMessage(content) {
+        stompClient.send(
+          "/app/groups/" + activeChannel.id + "/send",
+          {},
+          JSON.stringify({
             groupId: activeChannel.id,
             senderEmail: currentUser.email,
-            senderName: currentUser.username || currentUser.email || 'User',
-            content
-        }));
-    }
+            senderName: currentUser.username || currentUser.email,
+            content,
+          }),
+        );
+      }
 
-    function sendDirectMessage(content) {
+      function sendDirectMessage(content) {
         const key = conversationKey(currentUser.email, activeChannel.email);
-        stompClient.send('/app/direct/' + key + '/send', {}, JSON.stringify({
+        stompClient.send(
+          "/app/direct/" + key + "/send",
+          {},
+          JSON.stringify({
             conversationKey: key,
             senderEmail: currentUser.email,
-            senderName: currentUser.username || currentUser.email || 'User',
+            senderName: currentUser.username || currentUser.email,
             recipientEmail: activeChannel.email,
-            content
-        }));
-    }
+            content,
+          }),
+        );
+      }
 
-    messageForm.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const content = messageInput.value.trim();
-        if (!content || !stompClient || !stompClient.connected) {
-            return;
-        }
+      async function respondFriendRequest(id, action) {
+        const result = await authorizedRequest(
+          "/api/social/friend-requests/" + id + "/" + action,
+          { method: "POST" },
+        );
+        if (!result.ok) return showToast(result.data.error || "Could not update request.");
+        showToast(action === "accept" ? "Friend request accepted." : "Friend request declined.");
+        await loadSocialState();
+      }
 
-        if (activeChannel.type === 'group') {
-            if (!currentUser.email) {
-                showGroupsNote('Your email is missing from the current session, so group chat cannot be sent yet.');
-                return;
-            }
-            sendGroupMessage(content);
-        } else if (activeChannel.type === 'direct') {
-            if (!currentUser.email || !activeChannel.email) {
-                showGroupsNote('Direct messaging needs both sender and recipient emails.');
-                return;
-            }
-            sendDirectMessage(content);
-        } else {
-            sendLobbyMessage(content);
-        }
-
-        messageInput.value = '';
-        messageInput.focus();
-    });
-
-    newGroupBtn.addEventListener('click', () => {
-        window.location.href = '/create-group.html';
-    });
-
-    logoutBtn.addEventListener('click', () => {
-        clearSession();
-        window.location.href = '/login.html';
-    });
-
-    window.addEventListener('load', async () => {
-        currentUser = requireAuth();
-        if (!currentUser) {
-            return;
-        }
-
-        userAvatar.textContent = (currentUser.username || currentUser.email || 'U').substring(0, 1).toUpperCase();
-        userName.textContent = currentUser.username || currentUser.email || 'User';
-
-        renderPrimaryConversation();
-        selectLobby();
-        connectWs();
-        await loadUsers();
+      async function respondGroupInvitation(id, action) {
+        const result = await authorizedRequest(
+          "/api/social/group-invitations/" + id + "/" + action,
+          { method: "POST" },
+        );
+        if (!result.ok) return showToast(result.data.error || "Could not update invitation.");
+        showToast(action === "accept" ? "Group invitation accepted." : "Group invitation declined.");
+        await loadSocialState();
         await loadGroups();
-    });
+      }
 
-    window.addEventListener('beforeunload', () => {
-        try {
-            if (activeSubscription) {
-                activeSubscription.unsubscribe();
-            }
-            if (stompClient && stompClient.connected) {
-                stompClient.disconnect();
-            }
-        } catch (_) {
-            // no-op
+      async function bootstrap() {
+        currentUser = requireAuth();
+        if (!currentUser) return;
+        const name = currentUser.username || defaultName(currentUser.email);
+        el.userAvatar.textContent = initials(name);
+        el.userName.textContent = name;
+        el.userEmail.textContent = currentUser.email;
+        el.selfRailLabel.textContent = initials(name);
+        selectHome();
+        await loadSocialState();
+        await loadGroups();
+        connectWs();
+        window.setInterval(async () => {
+          await loadSocialState();
+          await loadGroups();
+        }, 15000);
+      }
+
+      el.friendRequestForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const email = el.friendEmailInput.value.trim();
+        if (!email) return;
+        el.friendSubmitBtn.disabled = true;
+        const result = await authorizedRequest("/api/social/friend-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        el.friendSubmitBtn.disabled = false;
+        el.friendRequestFeedback.textContent = result.ok
+          ? "Friend request sent."
+          : result.data.error || "Could not send friend request.";
+        if (result.ok) {
+          el.friendEmailInput.value = "";
+          showToast("Friend request sent.");
+          await loadSocialState();
         }
-    });
-</script>
-</body>
+      });
+
+      el.messageForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const content = el.messageInput.value.trim();
+        if (!content || !stompClient || !stompClient.connected) return;
+        if (activeChannel.type === "group") {
+          sendGroupMessage(content);
+          setPreview("group", activeChannel.id, "You: " + content);
+        } else if (activeChannel.type === "direct") {
+          sendDirectMessage(content);
+          setPreview("direct", activeChannel.id, "You: " + content);
+        } else {
+          return;
+        }
+        el.messageInput.value = "";
+      });
+
+      el.homeRailButton.addEventListener("click", selectHome);
+      el.newGroupBtn.addEventListener("click", () => (window.location.href = "/create-group.html"));
+      el.createGroupSidebarBtn.addEventListener(
+        "click",
+        () => (window.location.href = "/create-group.html"),
+      );
+      el.headerInboxButton.addEventListener("click", () =>
+        el.utilityPanel.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+      el.notificationToggleButton.addEventListener("click", () =>
+        el.utilityPanel.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+      el.closeInboxButton.addEventListener("click", () =>
+        window.scrollTo({ top: 0, behavior: "smooth" }),
+      );
+      el.logoutBtn.addEventListener("click", () => {
+        clearSession();
+        window.location.href = "/login.html";
+      });
+      window.addEventListener("beforeunload", () => {
+        try {
+          disconnectSubscription();
+          if (stompClient && stompClient.connected) stompClient.disconnect();
+        } catch (_) {
+          // no-op
+        }
+      });
+      window.addEventListener("load", bootstrap);
+    </script>
+  </body>
 </html>

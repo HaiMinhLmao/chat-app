@@ -6,8 +6,11 @@ import com.myclass.chat_app.dto.GroupSummaryResponse;
 import com.myclass.chat_app.entity.User;
 import com.myclass.chat_app.entity.ChatGroup;
 import com.myclass.chat_app.entity.GroupMember;
+import com.myclass.chat_app.entity.GroupInvitation;
+import com.myclass.chat_app.entity.InvitationStatus;
 import com.myclass.chat_app.entity.GroupRole;
 import com.myclass.chat_app.repository.ChatGroupRepository;
+import com.myclass.chat_app.repository.GroupInvitationRepository;
 import com.myclass.chat_app.repository.GroupMemberRepository;
 import com.myclass.chat_app.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,7 @@ public class GroupService {
 
     private final ChatGroupRepository groupRepository;
     private final GroupMemberRepository memberRepository;
+    private final GroupInvitationRepository groupInvitationRepository;
     private final UserRepository userRepository;
     private final TransientCollaborationStore transientStore;
     private final TransactionTemplate transactionTemplate;
@@ -39,12 +43,14 @@ public class GroupService {
     public GroupService(
             ChatGroupRepository groupRepository,
             GroupMemberRepository memberRepository,
+            GroupInvitationRepository groupInvitationRepository,
             UserRepository userRepository,
             TransientCollaborationStore transientStore,
             TransactionTemplate transactionTemplate
     ) {
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
+        this.groupInvitationRepository = groupInvitationRepository;
         this.userRepository = userRepository;
         this.transientStore = transientStore;
         this.transactionTemplate = transactionTemplate;
@@ -97,18 +103,20 @@ public class GroupService {
         Set<String> uniqueEmails = normalizeEmails(request.members());
         uniqueEmails.remove(creator);
 
-        List<GroupMember> added = new ArrayList<>();
         for (String email : uniqueEmails) {
-            if (!isValidEmail(email)) continue;
-            User u = loadOrCreateInvitedUser(email);
-            GroupMember gm = new GroupMember();
-            gm.setGroup(savedGroup);
-            gm.setUser(u);
-            gm.setRole(GroupRole.MEMBER);
-            added.add(memberRepository.save(gm));
+            if (!isValidEmail(email)) {
+                continue;
+            }
+            User invitedUser = loadOrCreateInvitedUser(email);
+            GroupInvitation invitation = new GroupInvitation();
+            invitation.setGroup(savedGroup);
+            invitation.setInvitedBy(createdBy);
+            invitation.setInvitedUser(invitedUser);
+            invitation.setStatus(InvitationStatus.PENDING);
+            groupInvitationRepository.save(invitation);
         }
 
-        return toResponse(savedGroup, adminMember, added);
+        return toResponse(savedGroup, adminMember, List.of());
     }
 
     private User loadOrCreateInvitedUser(String email) {

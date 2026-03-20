@@ -48,6 +48,27 @@ public class DatabaseSchemaInitializer {
                     )
                     """,
                     """
+                    create table if not exists friend_requests (
+                        id bigserial primary key,
+                        requester_user_id bigint not null references users(id) on delete cascade,
+                        recipient_user_id bigint not null references users(id) on delete cascade,
+                        status varchar(20) not null default 'PENDING',
+                        created_at timestamptz not null default now(),
+                        responded_at timestamptz
+                    )
+                    """,
+                    """
+                    create table if not exists group_invitations (
+                        id bigserial primary key,
+                        group_id bigint not null references chat_groups(id) on delete cascade,
+                        invited_by_user_id bigint not null references users(id) on delete cascade,
+                        invited_user_id bigint not null references users(id) on delete cascade,
+                        status varchar(20) not null default 'PENDING',
+                        created_at timestamptz not null default now(),
+                        responded_at timestamptz
+                    )
+                    """,
+                    """
                     create table if not exists messages (
                         id bigserial primary key,
                         sender varchar(200) not null,
@@ -66,6 +87,9 @@ public class DatabaseSchemaInitializer {
                     "alter table messages add column if not exists room varchar(512)",
                     "alter table messages add column if not exists type varchar(20) not null default 'LOBBY'",
                     "alter table messages alter column room type varchar(512)",
+                    "create index if not exists idx_friend_requests_recipient_status on friend_requests(recipient_user_id, status, created_at)",
+                    "create index if not exists idx_friend_requests_requester_status on friend_requests(requester_user_id, status, created_at)",
+                    "create index if not exists idx_group_invitations_user_status on group_invitations(invited_user_id, status, created_at)",
                     "create index if not exists idx_messages_type_room_time on messages(type, room, timestamp)",
                     "create index if not exists idx_messages_type_group_time on messages(type, group_id, timestamp)",
                     "create index if not exists idx_messages_sender_recipient_time on messages(sender_email, recipient_email, timestamp)"

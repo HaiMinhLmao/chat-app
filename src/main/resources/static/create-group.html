@@ -4,23 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyClassRoom - Create Group</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-1: #eef4ff;
-            --bg-2: #f8efe5;
-            --surface: rgba(255, 255, 255, 0.82);
-            --surface-strong: #ffffff;
-            --text: #18202c;
-            --muted: #657287;
-            --line: rgba(104, 123, 154, 0.18);
-            --accent: #315efb;
-            --accent-strong: #173cbf;
-            --accent-soft: rgba(49, 94, 251, 0.12);
-            --success: #0a7b58;
-            --success-soft: rgba(10, 123, 88, 0.12);
-            --danger: #c43d4b;
-            --danger-soft: rgba(196, 61, 75, 0.12);
-            --shadow: 0 24px 60px rgba(29, 47, 86, 0.14);
+            --bg-1: #0b1017;
+            --bg-2: #111827;
+            --surface: rgba(22, 27, 36, 0.88);
+            --surface-strong: rgba(18, 24, 34, 0.96);
+            --text: #f5f7fb;
+            --muted: #94a3b8;
+            --line: rgba(148, 163, 184, 0.16);
+            --accent: #5aa7ff;
+            --accent-strong: #2e84f4;
+            --accent-soft: rgba(90, 167, 255, 0.14);
+            --success: #33d69f;
+            --success-soft: rgba(51, 214, 159, 0.14);
+            --danger: #fb7185;
+            --danger-soft: rgba(251, 113, 133, 0.14);
+            --shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
             --radius-xl: 28px;
             --radius-lg: 18px;
             --radius-md: 14px;
@@ -33,12 +36,12 @@
         body {
             margin: 0;
             min-height: 100vh;
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Manrope", sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(49, 94, 251, 0.14), transparent 32%),
-                radial-gradient(circle at bottom right, rgba(233, 153, 72, 0.16), transparent 30%),
-                linear-gradient(135deg, var(--bg-1), var(--bg-2));
+                radial-gradient(circle at top left, rgba(90, 167, 255, 0.18), transparent 26%),
+                radial-gradient(circle at bottom right, rgba(51, 214, 159, 0.12), transparent 24%),
+                linear-gradient(160deg, var(--bg-1), var(--bg-2) 48%, #0f172a);
             padding: 28px;
         }
 
@@ -80,14 +83,14 @@
             width: 52px;
             height: 52px;
             border-radius: 16px;
-            background: linear-gradient(135deg, #315efb, #5c7cff 62%, #86a0ff);
-            color: #fff;
+            background: linear-gradient(135deg, #7cb7ff, #59e0a8);
+            color: #04101f;
             display: grid;
             place-items: center;
             font-size: 18px;
             font-weight: 800;
             letter-spacing: 0.08em;
-            box-shadow: 0 16px 35px rgba(49, 94, 251, 0.28);
+            box-shadow: 0 16px 35px rgba(46, 132, 244, 0.22);
         }
 
         .brand-copy h1 {
@@ -104,7 +107,7 @@
 
         .session-pill {
             border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.64);
+            background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(16px);
             border-radius: 999px;
             padding: 10px 16px;
@@ -122,7 +125,7 @@
 
         .hero,
         .panel {
-            border: 1px solid rgba(255, 255, 255, 0.72);
+            border: 1px solid var(--line);
             background: var(--surface);
             backdrop-filter: blur(18px);
             box-shadow: var(--shadow);
@@ -143,8 +146,8 @@
             width: fit-content;
             padding: 8px 12px;
             border-radius: 999px;
-            background: rgba(24, 32, 44, 0.06);
-            color: var(--muted);
+            background: var(--accent-soft);
+            color: var(--accent);
             font-size: 12px;
             font-weight: 700;
             letter-spacing: 0.08em;
@@ -153,6 +156,7 @@
 
         .hero h2 {
             margin: 0;
+            font-family: "Space Grotesk", sans-serif;
             font-size: 38px;
             line-height: 1.04;
             letter-spacing: -0.03em;
@@ -168,8 +172,8 @@
         .hero-summary {
             padding: 18px;
             border-radius: 22px;
-            background: linear-gradient(135deg, rgba(49, 94, 251, 0.1), rgba(255, 255, 255, 0.88));
-            border: 1px solid rgba(49, 94, 251, 0.14);
+            background: linear-gradient(135deg, rgba(90, 167, 255, 0.18), rgba(255, 255, 255, 0.03));
+            border: 1px solid rgba(90, 167, 255, 0.16);
             display: grid;
             gap: 10px;
         }
@@ -202,7 +206,7 @@
         .hero-item {
             padding: 14px 16px;
             border-radius: var(--radius-lg);
-            background: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--line);
         }
 
@@ -223,7 +227,7 @@
             gap: 10px;
             padding: 18px;
             border-radius: 22px;
-            background: rgba(255, 255, 255, 0.72);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--line);
         }
 
@@ -255,6 +259,7 @@
 
         .panel-head h3 {
             margin: 0;
+            font-family: "Space Grotesk", sans-serif;
             font-size: 28px;
             letter-spacing: -0.03em;
         }
@@ -281,8 +286,8 @@
         }
 
         .auth-badge.warn {
-            color: #935d06;
-            background: rgba(243, 173, 46, 0.16);
+            color: #f3b33c;
+            background: rgba(243, 179, 60, 0.16);
         }
 
         .auth-card {
@@ -354,7 +359,7 @@
             width: 100%;
             border: 1px solid var(--line);
             border-radius: var(--radius-md);
-            background: rgba(255, 255, 255, 0.92);
+            background: rgba(8, 12, 20, 0.92);
             color: var(--text);
             font: inherit;
             padding: 15px 16px;
@@ -384,11 +389,11 @@
         .chip {
             padding: 8px 12px;
             border-radius: 999px;
-            background: rgba(49, 94, 251, 0.08);
-            color: var(--accent-strong);
+            background: rgba(90, 167, 255, 0.14);
+            color: var(--accent);
             font-size: 12px;
             font-weight: 700;
-            border: 1px solid rgba(49, 94, 251, 0.14);
+            border: 1px solid rgba(90, 167, 255, 0.16);
         }
 
         .actions {
@@ -425,18 +430,18 @@
         }
 
         .primary {
-            color: #fff;
-            background: linear-gradient(135deg, #315efb, #5c7cff);
-            box-shadow: 0 18px 28px rgba(49, 94, 251, 0.24);
+            color: #04101f;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            box-shadow: 0 18px 28px rgba(46, 132, 244, 0.24);
         }
 
         .secondary {
             color: var(--text);
-            background: rgba(24, 32, 44, 0.06);
+            background: rgba(255, 255, 255, 0.08);
         }
 
         .ghost {
-            color: var(--accent-strong);
+            color: var(--accent);
             background: var(--accent-soft);
         }
 
@@ -554,11 +559,11 @@
                 </div>
                 <div class="hero-item">
                     <strong>Who gets added now</strong>
-                    <span>Invited emails are added to the group right away. People will see the room after they sign in with that same email.</span>
+                    <span>Invited emails receive a group invitation first. The room appears in their sidebar only after they accept it from notifications.</span>
                 </div>
                 <div class="hero-item">
                     <strong>What happens next</strong>
-                    <span>After creation, you return to the lobby, the new room appears in your group list, and you can start chatting right away.</span>
+                    <span>After creation, you return to the lobby, the new room appears for you as admin, and invitees get a pending join request in their inbox.</span>
                 </div>
             </div>
 
@@ -621,7 +626,7 @@
                     <div class="field full">
                         <label for="members">Members by email</label>
                         <input id="members" placeholder="a@gmail.com, b@gmail.com, c@gmail.com" />
-                        <div class="hint">Separate each email with a comma. Invited people can see the group after they sign in with that email.</div>
+                        <div class="hint">Separate each email with a comma. Each invited person receives a group invite and must accept it before the room appears for them.</div>
                         <div class="chips" id="memberPreview"></div>
                     </div>
                 </div>
@@ -836,7 +841,7 @@
         const session = getSupabaseSession();
         const user = getCurrentUser();
 
-        loginLink.href = '/login.html';
+        loginLink.href = '/login.html?returnTo=/create-group.html';
 
         if (session && session.access_token && user) {
             shell.classList.add('signed-in');
@@ -1003,7 +1008,7 @@
             }
 
             rememberCreatedGroup(data);
-            showSuccess('Group #' + data.id + ' created successfully. Returning to the lobby...');
+            showSuccess('Group #' + data.id + ' created. Invitations were sent and you are returning to the lobby...');
             setTimeout(() => {
                 const params = new URLSearchParams({
                     createdGroupId: String(data.id),
