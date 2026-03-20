@@ -52,7 +52,14 @@ public class LocalUserAuthService {
 
     public boolean supportsIdentifier(String identifier) {
         String normalized = normalize(identifier);
-        return normalized != null && localCredentialRepository.existsByUserEmailIgnoreCase(normalized);
+        if (normalized == null) {
+            return false;
+        }
+        try {
+            return localCredentialRepository.existsByUserEmailIgnoreCase(normalized);
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     public Map<String, Object> register(String email, String password, String fullName) {

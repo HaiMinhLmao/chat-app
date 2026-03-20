@@ -114,16 +114,28 @@ public class AuthController {
                 safeUpsertLocalUser(supabaseResponse, email, null);
                 return ResponseEntity.ok(response);
             } catch (Exception supabaseLoginError) {
-                if (localUserAuthService.supportsIdentifier(email)) {
-                    Map<String, Object> localResponse = localUserAuthService.login(email.trim(), password);
-                    safeUpsertLocalUser(localResponse, email, null);
-                    return ResponseEntity.ok(localResponse);
+                try {
+                    if (localUserAuthService.supportsIdentifier(email)) {
+                        Map<String, Object> localResponse = localUserAuthService.login(email.trim(), password);
+                        safeUpsertLocalUser(localResponse, email, null);
+                        return ResponseEntity.ok(localResponse);
+                    }
+                } catch (RuntimeException localDbError) {
+                    log.warn("Skipping local user auth fallback because the database is unavailable: {}", localDbError.getMessage());
                 }
                 throw supabaseLoginError;
             }
 
         } catch (Exception e) {
             String message = e.getMessage() == null ? "" : e.getMessage();
+            if (message.contains("Unable to acquire JDBC Connection")
+                    || message.contains("Connection is not available")
+                    || message.contains("request timed out after")) {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                        "error",
+                        "The app cannot reach the database right now. On deployment, point Spring Boot at the Supabase session pooler on port 5432 and redeploy."
+                ));
+            }
             if (message.contains("invalid_credentials")) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                         "error",
