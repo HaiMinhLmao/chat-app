@@ -13,6 +13,7 @@ import com.myclass.chat_app.repository.ChatGroupRepository;
 import com.myclass.chat_app.repository.GroupInvitationRepository;
 import com.myclass.chat_app.repository.GroupMemberRepository;
 import com.myclass.chat_app.repository.UserRepository;
+import com.myclass.chat_app.support.UserIdentitySupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -21,9 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -57,25 +56,22 @@ public class GroupService {
     }
 
     public GroupResponse createGroup(String creatorEmail, CreateGroupRequest request) {
-        if (creatorEmail == null || creatorEmail.isBlank()) {
+        String creator = UserIdentitySupport.normalizeEmail(creatorEmail);
+        if (creator == null) {
             throw new IllegalArgumentException("Unauthorized");
         }
-        String creator = creatorEmail.trim().toLowerCase(Locale.ROOT);
         if (request == null) {
             throw new IllegalArgumentException("Request body is required");
         }
 
-        String groupName = request.groupName();
-        if (groupName == null || groupName.isBlank()) {
+        String groupName = UserIdentitySupport.trimToNull(request.groupName());
+        if (groupName == null) {
             throw new IllegalArgumentException("groupName is required");
         }
 
         try {
             return transactionTemplate.execute(status -> createGroupInDatabase(creator, request));
         } catch (IllegalArgumentException e) {
-            if ("Creator user not found in local DB".equalsIgnoreCase(e.getMessage())) {
-                return transientStore.createGroup(creator, request);
-            }
             throw e;
         } catch (RuntimeException e) {
             return transientStore.createGroup(creator, request);
@@ -83,13 +79,15 @@ public class GroupService {
     }
 
     private GroupResponse createGroupInDatabase(String creator, CreateGroupRequest request) {
-        User createdBy = userRepository.findByEmailIgnoreCase(creator)
-                .orElseThrow(() -> new IllegalArgumentException("Creator user not found in local DB"));
+        User createdBy = loadOrCreateCreator(creator);
+        Set<String> uniqueEmails = normalizeEmails(request.members());
+        uniqueEmails.remove(creator);
+        List<User> invitedUsers = resolveInvitedUsers(uniqueEmails);
 
         ChatGroup group = new ChatGroup();
-        group.setName(request.groupName().trim());
-        group.setDescription(trimToNull(request.description()));
-        group.setCategory(trimToNull(request.category()));
+        group.setName(UserIdentitySupport.trimToNull(request.groupName()));
+        group.setDescription(UserIdentitySupport.trimToNull(request.description()));
+        group.setCategory(UserIdentitySupport.trimToNull(request.category()));
         group.setCreatedBy(createdBy);
 
         ChatGroup savedGroup = groupRepository.save(group);
@@ -100,14 +98,7 @@ public class GroupService {
         adminMember.setRole(GroupRole.ADMIN);
         memberRepository.save(adminMember);
 
-        Set<String> uniqueEmails = normalizeEmails(request.members());
-        uniqueEmails.remove(creator);
-
-        for (String email : uniqueEmails) {
-            if (!isValidEmail(email)) {
-                continue;
-            }
-            User invitedUser = loadOrCreateInvitedUser(email);
+        for (User invitedUser : invitedUsers) {
             GroupInvitation invitation = new GroupInvitation();
             invitation.setGroup(savedGroup);
             invitation.setInvitedBy(createdBy);
@@ -116,16 +107,45 @@ public class GroupService {
             groupInvitationRepository.save(invitation);
         }
 
-        return toResponse(savedGroup, adminMember, List.of());
+        return new GroupResponse(
+                savedGroup.getId(),
+                savedGroup.getName(),
+                savedGroup.getDescription(),
+                savedGroup.getCategory(),
+                savedGroup.getCreatedBy().getEmail(),
+                savedGroup.getCreatedAt(),
+                List.of(toMemberResponse(adminMember))
+        );
     }
 
-    private User loadOrCreateInvitedUser(String email) {
+    private User loadOrCreateCreator(String email) {
         return userRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
-            User invitedUser = new User();
-            invitedUser.setEmail(email);
-            invitedUser.setFullName(defaultDisplayName(email));
-            return userRepository.save(invitedUser);
+            User creator = new User();
+            creator.setEmail(email);
+            creator.setFullName(UserIdentitySupport.defaultDisplayName(email));
+            return userRepository.save(creator);
         });
+    }
+
+    private List<User> resolveInvitedUsers(Set<String> emails) {
+        List<String> invalidEmails = emails.stream()
+                .filter(email -> !isValidEmail(email))
+                .toList();
+        if (!invalidEmails.isEmpty()) {
+            throw new IllegalArgumentException(invalidInviteEmailMessage(invalidEmails));
+        }
+
+        List<User> invitedUsers = new ArrayList<>();
+        List<String> missingEmails = new ArrayList<>();
+        for (String email : emails) {
+            userRepository.findByEmailIgnoreCase(email)
+                    .ifPresentOrElse(invitedUsers::add, () -> missingEmails.add(email));
+        }
+
+        if (!missingEmails.isEmpty()) {
+            throw new IllegalArgumentException(missingAccountMessage(missingEmails));
+        }
+        return invitedUsers;
     }
 
     @Transactional(readOnly = true)
@@ -142,9 +162,7 @@ public class GroupService {
                     group.getCategory(),
                     group.getCreatedBy().getEmail(),
                     group.getCreatedAt(),
-                    members.stream()
-                            .map(m -> new GroupResponse.GroupMemberResponse(m.getUser().getEmail(), m.getRole().name()))
-                            .toList()
+                    members.stream().map(GroupService::toMemberResponse).toList()
             );
         } catch (IllegalArgumentException e) {
             return transientStore.getGroup(id);
@@ -155,10 +173,10 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public List<GroupSummaryResponse> listMyGroups(String email) {
-        if (email == null || email.isBlank()) {
+        String normalized = UserIdentitySupport.normalizeEmail(email);
+        if (normalized == null) {
             throw new IllegalArgumentException("Unauthorized");
         }
-        String normalized = email.trim().toLowerCase(Locale.ROOT);
         List<GroupSummaryResponse> transientGroups = transientStore.listMyGroups(normalized);
         try {
             List<GroupMember> memberships = memberRepository.findByUserEmailIgnoreCase(normalized);
@@ -179,8 +197,8 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public boolean isMember(Long groupId, String email) {
-        if (groupId == null || email == null || email.isBlank()) return false;
-        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        String normalized = UserIdentitySupport.normalizeEmail(email);
+        if (groupId == null || normalized == null) return false;
         try {
             if (memberRepository.findByGroupIdAndUserEmailIgnoreCase(groupId, normalized).isPresent()) {
                 return true;
@@ -189,21 +207,6 @@ public class GroupService {
             // Fall back to transient storage below.
         }
         return transientStore.isMember(groupId, normalized);
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isAdmin(Long groupId, String email) {
-        if (groupId == null || email == null || email.isBlank()) return false;
-        String normalized = email.trim().toLowerCase(Locale.ROOT);
-        try {
-            Optional<GroupMember> membership = memberRepository.findByGroupIdAndUserEmailIgnoreCase(groupId, normalized);
-            if (membership.isPresent()) {
-                return membership.get().getRole() == GroupRole.ADMIN;
-            }
-        } catch (RuntimeException ignored) {
-            // Fall back to transient storage below.
-        }
-        return transientStore.isAdmin(groupId, normalized);
     }
 
     private static boolean isValidEmail(String email) {
@@ -217,24 +220,23 @@ public class GroupService {
             if (raw == null) continue;
             // allow comma-separated
             for (String part : raw.split(",")) {
-                String e = part.trim().toLowerCase(Locale.ROOT);
-                if (!e.isBlank()) out.add(e);
+                String e = UserIdentitySupport.normalizeEmail(part);
+                if (e != null) out.add(e);
             }
         }
         return out;
     }
 
-    private static String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+    private static String invalidInviteEmailMessage(List<String> emails) {
+        return emails.size() == 1
+                ? "Invalid invite email: " + emails.get(0) + "."
+                : "Invalid invite emails: " + String.join(", ", emails) + ".";
     }
 
-    private static String defaultDisplayName(String email) {
-        int index = email.indexOf('@');
-        return index > 0 ? email.substring(0, index) : email;
+    private static String missingAccountMessage(List<String> emails) {
+        return emails.size() == 1
+                ? "No MyClassRoom account found for " + emails.get(0) + "."
+                : "No MyClassRoom accounts found for: " + String.join(", ", emails) + ".";
     }
 
     private static List<GroupSummaryResponse> mergeGroups(
@@ -251,22 +253,8 @@ public class GroupService {
         return new ArrayList<>(merged.values());
     }
 
-    private GroupResponse toResponse(ChatGroup group, GroupMember admin, List<GroupMember> added) {
-        List<GroupResponse.GroupMemberResponse> members = new ArrayList<>();
-        members.add(new GroupResponse.GroupMemberResponse(admin.getUser().getEmail(), admin.getRole().name()));
-        for (GroupMember m : added) {
-            members.add(new GroupResponse.GroupMemberResponse(m.getUser().getEmail(), m.getRole().name()));
-        }
-
-        return new GroupResponse(
-                group.getId(),
-                group.getName(),
-                group.getDescription(),
-                group.getCategory(),
-                group.getCreatedBy().getEmail(),
-                group.getCreatedAt(),
-                members
-        );
+    private static GroupResponse.GroupMemberResponse toMemberResponse(GroupMember member) {
+        return new GroupResponse.GroupMemberResponse(member.getUser().getEmail(), member.getRole().name());
     }
 }
 

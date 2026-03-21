@@ -673,9 +673,9 @@
 
         <section class="card" style="padding: 16px">
           <div class="eyebrow">Add Friend</div>
-          <div class="headline" style="margin-top: 8px">Invite by email</div>
+          <div class="headline" style="margin-top: 8px">Send request by email</div>
           <p class="muted mini" style="line-height: 1.7">
-            This does not send a Gmail message. The invite appears in MyClassRoom Inbox after that person signs in with the same email.
+            Only existing MyClassRoom accounts can receive requests. It appears in Inbox, not Gmail.
           </p>
           <form class="friend-form" id="friendRequestForm">
             <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
@@ -1739,7 +1739,7 @@
         event.preventDefault();
         const email = el.friendEmailInput.value.trim();
         if (!email) {
-          setFriendFeedback("Enter an email before sending the invite.", "error");
+          setFriendFeedback("Enter an email before sending the request.", "error");
           return;
         }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1748,7 +1748,7 @@
         }
         setFriendFeedback("", "success");
         el.friendSubmitBtn.disabled = true;
-        el.friendSubmitBtn.textContent = "Adding...";
+        el.friendSubmitBtn.textContent = "Sending...";
         const result = await authorizedRequest("/api/social/friend-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1758,11 +1758,8 @@
         el.friendSubmitBtn.textContent = "Add";
         if (result.ok) {
           el.friendEmailInput.value = "";
-          setFriendFeedback(
-            "Invite saved. The other person must sign in with that same email and open Inbox to accept.",
-            "success",
-          );
-          showToast("Invite saved. The other person will see it inside MyClassRoom Inbox.");
+          setFriendFeedback("Friend request sent. They can accept it from Inbox.", "success");
+          showToast("Friend request sent.");
           await loadSocialState();
         } else {
           setFriendFeedback(

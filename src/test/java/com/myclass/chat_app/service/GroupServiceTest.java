@@ -4,6 +4,7 @@ import com.myclass.chat_app.dto.CreateGroupRequest;
 import com.myclass.chat_app.dto.GroupResponse;
 import com.myclass.chat_app.dto.GroupSummaryResponse;
 import com.myclass.chat_app.entity.ChatGroup;
+import com.myclass.chat_app.entity.GroupInvitation;
 import com.myclass.chat_app.entity.GroupMember;
 import com.myclass.chat_app.entity.GroupRole;
 import com.myclass.chat_app.entity.User;
@@ -12,6 +13,7 @@ import com.myclass.chat_app.repository.GroupInvitationRepository;
 import com.myclass.chat_app.repository.GroupMemberRepository;
 import com.myclass.chat_app.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -20,8 +22,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class GroupServiceTest {
@@ -40,7 +44,13 @@ class GroupServiceTest {
         creator.setEmail("creator@example.com");
         creator.setFullName("Creator");
 
+        User invitedUser = new User();
+        invitedUser.setId(2L);
+        invitedUser.setEmail("friend@example.com");
+        invitedUser.setFullName("Friend");
+
         when(userRepository.findByEmailIgnoreCase("creator@example.com")).thenReturn(Optional.of(creator));
+        when(userRepository.findByEmailIgnoreCase("friend@example.com")).thenReturn(Optional.of(invitedUser));
         when(groupRepository.save(any())).thenThrow(new RuntimeException("database unavailable"));
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
@@ -55,6 +65,7 @@ class GroupServiceTest {
                 transientStore,
                 transactionTemplate
         );
+        transientStore.upsertUser("friend@example.com", "Friend");
 
         GroupResponse response = service.createGroup(
                 "creator@example.com",
@@ -130,7 +141,7 @@ class GroupServiceTest {
     }
 
     @Test
-    void createGroupCreatesPlaceholderUsersForInvitedEmailsWhenDatabaseIsAvailable() {
+    void createGroupRejectsUnknownInvitedEmailsWhenDatabaseIsAvailable() {
         ChatGroupRepository groupRepository = mock(ChatGroupRepository.class);
         GroupMemberRepository memberRepository = mock(GroupMemberRepository.class);
         GroupInvitationRepository groupInvitationRepository = mock(GroupInvitationRepository.class);
@@ -145,19 +156,6 @@ class GroupServiceTest {
 
         when(userRepository.findByEmailIgnoreCase("creator@example.com")).thenReturn(Optional.of(creator));
         when(userRepository.findByEmailIgnoreCase("friend@example.com")).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
-            if (user.getId() == null) {
-                user.setId(2L);
-            }
-            return user;
-        });
-        when(groupRepository.save(any(ChatGroup.class))).thenAnswer(invocation -> {
-            ChatGroup group = invocation.getArgument(0);
-            group.setId(7L);
-            return group;
-        });
-        when(memberRepository.save(any(GroupMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
@@ -172,7 +170,62 @@ class GroupServiceTest {
                 transactionTemplate
         );
 
-        GroupResponse response = service.createGroup(
+        assertThatThrownBy(() -> service.createGroup(
+                "creator@example.com",
+                new CreateGroupRequest(
+                        "Database Group",
+                        "db path",
+                        "MAD101",
+                        List.of("friend@example.com")
+                )
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("No MyClassRoom account found for friend@example.com.");
+    }
+
+    @Test
+    void createGroupSavesInvitationForExistingMembersWhenDatabaseIsAvailable() {
+        ChatGroupRepository groupRepository = mock(ChatGroupRepository.class);
+        GroupMemberRepository memberRepository = mock(GroupMemberRepository.class);
+        GroupInvitationRepository groupInvitationRepository = mock(GroupInvitationRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
+        TransientCollaborationStore transientStore = new TransientCollaborationStore();
+
+        User creator = new User();
+        creator.setId(1L);
+        creator.setEmail("creator@example.com");
+        creator.setFullName("Creator");
+
+        User invitedUser = new User();
+        invitedUser.setId(2L);
+        invitedUser.setEmail("friend@example.com");
+        invitedUser.setFullName("Friend");
+
+        when(userRepository.findByEmailIgnoreCase("creator@example.com")).thenReturn(Optional.of(creator));
+        when(userRepository.findByEmailIgnoreCase("friend@example.com")).thenReturn(Optional.of(invitedUser));
+        when(groupRepository.save(any(ChatGroup.class))).thenAnswer(invocation -> {
+            ChatGroup group = invocation.getArgument(0);
+            group.setId(7L);
+            return group;
+        });
+        when(memberRepository.save(any(GroupMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(groupInvitationRepository.save(any(GroupInvitation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+
+        GroupService service = new GroupService(
+                groupRepository,
+                memberRepository,
+                groupInvitationRepository,
+                userRepository,
+                transientStore,
+                transactionTemplate
+        );
+
+        service.createGroup(
                 "creator@example.com",
                 new CreateGroupRequest(
                         "Database Group",
@@ -182,8 +235,8 @@ class GroupServiceTest {
                 )
         );
 
-        assertThat(response.members())
-                .extracting(GroupResponse.GroupMemberResponse::email)
-                .containsExactly("creator@example.com");
+        ArgumentCaptor<GroupInvitation> invitationCaptor = ArgumentCaptor.forClass(GroupInvitation.class);
+        verify(groupInvitationRepository).save(invitationCaptor.capture());
+        assertThat(invitationCaptor.getValue().getInvitedUser().getEmail()).isEqualTo("friend@example.com");
     }
 }

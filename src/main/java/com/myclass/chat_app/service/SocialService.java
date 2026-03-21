@@ -15,18 +15,26 @@ import com.myclass.chat_app.repository.FriendRequestRepository;
 import com.myclass.chat_app.repository.GroupInvitationRepository;
 import com.myclass.chat_app.repository.GroupMemberRepository;
 import com.myclass.chat_app.repository.UserRepository;
+import com.myclass.chat_app.support.UserIdentitySupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 @Service
 public class SocialService {
+
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
+    private static final String UNKNOWN_ACCOUNT_PREFIX = "No MyClassRoom account found for ";
 
     private final FriendRequestRepository friendRequestRepository;
     private final GroupInvitationRepository groupInvitationRepository;
@@ -53,6 +61,7 @@ public class SocialService {
 
     public SocialStateResponse getState(String currentUserEmail) {
         String email = normalizeRequiredEmail(currentUserEmail);
+        SocialStateResponse transientState = transientStore.getSocialState(email);
         try {
             List<UserResponse> friends = listFriendsFromDatabase(email);
             List<FriendRequestResponse> incoming = friendRequestRepository
@@ -70,9 +79,12 @@ public class SocialService {
                     .stream()
                     .map(this::toGroupInvitationResponse)
                     .toList();
-            return new SocialStateResponse(friends, incoming, outgoing, invitations);
+            return mergeState(
+                    new SocialStateResponse(friends, incoming, outgoing, invitations),
+                    transientState
+            );
         } catch (RuntimeException exception) {
-            return transientStore.getSocialState(email);
+            return transientState;
         }
     }
 
@@ -83,6 +95,8 @@ public class SocialService {
 
         try {
             return transactionTemplate.execute(status -> sendFriendRequestInDatabase(requester, recipient));
+        } catch (IllegalArgumentException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
             return transientStore.sendFriendRequest(requester, recipient);
         }
@@ -105,8 +119,8 @@ public class SocialService {
     }
 
     public boolean areFriends(String firstEmail, String secondEmail) {
-        String first = normalizeEmail(firstEmail);
-        String second = normalizeEmail(secondEmail);
+        String first = UserIdentitySupport.normalizeEmail(firstEmail);
+        String second = UserIdentitySupport.normalizeEmail(secondEmail);
         if (first == null || second == null) {
             return false;
         }
@@ -123,8 +137,8 @@ public class SocialService {
     }
 
     private FriendRequestResponse sendFriendRequestInDatabase(String requesterEmail, String recipientEmail) {
-        User requester = loadOrCreateUser(requesterEmail);
-        User recipient = loadOrCreateUser(recipientEmail);
+        User requester = loadOrCreateCurrentUser(requesterEmail);
+        User recipient = loadExistingUser(recipientEmail);
 
         List<FriendRequest> existing = friendRequestRepository.findBetweenUsers(requesterEmail, recipientEmail);
         if (existing.stream().anyMatch(request -> request.getStatus() == InvitationStatus.ACCEPTED)) {
@@ -203,7 +217,10 @@ public class SocialService {
             User other = request.getRequester().getEmail().equalsIgnoreCase(email)
                     ? request.getRecipient()
                     : request.getRequester();
-            friends.putIfAbsent(other.getEmail().toLowerCase(Locale.ROOT), toUserResponse(other));
+            String otherEmail = UserIdentitySupport.normalizeEmail(other.getEmail());
+            if (otherEmail != null) {
+                friends.putIfAbsent(otherEmail, toUserResponse(other));
+            }
         }
         return List.copyOf(friends.values());
     }
@@ -222,22 +239,27 @@ public class SocialService {
         groupMemberRepository.save(member);
     }
 
-    private User loadOrCreateUser(String email) {
+    private User loadOrCreateCurrentUser(String email) {
         return userRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
             User user = new User();
             user.setEmail(email);
-            user.setFullName(defaultDisplayName(email));
+            user.setFullName(UserIdentitySupport.defaultDisplayName(email));
             return userRepository.save(user);
         });
+    }
+
+    private User loadExistingUser(String email) {
+        return userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException(unknownAccountMessage(email)));
     }
 
     private FriendRequestResponse toFriendRequestResponse(FriendRequest request) {
         return new FriendRequestResponse(
                 request.getId(),
                 request.getRequester().getEmail(),
-                displayName(request.getRequester()),
+                UserIdentitySupport.displayName(request.getRequester()),
                 request.getRecipient().getEmail(),
-                displayName(request.getRecipient()),
+                UserIdentitySupport.displayName(request.getRecipient()),
                 request.getStatus().name(),
                 request.getCreatedAt()
         );
@@ -250,7 +272,7 @@ public class SocialService {
                 invitation.getGroup().getName(),
                 invitation.getGroup().getCategory(),
                 invitation.getInvitedBy().getEmail(),
-                displayName(invitation.getInvitedBy()),
+                UserIdentitySupport.displayName(invitation.getInvitedBy()),
                 invitation.getStatus().name(),
                 invitation.getCreatedAt()
         );
@@ -259,50 +281,113 @@ public class SocialService {
     private UserResponse toUserResponse(User user) {
         return new UserResponse(
                 user.getId(),
-                displayName(user),
+                UserIdentitySupport.displayName(user),
                 user.getEmail(),
                 user.getFullName()
         );
-    }
-
-    private String displayName(User user) {
-        if (user == null) {
-            return "User";
-        }
-        String fullName = user.getFullName();
-        if (fullName != null && !fullName.isBlank()) {
-            return fullName.trim();
-        }
-        return defaultDisplayName(user.getEmail());
-    }
-
-    private String defaultDisplayName(String email) {
-        if (email == null || email.isBlank()) {
-            return "User";
-        }
-        int atIndex = email.indexOf('@');
-        return atIndex > 0 ? email.substring(0, atIndex) : email;
     }
 
     private void validateFriendRequestEmails(String requester, String recipient) {
         if (requester.equals(recipient)) {
             throw new IllegalArgumentException("You cannot send a friend request to yourself.");
         }
+        if (!isValidEmail(recipient)) {
+            throw new IllegalArgumentException("Enter a valid email address.");
+        }
+    }
+
+    private String unknownAccountMessage(String email) {
+        return UNKNOWN_ACCOUNT_PREFIX + email + ".";
     }
 
     private String normalizeRequiredEmail(String email) {
-        String normalized = normalizeEmail(email);
+        String normalized = UserIdentitySupport.normalizeEmail(email);
         if (normalized == null) {
             throw new IllegalArgumentException("Unauthorized");
         }
         return normalized;
     }
 
-    private String normalizeEmail(String email) {
-        if (email == null) {
-            return null;
+    private static boolean isValidEmail(String email) {
+        return email != null && EMAIL_PATTERN.matcher(email).matches();
+    }
+
+    private SocialStateResponse mergeState(SocialStateResponse databaseState, SocialStateResponse transientState) {
+        return new SocialStateResponse(
+                mergeFriends(databaseState.friends(), transientState.friends()),
+                mergeFriendRequests(databaseState.incomingFriendRequests(), transientState.incomingFriendRequests()),
+                mergeFriendRequests(databaseState.outgoingFriendRequests(), transientState.outgoingFriendRequests()),
+                mergeGroupInvitations(databaseState.groupInvitations(), transientState.groupInvitations())
+        );
+    }
+
+    private List<UserResponse> mergeFriends(List<UserResponse> databaseFriends, List<UserResponse> transientFriends) {
+        Map<String, UserResponse> merged = new LinkedHashMap<>();
+        for (UserResponse friend : databaseFriends) {
+            String key = UserIdentitySupport.normalizeEmail(friend.email());
+            if (key != null) {
+                merged.put(key, friend);
+            }
         }
-        String normalized = email.trim().toLowerCase(Locale.ROOT);
-        return normalized.isBlank() ? null : normalized;
+        for (UserResponse friend : transientFriends) {
+            String key = UserIdentitySupport.normalizeEmail(friend.email());
+            if (key != null) {
+                merged.putIfAbsent(key, friend);
+            }
+        }
+        return List.copyOf(merged.values());
+    }
+
+    private List<FriendRequestResponse> mergeFriendRequests(
+            List<FriendRequestResponse> databaseRequests,
+            List<FriendRequestResponse> transientRequests
+    ) {
+        Map<String, FriendRequestResponse> merged = new LinkedHashMap<>();
+        for (FriendRequestResponse request : databaseRequests) {
+            merged.put(friendRequestKey(request), request);
+        }
+        for (FriendRequestResponse request : transientRequests) {
+            merged.putIfAbsent(friendRequestKey(request), request);
+        }
+        return merged.values().stream()
+                .sorted(Comparator.comparing(FriendRequestResponse::createdAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private List<GroupInvitationResponse> mergeGroupInvitations(
+            List<GroupInvitationResponse> databaseInvitations,
+            List<GroupInvitationResponse> transientInvitations
+    ) {
+        Map<String, GroupInvitationResponse> merged = new LinkedHashMap<>();
+        for (GroupInvitationResponse invitation : databaseInvitations) {
+            merged.put(groupInvitationKey(invitation), invitation);
+        }
+        for (GroupInvitationResponse invitation : transientInvitations) {
+            merged.putIfAbsent(groupInvitationKey(invitation), invitation);
+        }
+        return merged.values().stream()
+                .sorted(Comparator.comparing(GroupInvitationResponse::createdAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private String friendRequestKey(FriendRequestResponse request) {
+        Set<String> participants = new LinkedHashSet<>();
+        String requester = UserIdentitySupport.normalizeEmail(request.requesterEmail());
+        String recipient = UserIdentitySupport.normalizeEmail(request.recipientEmail());
+        if (requester != null) {
+            participants.add(requester);
+        }
+        if (recipient != null) {
+            participants.add(recipient);
+        }
+        return String.join("::", participants) + "::" + request.status();
+    }
+
+    private String groupInvitationKey(GroupInvitationResponse invitation) {
+        return invitation.groupId()
+                + "::"
+                + UserIdentitySupport.normalizeEmail(invitation.invitedByEmail())
+                + "::"
+                + invitation.status();
     }
 }

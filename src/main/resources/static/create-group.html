@@ -604,7 +604,7 @@
                     <div class="field">
                         <label for="groupName">Group name *</label>
                         <input id="groupName" placeholder="e.g. DBI202 Study Group" required />
-                        <div class="hint">Use a name people can recognize quickly in the sidebar.</div>
+                        <div class="hint">Keep it short so members can spot it fast.</div>
                     </div>
 
                     <div class="field">
@@ -615,18 +615,18 @@
                             <option value="PRO192">PRO192 - Computer Science</option>
                             <option value="DBI202">DBI202 - Database Systems</option>
                         </select>
-                        <div class="hint">Optional, but it helps members scan the right room faster.</div>
+                        <div class="hint">Optional, but useful when you have several rooms.</div>
                     </div>
 
                     <div class="field full">
                         <label for="description">Description</label>
-                        <textarea id="description" placeholder="What is this group for? Share the purpose, meeting style, or what members should bring."></textarea>
+                        <textarea id="description" placeholder="What is this group for? Add a short purpose or plan."></textarea>
                     </div>
 
                     <div class="field full">
                         <label for="members">Members by email</label>
                         <input id="members" placeholder="a@gmail.com, b@gmail.com, c@gmail.com" />
-                        <div class="hint">Separate each email with a comma. Each invited person receives a group invite and must accept it before the room appears for them.</div>
+                        <div class="hint">Only existing MyClassRoom accounts can be invited. Separate emails with commas. The invite appears in Inbox.</div>
                         <div class="chips" id="memberPreview"></div>
                     </div>
                 </div>
@@ -863,11 +863,11 @@
             shell.classList.add('signed-in');
             creatorName.textContent = user.username || user.email || 'Your account';
             creatorMeta.textContent = (user.email || 'Signed in user') + ' will become the first admin of this group.';
-            panelSubtitle.textContent = 'Create a study group only when you need one. Private chat in the lobby still works normally.';
+            panelSubtitle.textContent = 'Create a room for a real team, then invite members from inside MyClassRoom.';
             setAuthUi(
                 'ok',
                 'Signed in as ' + (user.email || user.username || 'your account'),
-                'Your session is attached automatically when this form calls the protected group endpoint.'
+                'This form already uses your current session.'
             );
             setFormEnabled(true);
             return true;
@@ -877,7 +877,7 @@
         setAuthUi(
             'warn',
             'Sign in required',
-            'We could not find a valid Supabase session for this browser. Sign in first, then open this page again only if you really want to create a group.'
+            'We could not find a valid session for this browser. Sign in first, then open this page again.'
         );
         creatorName.textContent = 'Sign in first';
         creatorMeta.textContent = 'We will show who is creating the group as soon as a valid session is available.';
@@ -1024,7 +1024,7 @@
             }
 
             rememberCreatedGroup(data);
-            showSuccess('Group #' + data.id + ' created. Invitations were sent and you are returning to the lobby...');
+            showSuccess('Group #' + data.id + ' created. Invitations are now in Inbox and you are returning to the lobby...');
             setTimeout(() => {
                 const params = new URLSearchParams({
                     createdGroupId: String(data.id),
@@ -1048,7 +1048,7 @@
 
         const token = await ensureSignedIn(false);
         if (!token) {
-            showError('Sign in first, then come back here only if you want to create a new group.');
+            showError('Sign in first, then come back here when you want to create a group.');
         }
     });
 </script>

@@ -10,6 +10,7 @@ import com.myclass.chat_app.dto.UserResponse;
 import com.myclass.chat_app.entity.GroupRole;
 import com.myclass.chat_app.entity.InvitationStatus;
 import com.myclass.chat_app.entity.User;
+import com.myclass.chat_app.support.UserIdentitySupport;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -18,9 +19,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -43,10 +42,11 @@ public class TransientCollaborationStore {
     private final Map<Long, StoredGroupInvitation> groupInvitationsById = new ConcurrentHashMap<>();
 
     public User upsertUser(String email, String fullName) {
-        String normalized = normalizeEmail(email);
+        String normalized = UserIdentitySupport.normalizeEmail(email);
         if (normalized == null) {
             throw new IllegalArgumentException("Email is required");
         }
+        String trimmedFullName = UserIdentitySupport.trimToNull(fullName);
 
         return usersByEmail.compute(normalized, (key, existing) -> {
             User user = existing != null ? existing : new User();
@@ -54,24 +54,16 @@ public class TransientCollaborationStore {
                 user.setId(userIdSequence.incrementAndGet());
             }
             user.setEmail(normalized);
-            if (fullName != null && !fullName.isBlank()) {
-                user.setFullName(fullName.trim());
+            if (trimmedFullName != null) {
+                user.setFullName(trimmedFullName);
             } else if (user.getFullName() == null || user.getFullName().isBlank()) {
-                user.setFullName(defaultDisplayName(normalized));
+                user.setFullName(UserIdentitySupport.defaultDisplayName(normalized));
             }
             if (user.getCreatedAt() == null) {
                 user.setCreatedAt(Instant.now());
             }
             return user;
         });
-    }
-
-    public Optional<User> findUserByEmail(String email) {
-        String normalized = normalizeEmail(email);
-        if (normalized == null) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(usersByEmail.get(normalized));
     }
 
     public List<User> listUsers() {
@@ -81,15 +73,19 @@ public class TransientCollaborationStore {
     }
 
     public synchronized GroupResponse createGroup(String creatorEmail, CreateGroupRequest request) {
-        String creator = normalizeEmail(creatorEmail);
+        String creator = UserIdentitySupport.normalizeEmail(creatorEmail);
         if (creator == null) {
             throw new IllegalArgumentException("Unauthorized");
         }
-        if (request == null || request.groupName() == null || request.groupName().isBlank()) {
+        String groupName = request == null ? null : UserIdentitySupport.trimToNull(request.groupName());
+        if (groupName == null) {
             throw new IllegalArgumentException("groupName is required");
         }
 
         upsertUser(creator, null);
+        Set<String> invitedEmails = normalizeEmails(request.members());
+        invitedEmails.remove(creator);
+        validateInvitedUsers(invitedEmails);
 
         long groupId = groupIdSequence.incrementAndGet();
         Instant createdAt = Instant.now();
@@ -98,20 +94,16 @@ public class TransientCollaborationStore {
 
         StoredGroup group = new StoredGroup(
                 groupId,
-                request.groupName().trim(),
-                trimToNull(request.description()),
-                trimToNull(request.category()),
+                groupName,
+                UserIdentitySupport.trimToNull(request.description()),
+                UserIdentitySupport.trimToNull(request.category()),
                 creator,
                 createdAt,
                 members
         );
         groupsById.put(groupId, group);
 
-        for (String email : normalizeEmails(request.members())) {
-            if (email.equals(creator) || !isValidEmail(email)) {
-                continue;
-            }
-            upsertUser(email, null);
+        for (String email : invitedEmails) {
             long invitationId = groupInvitationIdSequence.incrementAndGet();
             groupInvitationsById.put(
                     invitationId,
@@ -142,7 +134,7 @@ public class TransientCollaborationStore {
     }
 
     public List<GroupSummaryResponse> listMyGroups(String email) {
-        String normalized = normalizeEmail(email);
+        String normalized = UserIdentitySupport.normalizeEmail(email);
         if (normalized == null) {
             throw new IllegalArgumentException("Unauthorized");
         }
@@ -160,7 +152,7 @@ public class TransientCollaborationStore {
     }
 
     public boolean isMember(Long groupId, String email) {
-        String normalized = normalizeEmail(email);
+        String normalized = UserIdentitySupport.normalizeEmail(email);
         if (groupId == null || normalized == null) {
             return false;
         }
@@ -168,18 +160,9 @@ public class TransientCollaborationStore {
         return group != null && group.members().containsKey(normalized);
     }
 
-    public boolean isAdmin(Long groupId, String email) {
-        String normalized = normalizeEmail(email);
-        if (groupId == null || normalized == null) {
-            return false;
-        }
-        StoredGroup group = groupsById.get(groupId);
-        return group != null && group.members().get(normalized) == GroupRole.ADMIN;
-    }
-
     public synchronized FriendRequestResponse sendFriendRequest(String requesterEmail, String recipientEmail) {
-        String requester = normalizeEmail(requesterEmail);
-        String recipient = normalizeEmail(recipientEmail);
+        String requester = UserIdentitySupport.normalizeEmail(requesterEmail);
+        String recipient = UserIdentitySupport.normalizeEmail(recipientEmail);
         if (requester == null || recipient == null) {
             throw new IllegalArgumentException("Both emails are required.");
         }
@@ -197,7 +180,7 @@ public class TransientCollaborationStore {
         }
 
         upsertUser(requester, null);
-        upsertUser(recipient, null);
+        requireKnownUser(recipient);
 
         long requestId = friendRequestIdSequence.incrementAndGet();
         StoredFriendRequest request = new StoredFriendRequest(
@@ -213,7 +196,7 @@ public class TransientCollaborationStore {
     }
 
     public synchronized FriendRequestResponse respondToFriendRequest(Long requestId, String currentUserEmail, InvitationStatus decision) {
-        String email = normalizeEmail(currentUserEmail);
+        String email = UserIdentitySupport.normalizeEmail(currentUserEmail);
         if (requestId == null || email == null) {
             throw new IllegalArgumentException("Friend request was not found.");
         }
@@ -241,7 +224,7 @@ public class TransientCollaborationStore {
     }
 
     public synchronized GroupInvitationResponse respondToGroupInvitation(Long invitationId, String currentUserEmail, InvitationStatus decision) {
-        String email = normalizeEmail(currentUserEmail);
+        String email = UserIdentitySupport.normalizeEmail(currentUserEmail);
         if (invitationId == null || email == null) {
             throw new IllegalArgumentException("Group invitation was not found.");
         }
@@ -278,7 +261,7 @@ public class TransientCollaborationStore {
     }
 
     public SocialStateResponse getSocialState(String currentUserEmail) {
-        String email = normalizeEmail(currentUserEmail);
+        String email = UserIdentitySupport.normalizeEmail(currentUserEmail);
         if (email == null) {
             throw new IllegalArgumentException("Unauthorized");
         }
@@ -317,8 +300,8 @@ public class TransientCollaborationStore {
     }
 
     public boolean areFriends(String firstEmail, String secondEmail) {
-        String first = normalizeEmail(firstEmail);
-        String second = normalizeEmail(secondEmail);
+        String first = UserIdentitySupport.normalizeEmail(firstEmail);
+        String second = UserIdentitySupport.normalizeEmail(secondEmail);
         if (first == null || second == null) {
             return false;
         }
@@ -351,9 +334,9 @@ public class TransientCollaborationStore {
         return new FriendRequestResponse(
                 request.id(),
                 request.requesterEmail(),
-                displayName(requester),
+                UserIdentitySupport.displayName(requester),
                 request.recipientEmail(),
-                displayName(recipient),
+                UserIdentitySupport.displayName(recipient),
                 request.status().name(),
                 request.createdAt()
         );
@@ -368,7 +351,7 @@ public class TransientCollaborationStore {
                 group != null ? group.name() : "Study Group",
                 group != null ? group.category() : "",
                 invitation.invitedByEmail(),
-                displayName(invitedBy),
+                UserIdentitySupport.displayName(invitedBy),
                 invitation.status().name(),
                 invitation.createdAt()
         );
@@ -378,20 +361,10 @@ public class TransientCollaborationStore {
         User user = upsertUser(email, null);
         return new UserResponse(
                 user.getId(),
-                displayName(user),
+                UserIdentitySupport.displayName(user),
                 user.getEmail(),
                 user.getFullName()
         );
-    }
-
-    private String displayName(User user) {
-        if (user == null) {
-            return "User";
-        }
-        if (user.getFullName() != null && !user.getFullName().isBlank()) {
-            return user.getFullName().trim();
-        }
-        return defaultDisplayName(user.getEmail());
     }
 
     private static Set<String> normalizeEmails(List<String> emails) {
@@ -404,7 +377,7 @@ public class TransientCollaborationStore {
                 continue;
             }
             for (String part : raw.split(",")) {
-                String normalized = normalizeEmail(part);
+                String normalized = UserIdentitySupport.normalizeEmail(part);
                 if (normalized != null) {
                     out.add(normalized);
                 }
@@ -417,30 +390,48 @@ public class TransientCollaborationStore {
         return email != null && EMAIL_PATTERN.matcher(email).matches();
     }
 
+    private void validateInvitedUsers(Set<String> emails) {
+        List<String> invalidEmails = emails.stream()
+                .filter(email -> !isValidEmail(email))
+                .toList();
+        if (!invalidEmails.isEmpty()) {
+            throw new IllegalArgumentException(invalidInviteEmailMessage(invalidEmails));
+        }
+
+        List<String> missingEmails = emails.stream()
+                .filter(email -> !hasUser(email))
+                .toList();
+        if (!missingEmails.isEmpty()) {
+            throw new IllegalArgumentException(missingAccountMessage(missingEmails));
+        }
+    }
+
+    private void requireKnownUser(String email) {
+        if (!hasUser(email)) {
+            throw new IllegalArgumentException(missingAccountMessage(List.of(email)));
+        }
+    }
+
+    private boolean hasUser(String email) {
+        String normalized = UserIdentitySupport.normalizeEmail(email);
+        return normalized != null && usersByEmail.containsKey(normalized);
+    }
+
+    private static String invalidInviteEmailMessage(List<String> emails) {
+        return emails.size() == 1
+                ? "Invalid invite email: " + emails.get(0) + "."
+                : "Invalid invite emails: " + String.join(", ", emails) + ".";
+    }
+
+    private static String missingAccountMessage(List<String> emails) {
+        return emails.size() == 1
+                ? "No MyClassRoom account found for " + emails.get(0) + "."
+                : "No MyClassRoom accounts found for: " + String.join(", ", emails) + ".";
+    }
+
     private static boolean samePair(StoredFriendRequest request, String first, String second) {
         return (request.requesterEmail().equals(first) && request.recipientEmail().equals(second))
                 || (request.requesterEmail().equals(second) && request.recipientEmail().equals(first));
-    }
-
-    private static String normalizeEmail(String email) {
-        if (email == null) {
-            return null;
-        }
-        String normalized = email.trim().toLowerCase(Locale.ROOT);
-        return normalized.isBlank() ? null : normalized;
-    }
-
-    private static String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static String defaultDisplayName(String email) {
-        int index = email.indexOf('@');
-        return index > 0 ? email.substring(0, index) : email;
     }
 
     private record StoredGroup(
