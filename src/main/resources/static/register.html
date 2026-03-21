@@ -197,7 +197,7 @@
             <div class="logo-section">
                 <div class="logo">MC</div>
                 <div class="logo-text">MyClassRoom</div>
-                <div class="logo-subtitle">Create your account with Supabase Auth</div>
+                <div class="logo-subtitle">Tạo tài khoản MyClassRoom</div>
             </div>
 
             <div class="error-message" id="errorMessage"></div>
@@ -210,41 +210,41 @@
                         type="email"
                         id="email"
                         name="email"
-                        placeholder="Enter your email"
+                        placeholder="Nhập email của bạn"
                         required
                         autocomplete="email"
                     >
                 </div>
 
                 <div class="form-group">
-                    <label for="fullName">Full Name</label>
+                    <label for="fullName">Họ và tên</label>
                     <input
                         type="text"
                         id="fullName"
                         name="fullName"
-                        placeholder="Enter your full name"
+                        placeholder="Nhập họ và tên"
                         required
                         autocomplete="name"
                     >
                 </div>
 
                 <div class="form-group">
-                    <label for="password">Password</label>
+                    <label for="password">Mật khẩu</label>
                     <input
                         type="password"
                         id="password"
                         name="password"
-                        placeholder="Enter your password"
+                        placeholder="Nhập mật khẩu"
                         required
                         autocomplete="new-password"
                     >
                 </div>
 
-                <button type="submit" class="register-btn" id="registerBtn">Create Account</button>
+                <button type="submit" class="register-btn" id="registerBtn">Đăng ký</button>
             </form>
 
             <div class="login-link">
-                Already have an account? <a href="/login.html">Sign In</a>
+                Đã có tài khoản? <a href="/login.html">Đăng nhập</a>
             </div>
         </div>
     </div>
@@ -268,18 +268,18 @@
             const password = passwordInput.value;
 
             if (!email || !fullName || !password) {
-                showError('Please fill in all fields');
+                showError('Vui lòng nhập đầy đủ thông tin.');
                 return;
             }
 
             if (password.length < 6) {
-                showError('Password must be at least 6 characters long');
+                showError('Mật khẩu phải có ít nhất 6 ký tự.');
                 return;
             }
 
             registerBtn.classList.add('loading');
             registerBtn.disabled = true;
-            registerBtn.textContent = 'Creating account...';
+            registerBtn.textContent = 'Đang tạo tài khoản...';
 
             try {
                 const response = await fetch('/api/auth/register', {
@@ -305,30 +305,30 @@
                     sessionStorage.setItem('registrationEmail', email);
 
                     console.log('Registration successful, redirecting to login...');
-                    showSuccess(data.message || 'Account created successfully! Redirecting to login...');
+                    showSuccess(data.message || 'Tạo tài khoản thành công. Đang chuyển sang trang đăng nhập...');
 
                     setTimeout(() => {
                         window.location.href = '/login.html';
                     }, 1400);
                 } else {
-                    const error = data.error || 'Registration failed';
+                    const error = data.error || 'Đăng ký thất bại.';
                     console.log('Registration failed:', error);
                     showError(error);
                     registerBtn.classList.remove('loading');
                     registerBtn.disabled = false;
-                    registerBtn.textContent = 'Create Account';
+                    registerBtn.textContent = 'Đăng ký';
                 }
             } catch (error) {
                 console.error('Registration error:', error);
-                showError('An error occurred. Please try again.');
+                showError('Có lỗi kết nối. Vui lòng thử lại.');
                 registerBtn.classList.remove('loading');
                 registerBtn.disabled = false;
-                registerBtn.textContent = 'Create Account';
+                registerBtn.textContent = 'Đăng ký';
             }
         });
 
         function showError(message) {
-            errorMessage.textContent = message;
+            errorMessage.textContent = translateAuthMessage(message);
             errorMessage.classList.add('show');
             setTimeout(() => {
                 errorMessage.classList.remove('show');
@@ -336,8 +336,45 @@
         }
 
         function showSuccess(message) {
-            successMessage.textContent = message;
+            successMessage.textContent = translateAuthMessage(message);
             successMessage.classList.add('show');
+        }
+
+        function translateAuthMessage(message) {
+            const text = String(message || '').trim();
+            if (!text) return 'Có lỗi xảy ra. Vui lòng thử lại.';
+            if (text === 'Please fill in all fields') return 'Vui lòng nhập đầy đủ thông tin.';
+            if (text === 'Password must be at least 6 characters long') {
+                return 'Mật khẩu phải có ít nhất 6 ký tự.';
+            }
+            if (text === 'Request body is required' || text === 'Thiếu dữ liệu gửi lên.') {
+                return 'Thiếu dữ liệu gửi lên.';
+            }
+            if (text === 'Email and password are required' || text === 'Vui lòng nhập email và mật khẩu.') {
+                return 'Vui lòng nhập email và mật khẩu.';
+            }
+            if (text.includes('Email is invalid') || text.includes('Email không hợp lệ')) {
+                return 'Email không hợp lệ. Vui lòng nhập đúng định dạng, ví dụ name@gmail.com.';
+            }
+            if (text.includes('already registered') || text.includes('đã được đăng ký')) {
+                return 'Email này đã được đăng ký. Vui lòng đăng nhập.';
+            }
+            if (text === 'Registration failed' || text === 'Đăng ký thất bại.') {
+                return 'Đăng ký thất bại.';
+            }
+            if (text === 'An error occurred. Please try again.' || text === 'Có lỗi kết nối. Vui lòng thử lại.') {
+                return 'Có lỗi kết nối. Vui lòng thử lại.';
+            }
+            if (text.includes('Supabase Auth is unavailable') || text.includes('Hệ thống đăng nhập đang tạm thời không khả dụng')) {
+                return 'Hệ thống đăng ký đang tạm thời không khả dụng. Vui lòng thử lại sau.';
+            }
+            if (text.includes('database') || text.includes('mất kết nối dữ liệu')) {
+                return 'Hệ thống đang tạm mất kết nối dữ liệu. Vui lòng thử lại sau.';
+            }
+            if (text.includes('Account created successfully') || text.includes('Tạo tài khoản thành công')) {
+                return 'Tạo tài khoản thành công. Đang chuyển sang trang đăng nhập...';
+            }
+            return text;
         }
 
         // Clear error when user starts typing

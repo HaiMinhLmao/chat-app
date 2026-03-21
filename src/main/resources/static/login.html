@@ -121,7 +121,7 @@
         <div class="logo-section">
             <div class="logo">MC</div>
             <div class="logo-text">MyClassRoom</div>
-            <div class="logo-subtitle">Sign in with Supabase Auth</div>
+            <div class="logo-subtitle">Đăng nhập vào MyClassRoom</div>
         </div>
 
         <div class="error-message" id="errorMessage"></div>
@@ -130,17 +130,17 @@
         <form id="loginForm">
             <div class="form-group">
                 <label for="email">Email</label>
-                <input type="email" id="email" autocomplete="username" placeholder="Enter your email" required>
+                <input type="email" id="email" autocomplete="username" placeholder="Nhập email của bạn" required>
             </div>
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" autocomplete="current-password" placeholder="Enter your password" required>
+                <label for="password">Mật khẩu</label>
+                <input type="password" id="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required>
             </div>
-            <button class="btn" type="submit" id="loginBtn">Sign In</button>
+            <button class="btn" type="submit" id="loginBtn">Đăng nhập</button>
         </form>
 
         <div class="link">
-            Don't have an account? <a href="/register.html">Create one</a>
+            Chưa có tài khoản? <a href="/register.html">Đăng ký ngay</a>
         </div>
     </div>
 </div>
@@ -158,7 +158,7 @@
     const registrationEmail = sessionStorage.getItem('registrationEmail');
     if (registrationEmail) {
         emailInput.value = registrationEmail;
-        successMessage.textContent = 'Account created successfully. Please sign in.';
+        successMessage.textContent = 'Tạo tài khoản thành công. Vui lòng đăng nhập.';
         successMessage.classList.add('show');
         sessionStorage.removeItem('registrationEmail');
         passwordInput.focus();
@@ -173,13 +173,13 @@
         const password = passwordInput.value;
 
         if (!email || !password) {
-            showError('Please enter your email and password');
+            showError('Vui lòng nhập email và mật khẩu.');
             return;
         }
 
         loginBtn.classList.add('loading');
         loginBtn.disabled = true;
-        loginBtn.textContent = 'Signing in...';
+        loginBtn.textContent = 'Đang đăng nhập...';
 
         try {
             const res = await fetch('/api/auth/login', {
@@ -190,7 +190,7 @@
 
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                showError(data.error || 'Login failed');
+                showError(data.error || 'Đăng nhập thất bại.');
                 resetBtn();
                 return;
             }
@@ -212,7 +212,7 @@
 
             window.location.href = '/index.html';
         } catch (err) {
-            showError('Network error. Please try again.');
+            showError('Lỗi kết nối. Vui lòng thử lại.');
             resetBtn();
         }
     });
@@ -220,12 +220,34 @@
     function resetBtn() {
         loginBtn.classList.remove('loading');
         loginBtn.disabled = false;
-        loginBtn.textContent = 'Sign In';
+        loginBtn.textContent = 'Đăng nhập';
     }
 
     function showError(msg) {
-        errorMessage.textContent = msg;
+        errorMessage.textContent = translateAuthMessage(msg);
         errorMessage.classList.add('show');
+    }
+
+    function translateAuthMessage(msg) {
+        const text = String(msg || '').trim();
+        if (!text) return 'Có lỗi xảy ra. Vui lòng thử lại.';
+        if (text === 'Please enter your email and password') return 'Vui lòng nhập email và mật khẩu.';
+        if (text === 'Request body is required' || text === 'Thiếu dữ liệu gửi lên.') return 'Thiếu dữ liệu gửi lên.';
+        if (text === 'Email and password are required' || text === 'Vui lòng nhập email và mật khẩu.') return 'Vui lòng nhập email và mật khẩu.';
+        if (text === 'Invalid login credentials.' || text === 'Email hoặc mật khẩu không đúng.') return 'Email hoặc mật khẩu không đúng.';
+        if (text.startsWith('Login failed:')) return 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.';
+        if (text === 'Login failed') return 'Đăng nhập thất bại.';
+        if (text === 'Network error. Please try again.') return 'Lỗi kết nối. Vui lòng thử lại.';
+        if (text === 'Sign in again.' || text === 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') {
+            return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        }
+        if (text.includes('Supabase Auth is unavailable') || text.includes('Hệ thống đăng nhập đang tạm thời không khả dụng')) {
+            return 'Hệ thống đăng nhập đang tạm thời không khả dụng. Vui lòng thử lại sau.';
+        }
+        if (text.includes('database') || text.includes('mất kết nối dữ liệu')) {
+            return 'Hệ thống đang tạm mất kết nối dữ liệu. Vui lòng thử lại sau.';
+        }
+        return text;
     }
 </script>
 </body>

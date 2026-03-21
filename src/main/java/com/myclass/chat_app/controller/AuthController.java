@@ -38,11 +38,11 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody(required = false) AuthRequest request) {
         try {
             if (request == null) {
-                return badRequest("Request body is required");
+                return badRequest("Thiếu dữ liệu gửi lên.");
             }
 
             if (!request.hasEmailAndPassword()) {
-                return badRequest("Email and password are required");
+                return badRequest("Vui lòng nhập email và mật khẩu.");
             }
 
             String identifier = request.trimmedIdentifier();
@@ -53,10 +53,10 @@ public class AuthController {
         } catch (Exception e) {
             String message = e.getMessage() == null ? "" : e.getMessage();
             if (isInvalidEmailError(message)) {
-                return badRequest("Email is invalid. Please enter a real email address like name@gmail.com, not just a username.");
+                return badRequest("Email không hợp lệ. Vui lòng nhập đúng định dạng, ví dụ name@gmail.com.");
             }
             if (message.contains("user_already_exists")) {
-                return badRequest("This email is already registered. Please sign in instead.");
+                return badRequest("Email này đã được đăng ký. Vui lòng đăng nhập.");
             }
             if (isSupabaseUnavailable(message)) {
                 return supabaseUnavailableResponse();
@@ -64,7 +64,7 @@ public class AuthController {
             if (isDatabaseUnavailable(message)) {
                 return databaseUnavailableResponse();
             }
-            return badRequest(message);
+            return badRequest("Đăng ký thất bại. Vui lòng thử lại.");
         }
     }
 
@@ -72,11 +72,11 @@ public class AuthController {
     public ResponseEntity<?> login(@RequestBody(required = false) AuthRequest request) {
         try {
             if (request == null) {
-                return badRequest("Request body is required");
+                return badRequest("Thiếu dữ liệu gửi lên.");
             }
 
             if (!request.hasEmailAndPassword()) {
-                return badRequest("Email and password are required");
+                return badRequest("Vui lòng nhập email và mật khẩu.");
             }
 
             String identifier = request.trimmedIdentifier();
@@ -94,10 +94,10 @@ public class AuthController {
             }
             if (message.contains("invalid_credentials")) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(errorResponse("Invalid login credentials."));
+                        .body(errorResponse("Email hoặc mật khẩu không đúng."));
             }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(errorResponse("Login failed: " + message));
+                    .body(errorResponse("Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."));
         }
     }
 
@@ -105,11 +105,11 @@ public class AuthController {
     public ResponseEntity<?> refresh(@RequestBody(required = false) AuthRefreshRequest request) {
         try {
             if (request == null) {
-                return badRequest("Request body is required");
+                return badRequest("Thiếu dữ liệu gửi lên.");
             }
 
             if (!request.hasRefreshToken()) {
-                return badRequest("Missing refresh_token");
+                return badRequest("Thiếu refresh token.");
             }
 
             String refreshToken = request.trimmedRefreshToken();
@@ -123,7 +123,7 @@ public class AuthController {
                 return databaseUnavailableResponse();
             }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(errorResponse("Refresh failed: " + message));
+                    .body(errorResponse("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."));
         }
     }
 
@@ -175,13 +175,13 @@ public class AuthController {
 
     private ResponseEntity<AuthErrorResponse> databaseUnavailableResponse() {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse(
-                "The app cannot reach the database right now. On deployment, point Spring Boot at the Supabase session pooler on port 5432 and redeploy."
+                "Hệ thống đang tạm mất kết nối dữ liệu. Vui lòng thử lại sau."
         ));
     }
 
     private ResponseEntity<AuthErrorResponse> supabaseUnavailableResponse() {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse(
-                "Supabase Auth is unavailable or misconfigured right now. Check SUPABASE_ANON_KEY and try again."
+                "Hệ thống đăng nhập đang tạm thời không khả dụng. Vui lòng thử lại sau."
         ));
     }
 

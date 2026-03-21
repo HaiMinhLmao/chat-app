@@ -14,23 +14,23 @@
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
     <style>
       :root {
-        --bg: #0d1117;
-        --panel: #161b24;
-        --line: rgba(148, 163, 184, 0.16);
-        --text: #f5f7fb;
-        --muted: #90a0ba;
-        --accent: #5aa7ff;
-        --accent-soft: rgba(90, 167, 255, 0.14);
-        --success: #33d69f;
-        --success-soft: rgba(51, 214, 159, 0.14);
-        --danger: #fb7185;
-        --danger-soft: rgba(251, 113, 133, 0.14);
-        --warning: #f3b33c;
-        --warning-soft: rgba(243, 179, 60, 0.16);
+        --bg: #f3f7fb;
+        --panel: #ffffff;
+        --line: rgba(15, 23, 42, 0.08);
+        --text: #0f172a;
+        --muted: #64748b;
+        --accent: #2563eb;
+        --accent-soft: rgba(37, 99, 235, 0.1);
+        --success: #059669;
+        --success-soft: rgba(5, 150, 105, 0.12);
+        --danger: #e11d48;
+        --danger-soft: rgba(225, 29, 72, 0.1);
+        --warning: #b45309;
+        --warning-soft: rgba(245, 158, 11, 0.12);
         --radius-xl: 28px;
         --radius-lg: 22px;
         --radius-md: 16px;
-        --shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+        --shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
       }
 
       * {
@@ -43,9 +43,9 @@
         font-family: "Manrope", sans-serif;
         color: var(--text);
         background:
-          radial-gradient(circle at top left, rgba(90, 167, 255, 0.18), transparent 24%),
-          radial-gradient(circle at bottom right, rgba(51, 214, 159, 0.12), transparent 24%),
-          linear-gradient(160deg, #0b1017, #111827 48%, #0f172a);
+          radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 22%),
+          radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.08), transparent 24%),
+          linear-gradient(180deg, #f8fbff, #eef4fb 55%, #f5f8fc);
       }
 
       button,
@@ -67,7 +67,7 @@
       .panel {
         border: 1px solid var(--line);
         border-radius: var(--radius-xl);
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)), var(--panel);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98)), var(--panel);
         box-shadow: var(--shadow);
       }
 
@@ -101,7 +101,7 @@
         height: 54px;
         border: 0;
         border-radius: 18px;
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.88);
         color: inherit;
         display: grid;
         place-items: center;
@@ -113,7 +113,7 @@
 
       .rail-btn.active,
       .rail-btn:hover {
-        background: linear-gradient(135deg, rgba(90, 167, 255, 0.28), rgba(255, 255, 255, 0.08));
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(255, 255, 255, 0.98));
       }
 
       .rail-btn.brand {
@@ -158,7 +158,7 @@
       .messages {
         border: 1px solid var(--line);
         border-radius: var(--radius-lg);
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
       }
 
       .profile {
@@ -232,9 +232,9 @@
       .friend-form input,
       .composer .composer-input {
         width: 100%;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(148, 163, 184, 0.3);
         border-radius: 14px;
-        background: rgba(8, 12, 20, 0.9);
+        background: #fff;
         color: var(--text);
         padding: 14px 16px;
       }
@@ -242,8 +242,8 @@
       .friend-form input:focus,
       .composer .composer-input:focus {
         outline: none;
-        border-color: rgba(90, 167, 255, 0.5);
-        box-shadow: 0 0 0 4px rgba(90, 167, 255, 0.12);
+        border-color: rgba(37, 99, 235, 0.45);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
       }
 
       .btn,
@@ -257,14 +257,14 @@
         border-radius: 14px;
         padding: 0 18px;
         font-weight: 800;
-        color: #04101f;
-        background: linear-gradient(135deg, var(--accent), #2e84f4);
+        color: #fff;
+        background: linear-gradient(135deg, var(--accent), #3b82f6);
       }
 
       .btn.secondary,
       .tiny-btn {
         color: var(--text);
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(37, 99, 235, 0.08);
       }
 
       .tiny-btn {
@@ -301,7 +301,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(37, 99, 235, 0.08);
         font-size: 12px;
         font-weight: 800;
       }
@@ -333,8 +333,8 @@
 
       .channel-item:hover,
       .channel-item.active {
-        border-color: rgba(90, 167, 255, 0.22);
-        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(37, 99, 235, 0.16);
+        background: rgba(37, 99, 235, 0.07);
       }
 
       .channel-avatar {
@@ -365,7 +365,7 @@
       }
 
       .main {
-        padding: 20px;
+        padding: 24px;
         display: flex;
         flex-direction: column;
         gap: 16px;
@@ -375,27 +375,39 @@
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 16px;
+        align-items: start;
+      }
+
+      .main-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-end;
       }
 
       .main-title {
         margin: 8px 0 0;
-        font-size: clamp(38px, 4vw, 56px);
-        line-height: 0.95;
+        font-size: clamp(34px, 4vw, 52px);
+        line-height: 1;
         letter-spacing: -0.06em;
       }
 
       .main-copy {
-        max-width: 720px;
-        margin-top: 12px;
+        max-width: 640px;
+        margin-top: 8px;
         color: var(--muted);
-        line-height: 1.7;
+        line-height: 1.6;
+      }
+
+      .main-copy:empty {
+        display: none;
       }
 
       .status-pill {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 10px 14px;
+        padding: 9px 14px;
         border-radius: 999px;
         background: var(--warning-soft);
         color: var(--warning);
@@ -430,7 +442,7 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        background: linear-gradient(180deg, rgba(8, 12, 20, 0.98), rgba(13, 20, 31, 0.98));
+        background: linear-gradient(180deg, #ffffff, #f8fbff);
       }
 
       .banner {
@@ -445,11 +457,11 @@
       }
 
       .banner.info {
-        background: rgba(90, 167, 255, 0.08);
+        background: rgba(37, 99, 235, 0.08);
       }
 
       .banner.error {
-        background: rgba(251, 113, 133, 0.12);
+        background: rgba(225, 29, 72, 0.08);
       }
 
       .messages-body {
@@ -463,19 +475,19 @@
       }
 
       .empty-state {
-        max-width: 680px;
+        max-width: 520px;
         margin: auto;
-        padding: 34px;
+        padding: 28px;
         border: 1px solid var(--line);
         border-radius: var(--radius-lg);
-        background: rgba(255, 255, 255, 0.05);
+        background: linear-gradient(180deg, rgba(37, 99, 235, 0.04), rgba(255, 255, 255, 0.96));
         text-align: center;
       }
 
       .empty-state h2 {
         margin: 14px 0 12px;
         font-family: "Space Grotesk", sans-serif;
-        font-size: 42px;
+        font-size: 34px;
         letter-spacing: -0.06em;
       }
 
@@ -509,7 +521,8 @@
       .message-bubble {
         padding: 14px 16px;
         border-radius: 18px;
-        background: rgba(255, 255, 255, 0.06);
+        background: #fff;
+        border: 1px solid rgba(148, 163, 184, 0.16);
         line-height: 1.6;
         display: flex;
         flex-direction: column;
@@ -517,8 +530,9 @@
       }
 
       .message-row.sent .message-bubble {
-        background: linear-gradient(135deg, var(--accent), #2e84f4);
-        color: #04101f;
+        background: linear-gradient(135deg, var(--accent), #3b82f6);
+        color: #fff;
+        border-color: transparent;
       }
 
       .message-copy {
@@ -532,13 +546,13 @@
         gap: 10px;
         padding: 12px;
         border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(8, 12, 20, 0.28);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(248, 250, 252, 0.96);
       }
 
       .message-row.sent .message-attachment {
-        background: rgba(4, 16, 31, 0.18);
-        border-color: rgba(4, 16, 31, 0.22);
+        background: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.24);
       }
 
       .message-attachment video,
@@ -560,7 +574,7 @@
       }
 
       .message-row.sent .message-attachment small {
-        color: rgba(4, 16, 31, 0.7);
+        color: rgba(255, 255, 255, 0.82);
       }
 
       .attach-btn {
@@ -575,7 +589,7 @@
 
       .notification-item {
         padding: 14px;
-        background: rgba(255, 255, 255, 0.04);
+        background: rgba(37, 99, 235, 0.04);
       }
 
       .toast {
@@ -585,7 +599,7 @@
         padding: 14px 16px;
         border-radius: 16px;
         border: 1px solid var(--line);
-        background: rgba(8, 12, 20, 0.96);
+        background: rgba(255, 255, 255, 0.96);
         transform: translateY(20px);
         opacity: 0;
         transition: transform 0.2s ease, opacity 0.2s ease;
@@ -594,6 +608,47 @@
       .toast.show {
         transform: translateY(0);
         opacity: 1;
+      }
+
+      body.compact-chat .main {
+        gap: 12px;
+      }
+
+      body.compact-chat .main-top {
+        align-items: center;
+      }
+
+      body.compact-chat .main-title {
+        margin-top: 4px;
+        font-size: clamp(28px, 3.6vw, 40px);
+      }
+
+      body.compact-chat .main-copy,
+      body.compact-chat .stats {
+        display: none;
+      }
+
+      body.compact-chat .main-actions {
+        flex-direction: row;
+        align-items: center;
+      }
+
+      body.compact-chat #headerInboxButton {
+        min-height: 42px;
+        padding: 0 14px;
+      }
+
+      body.compact-chat .messages-body {
+        padding-top: 18px;
+      }
+
+      body.compact-chat .empty-state {
+        max-width: 420px;
+        padding: 24px;
+      }
+
+      body.compact-chat .empty-state h2 {
+        font-size: 30px;
       }
 
       @media (max-width: 1380px) {
@@ -640,6 +695,12 @@
           grid-template-columns: 1fr;
           flex-direction: column;
         }
+
+        .main-actions,
+        body.compact-chat .main-actions {
+          align-items: stretch;
+          flex-direction: column;
+        }
       }
     </style>
   </head>
@@ -665,9 +726,7 @@
           <div>
             <div class="headline" id="userName">Your Workspace</div>
             <div class="muted mini" id="userEmail">user@example.com</div>
-            <div class="mini" style="color: var(--success); margin-top: 6px">
-              Realtime session is active
-            </div>
+            <div class="mini" style="color: var(--success); margin-top: 6px">Online</div>
           </div>
         </div>
 
@@ -710,17 +769,15 @@
       <main class="main panel">
         <div class="main-top">
           <div>
-            <div class="eyebrow" id="chatKicker">Workspace Overview</div>
+            <div class="eyebrow" id="chatKicker">Overview</div>
             <h1 class="main-title" id="chatTitle">MyClassRoom</h1>
             <div class="main-copy" id="chatSubtitle">
-              Invite friends by email, accept requests in the inbox, and keep direct chats and study groups cleanly separated.
+              Friends, invites, and groups in one place.
             </div>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end">
+          <div class="main-actions">
             <div class="status-pill" id="connectionState">Reconnecting</div>
-            <button class="btn secondary" id="headerInboxButton" type="button">
-              Open Inbox
-            </button>
+            <button class="btn secondary" id="headerInboxButton" type="button">Inbox</button>
           </div>
         </div>
 
@@ -1085,6 +1142,10 @@
         el.surfaceBanner.textContent = message;
       }
 
+      function syncSurfaceMode() {
+        document.body.classList.toggle("compact-chat", activeChannel.type !== "home");
+      }
+
       function syncComposer() {
         const inConversation = activeChannel.type !== "home";
         const canSendText = inConversation && stompClient && stompClient.connected;
@@ -1093,15 +1154,14 @@
         el.sendBtn.disabled = !canSendText;
         el.attachBtn.disabled = !canAttach;
         if (!inConversation) {
-          el.messageInput.placeholder =
-            "Choose a friend or accepted group before sending a message...";
+          el.messageInput.placeholder = "Pick a chat to start typing...";
         } else if (activeChannel.type === "direct") {
           el.messageInput.placeholder = canSendText
-            ? "Type a message or add a caption before sending video/file..."
-            : "Type a caption or send video/file. Text send will resume after reconnect.";
+            ? "Write a message or add a caption..."
+            : "Reconnecting before this message can be sent...";
         } else {
           el.messageInput.placeholder = canSendText
-            ? "Send a message to this study group..."
+            ? "Write a message..."
             : "Reconnecting before group messages can be sent...";
         }
       }
@@ -1236,20 +1296,17 @@
 
       function selectHome() {
         activeChannel = { type: "home" };
-        el.chatKicker.textContent = "Workspace Overview";
+        syncSurfaceMode();
+        el.chatKicker.textContent = "Overview";
         el.chatTitle.textContent = currentUser.username || defaultName(currentUser.email);
-        el.chatSubtitle.textContent =
-          "Use accepted friends for direct chat and accept group invites from the inbox before rooms appear.";
-        showBanner(
-          "Friend requests unlock direct chat. Group invitations unlock rooms after you accept them.",
-          "info",
-        );
+        el.chatSubtitle.textContent = "Friends, invites, and groups in one place.";
+        showBanner("", "info");
         disconnectSubscription();
         highlightSelection();
         clearMessages(
-          "Choose a conversation",
-          "Send a friend request by email or accept a group invite from the inbox to begin chatting.",
-          "No Channel Selected",
+          "Pick a chat",
+          "Open a friend or group from the left to start talking.",
+          "Workspace",
         );
         syncComposer();
       }
@@ -1261,10 +1318,10 @@
           email: friend.email,
           name: displayName(friend),
         };
-        el.chatKicker.textContent = "Direct Message";
+        syncSurfaceMode();
+        el.chatKicker.textContent = "Direct";
         el.chatTitle.textContent = displayName(friend);
-        el.chatSubtitle.textContent =
-          "Direct chat is active because this friend request was accepted.";
+        el.chatSubtitle.textContent = friend.email || "";
         showBanner("", "info");
         highlightSelection();
         syncComposer();
@@ -1274,10 +1331,10 @@
 
       function selectGroup(group) {
         activeChannel = { type: "group", id: group.id, name: group.name || "Study Group" };
-        el.chatKicker.textContent = "Study Group";
+        syncSurfaceMode();
+        el.chatKicker.textContent = "Group";
         el.chatTitle.textContent = group.name || "Study Group";
-        el.chatSubtitle.textContent =
-          (group.category ? group.category + " | " : "") + "Accepted room for shared work.";
+        el.chatSubtitle.textContent = group.category || "";
         showBanner("", "info");
         highlightSelection();
         syncComposer();
@@ -1518,13 +1575,13 @@
       }
 
       async function loadDirectHistory(otherEmail) {
-        clearMessages("Loading direct chat", "Pulling the latest direct conversation.", "Direct");
+        clearMessages("Loading chat", "Pulling the latest messages.", "Direct");
         const result = await authorizedRequest(
           "/api/messages/direct/" + encodeURIComponent(otherEmail),
         );
         if (!result.ok) {
           clearMessages(
-            "Direct chat locked",
+            "Chat unavailable",
             result.data.error || "Direct messaging unlocks after a friend request is accepted.",
             "Direct",
           );
@@ -1537,7 +1594,7 @@
         showBanner("", "info");
         const messages = Array.isArray(result.data) ? result.data : [];
         if (!messages.length) {
-          clearMessages("Say hello", "Start a one-to-one conversation here.", "Direct");
+          clearMessages("No messages yet", "Start the conversation here.", "Direct");
           return;
         }
         el.messagesArea.innerHTML = "";
@@ -1556,7 +1613,7 @@
       }
 
       async function loadGroupHistory(groupId) {
-        clearMessages("Loading room", "Pulling the latest group conversation.", "Group");
+        clearMessages("Loading room", "Pulling the latest messages.", "Group");
         const result = await authorizedRequest("/api/messages/groups/" + groupId);
         if (!result.ok) {
           clearMessages(
@@ -1570,7 +1627,7 @@
         showBanner("", "info");
         const messages = Array.isArray(result.data) ? result.data : [];
         if (!messages.length) {
-          clearMessages("This room is ready", "Kick off the first group message.", "Group");
+          clearMessages("No messages yet", "Send the first message to this room.", "Group");
           return;
         }
         el.messagesArea.innerHTML = "";
