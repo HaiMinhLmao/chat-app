@@ -3,10 +3,10 @@ package com.myclass.chat_app.service;
 import com.myclass.chat_app.dto.UserResponse;
 import com.myclass.chat_app.entity.User;
 import com.myclass.chat_app.repository.UserRepository;
+import com.myclass.chat_app.support.UserIdentitySupport;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class UserService {
@@ -19,32 +19,18 @@ public class UserService {
         this.transientStore = transientStore;
     }
 
-    public Optional<User> findByEmail(String email) {
-        if (email == null || email.isBlank()) return Optional.empty();
-        String normalizedEmail = email.trim().toLowerCase();
-        try {
-            Optional<User> user = userRepository.findByEmailIgnoreCase(normalizedEmail);
-            if (user.isPresent()) {
-                transientStore.upsertUser(normalizedEmail, user.get().getFullName());
-                return user;
-            }
-        } catch (RuntimeException ignored) {
-            // Fall back to transient storage when the database is unavailable.
-        }
-        return transientStore.findUserByEmail(normalizedEmail);
-    }
-
     public User upsertByEmail(String email, String fullName) {
-        String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
-        if (normalizedEmail.isBlank()) {
+        String normalizedEmail = UserIdentitySupport.normalizeEmail(email);
+        if (normalizedEmail == null) {
             throw new IllegalArgumentException("Email is required");
         }
+        String trimmedFullName = UserIdentitySupport.trimToNull(fullName);
 
         try {
             User user = userRepository.findByEmailIgnoreCase(normalizedEmail).orElseGet(User::new);
             user.setEmail(normalizedEmail);
-            if (fullName != null && !fullName.isBlank()) {
-                user.setFullName(fullName.trim());
+            if (trimmedFullName != null) {
+                user.setFullName(trimmedFullName);
             }
             User saved = userRepository.save(user);
             transientStore.upsertUser(normalizedEmail, saved.getFullName());
@@ -55,41 +41,29 @@ public class UserService {
     }
 
     public List<UserResponse> listUsers(String excludeEmail) {
-        String normalizedExclude = excludeEmail == null ? "" : excludeEmail.trim().toLowerCase();
+        String normalizedExclude = UserIdentitySupport.normalizeEmail(excludeEmail);
         try {
             List<User> users = userRepository.findAll();
             users.forEach(user -> transientStore.upsertUser(user.getEmail(), user.getFullName()));
             return users.stream()
-                    .filter(user -> !user.getEmail().equalsIgnoreCase(normalizedExclude))
+                    .filter(user -> normalizedExclude == null || !user.getEmail().equalsIgnoreCase(normalizedExclude))
                     .map(this::toResponse)
                     .toList();
         } catch (RuntimeException ignored) {
             return transientStore.listUsers().stream()
-                    .filter(user -> !user.getEmail().equalsIgnoreCase(normalizedExclude))
+                    .filter(user -> normalizedExclude == null || !user.getEmail().equalsIgnoreCase(normalizedExclude))
                     .map(this::toResponse)
                     .toList();
         }
     }
 
     private UserResponse toResponse(User user) {
-        String fullName = user.getFullName();
-        String username = (fullName != null && !fullName.isBlank())
-                ? fullName
-                : defaultDisplayName(user.getEmail());
         return new UserResponse(
                 user.getId(),
-                username,
+                UserIdentitySupport.displayName(user),
                 user.getEmail(),
-                fullName
+                user.getFullName()
         );
-    }
-
-    private String defaultDisplayName(String email) {
-        if (email == null) {
-            return "User";
-        }
-        int index = email.indexOf('@');
-        return index > 0 ? email.substring(0, index) : email;
     }
 }
 
