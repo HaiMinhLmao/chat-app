@@ -1,5 +1,6 @@
 package com.myclass.chat_app.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,7 +10,6 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -22,9 +22,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtDecoder jwtDecoder(@Value("${supabase.url}") String supabaseUrl) {
-        return NimbusJwtDecoder.withJwkSetUri(supabaseUrl + "/auth/v1/.well-known/jwks.json")
-                .build();
+    public JwtDecoder jwtDecoder(
+            @Value("${supabase.url}") String supabaseUrl,
+            @Value("${supabase.anon.key}") String anonKey,
+            ObjectMapper objectMapper
+    ) {
+        return new SupabaseUserLookupJwtDecoder(supabaseUrl, anonKey, objectMapper);
     }
 
     @Bean
