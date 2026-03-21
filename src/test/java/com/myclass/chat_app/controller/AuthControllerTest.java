@@ -4,8 +4,6 @@ import com.myclass.chat_app.dto.AuthRequest;
 import com.myclass.chat_app.dto.AuthSessionResponse;
 import com.myclass.chat_app.dto.AuthUserMetadataResponse;
 import com.myclass.chat_app.dto.AuthUserResponse;
-import com.myclass.chat_app.service.LocalAdminAuthService;
-import com.myclass.chat_app.service.LocalUserAuthService;
 import com.myclass.chat_app.service.SupabaseAuthService;
 import com.myclass.chat_app.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -19,80 +17,74 @@ import static org.mockito.Mockito.when;
 class AuthControllerTest {
 
     @Test
-    void loginFallsBackToLocalUserWhenSupabaseRejectsCredentials() {
+    void loginUsesSupabaseAuth() {
         SupabaseAuthService supabaseAuthService = mock(SupabaseAuthService.class);
-        LocalAdminAuthService localAdminAuthService = mock(LocalAdminAuthService.class);
-        LocalUserAuthService localUserAuthService = mock(LocalUserAuthService.class);
         UserService userService = mock(UserService.class);
-
-        AuthSessionResponse localResponse = session("student@example.com", "Student", "local");
-
-        when(localAdminAuthService.supportsIdentifier("student@example.com")).thenReturn(false);
-        when(supabaseAuthService.login("student@example.com", "secret123"))
-                .thenThrow(new RuntimeException("Supabase login error: HTTP 400 from Supabase: {\"error_code\":\"invalid_credentials\"}"));
-        when(localUserAuthService.login("student@example.com", "secret123")).thenReturn(localResponse);
+        AuthSessionResponse supabaseResponse = session("student@example.com", "Student", null);
+        when(supabaseAuthService.login("student@example.com", "secret123")).thenReturn(supabaseResponse);
 
         AuthController controller = new AuthController(
                 supabaseAuthService,
-                localAdminAuthService,
-                localUserAuthService,
                 userService
         );
 
         ResponseEntity<?> response = controller.login(new AuthRequest("student@example.com", "secret123", null));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isEqualTo(localResponse);
+        assertThat(response.getBody()).isEqualTo(supabaseResponse);
     }
 
     @Test
-    void registerFallsBackToLocalUserWhenSupabaseApiKeyIsInvalid() {
+    void registerUsesSupabaseAuth() {
         SupabaseAuthService supabaseAuthService = mock(SupabaseAuthService.class);
-        LocalAdminAuthService localAdminAuthService = mock(LocalAdminAuthService.class);
-        LocalUserAuthService localUserAuthService = mock(LocalUserAuthService.class);
         UserService userService = mock(UserService.class);
-
-        AuthSessionResponse localResponse = session("student@example.com", "Student", "local");
-
+        AuthSessionResponse supabaseResponse = session("student@example.com", "Student", null);
         when(supabaseAuthService.register("student@example.com", "secret123", "Student"))
-                .thenThrow(new RuntimeException("Supabase signup error: HTTP 401 from Supabase: {\"message\":\"Invalid API key\"}"));
-        when(localUserAuthService.register("student@example.com", "secret123", "Student")).thenReturn(localResponse);
+                .thenReturn(supabaseResponse);
 
         AuthController controller = new AuthController(
                 supabaseAuthService,
-                localAdminAuthService,
-                localUserAuthService,
                 userService
         );
 
         ResponseEntity<?> response = controller.register(new AuthRequest("student@example.com", "secret123", "Student"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isEqualTo(localResponse);
+        assertThat(response.getBody()).isEqualTo(supabaseResponse);
     }
 
     @Test
-    void registerReturnsServiceUnavailableWhenLocalFallbackCannotReachDatabase() {
+    void registerReturnsServiceUnavailableWhenSupabaseIsUnavailable() {
         SupabaseAuthService supabaseAuthService = mock(SupabaseAuthService.class);
-        LocalAdminAuthService localAdminAuthService = mock(LocalAdminAuthService.class);
-        LocalUserAuthService localUserAuthService = mock(LocalUserAuthService.class);
         UserService userService = mock(UserService.class);
-
         when(supabaseAuthService.register("student@example.com", "secret123", "Student"))
-                .thenThrow(new RuntimeException("Supabase signup error: HTTP 401 from Supabase: {\"message\":\"Invalid API key\"}"));
-        when(localUserAuthService.register("student@example.com", "secret123", "Student"))
-                .thenThrow(new RuntimeException("Unable to acquire JDBC Connection"));
+                .thenThrow(new RuntimeException("Supabase signup timed out after 8 seconds."));
 
         AuthController controller = new AuthController(
                 supabaseAuthService,
-                localAdminAuthService,
-                localUserAuthService,
                 userService
         );
 
         ResponseEntity<?> response = controller.register(new AuthRequest("student@example.com", "secret123", "Student"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void loginReturnsUnauthorizedWhenSupabaseRejectsCredentials() {
+        SupabaseAuthService supabaseAuthService = mock(SupabaseAuthService.class);
+        UserService userService = mock(UserService.class);
+        when(supabaseAuthService.login("student@example.com", "wrong-password"))
+                .thenThrow(new RuntimeException("HTTP 400 from Supabase: {\"error_code\":\"invalid_credentials\"}"));
+
+        AuthController controller = new AuthController(
+                supabaseAuthService,
+                userService
+        );
+
+        ResponseEntity<?> response = controller.login(new AuthRequest("student@example.com", "wrong-password", null));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     private AuthSessionResponse session(String email, String fullName, String mode) {

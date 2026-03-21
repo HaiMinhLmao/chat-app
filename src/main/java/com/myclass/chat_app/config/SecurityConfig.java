@@ -1,25 +1,16 @@
 package com.myclass.chat_app.config;
 
-import com.myclass.chat_app.service.LocalAdminAuthService;
-import com.myclass.chat_app.service.LocalUserAuthService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.BadJwtException;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.web.SecurityFilterChain;
-
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableWebSecurity
@@ -31,35 +22,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtDecoder jwtDecoder(
-            @Value("${supabase.url}") String supabaseUrl,
-            @Value("${app.local-auth.jwt-secret:myclassroom-local-demo-secret-please-change-2026}") String localJwtSecret
-    ) {
-        SecretKeySpec secretKey = new SecretKeySpec(localJwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        NimbusJwtDecoder localDecoder = NimbusJwtDecoder.withSecretKey(secretKey)
-                .macAlgorithm(MacAlgorithm.HS256)
+    public JwtDecoder jwtDecoder(@Value("${supabase.url}") String supabaseUrl) {
+        return NimbusJwtDecoder.withJwkSetUri(supabaseUrl + "/auth/v1/.well-known/jwks.json")
                 .build();
-        NimbusJwtDecoder supabaseDecoder = NimbusJwtDecoder.withJwkSetUri(supabaseUrl + "/auth/v1/.well-known/jwks.json")
-                .build();
-
-        return token -> {
-            try {
-                Jwt jwt = localDecoder.decode(token);
-                String issuer = jwt.getClaimAsString("iss");
-                if (LocalAdminAuthService.LOCAL_ISSUER.equals(issuer)
-                        || LocalUserAuthService.LOCAL_USER_ISSUER.equals(issuer)) {
-                    return jwt;
-                }
-            } catch (JwtException ignored) {
-                // Fall through to Supabase JWT validation below.
-            }
-
-            try {
-                return supabaseDecoder.decode(token);
-            } catch (JwtException exception) {
-                throw new BadJwtException("Token could not be verified by local admin auth or Supabase.");
-            }
-        };
     }
 
     @Bean

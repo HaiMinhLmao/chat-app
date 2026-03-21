@@ -230,7 +230,7 @@
       }
 
       .friend-form input,
-      .composer input {
+      .composer .composer-input {
         width: 100%;
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 14px;
@@ -240,7 +240,7 @@
       }
 
       .friend-form input:focus,
-      .composer input:focus {
+      .composer .composer-input:focus {
         outline: none;
         border-color: rgba(90, 167, 255, 0.5);
         box-shadow: 0 0 0 4px rgba(90, 167, 255, 0.12);
@@ -511,11 +511,61 @@
         border-radius: 18px;
         background: rgba(255, 255, 255, 0.06);
         line-height: 1.6;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
       }
 
       .message-row.sent .message-bubble {
         background: linear-gradient(135deg, var(--accent), #2e84f4);
         color: #04101f;
+      }
+
+      .message-copy {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .message-attachment {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(8, 12, 20, 0.28);
+      }
+
+      .message-row.sent .message-attachment {
+        background: rgba(4, 16, 31, 0.18);
+        border-color: rgba(4, 16, 31, 0.22);
+      }
+
+      .message-attachment video,
+      .message-attachment img {
+        width: min(100%, 340px);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.55);
+      }
+
+      .message-attachment a {
+        color: inherit;
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      .message-attachment small {
+        color: var(--muted);
+      }
+
+      .message-row.sent .message-attachment small {
+        color: rgba(4, 16, 31, 0.7);
+      }
+
+      .attach-btn {
+        min-width: 118px;
+        white-space: nowrap;
       }
 
       .composer {
@@ -693,7 +743,10 @@
           <div class="banner info" id="surfaceBanner"></div>
           <div class="messages-body" id="messagesArea"></div>
           <form class="composer" id="messageForm">
+            <input id="attachmentInput" type="file" hidden />
+            <button class="btn secondary attach-btn" id="attachBtn" type="button">Video/File</button>
             <input
+              class="composer-input"
               id="messageInput"
               type="text"
               placeholder="Choose a friend or accepted group before sending a message..."
@@ -749,6 +802,8 @@
         friendEmailInput: document.getElementById("friendEmailInput"),
         friendSubmitBtn: document.getElementById("friendSubmitBtn"),
         friendRequestFeedback: document.getElementById("friendRequestFeedback"),
+        attachmentInput: document.getElementById("attachmentInput"),
+        attachBtn: document.getElementById("attachBtn"),
         friendsList: document.getElementById("friendsList"),
         friendsCount: document.getElementById("friendsCount"),
         friendsEmpty: document.getElementById("friendsEmpty"),
@@ -794,6 +849,8 @@
       let workspaceRefreshTimer = null;
       let notificationsPrimed = false;
       const previews = new Map();
+      const AUTH_SESSION_KEY = "authSession";
+      const LEGACY_SESSION_KEY = "supabaseSession";
 
       function parseJson(value) {
         try {
@@ -804,11 +861,18 @@
       }
 
       function getSession() {
-        return parseJson(sessionStorage.getItem("supabaseSession"));
+        const current = parseJson(sessionStorage.getItem(AUTH_SESSION_KEY));
+        if (current) return current;
+        const legacy = parseJson(sessionStorage.getItem(LEGACY_SESSION_KEY));
+        if (!legacy) return null;
+        sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(legacy));
+        sessionStorage.removeItem(LEGACY_SESSION_KEY);
+        return legacy;
       }
 
       function clearSession() {
-        sessionStorage.removeItem("supabaseSession");
+        sessionStorage.removeItem(AUTH_SESSION_KEY);
+        sessionStorage.removeItem(LEGACY_SESSION_KEY);
         sessionStorage.removeItem("currentUser");
       }
 
@@ -867,9 +931,10 @@
         const data = await parseResponsePayload(response);
         if (!response.ok || !data.access_token) return null;
         sessionStorage.setItem(
-          "supabaseSession",
+          AUTH_SESSION_KEY,
           JSON.stringify({ ...session, ...data, user: session.user || null }),
         );
+        sessionStorage.removeItem(LEGACY_SESSION_KEY);
         return data.access_token;
       }
 
@@ -895,7 +960,10 @@
         let response = await fetch(url, buildOptions(token));
         if (response.status === 401) {
           token = await refreshSession();
-          if (!token) return { ok: false, data: { error: "Sign in again." } };
+          if (!token) {
+            clearSession();
+            return { ok: false, data: { error: "Sign in again." } };
+          }
           response = await fetch(url, buildOptions(token));
         }
         const data = await parseResponsePayload(response);
@@ -1018,10 +1086,24 @@
       }
 
       function syncComposer() {
-        const enabled =
-          activeChannel.type !== "home" && stompClient && stompClient.connected;
-        el.messageInput.disabled = !enabled;
-        el.sendBtn.disabled = !enabled;
+        const inConversation = activeChannel.type !== "home";
+        const canSendText = inConversation && stompClient && stompClient.connected;
+        const canAttach = activeChannel.type === "direct";
+        el.messageInput.disabled = !inConversation;
+        el.sendBtn.disabled = !canSendText;
+        el.attachBtn.disabled = !canAttach;
+        if (!inConversation) {
+          el.messageInput.placeholder =
+            "Choose a friend or accepted group before sending a message...";
+        } else if (activeChannel.type === "direct") {
+          el.messageInput.placeholder = canSendText
+            ? "Type a message or add a caption before sending video/file..."
+            : "Type a caption or send video/file. Text send will resume after reconnect.";
+        } else {
+          el.messageInput.placeholder = canSendText
+            ? "Send a message to this study group..."
+            : "Reconnecting before group messages can be sent...";
+        }
       }
 
       function setConnectionState(text, online) {
@@ -1041,7 +1123,90 @@
           "</div></div>";
       }
 
-      function addMessage(content, sent, sender, timestamp) {
+      function formatBytes(bytes) {
+        const value = Number(bytes || 0);
+        if (!value) return "0 B";
+        const units = ["B", "KB", "MB", "GB"];
+        let size = value;
+        let index = 0;
+        while (size >= 1024 && index < units.length - 1) {
+          size /= 1024;
+          index += 1;
+        }
+        return (size >= 10 || index === 0 ? size.toFixed(0) : size.toFixed(1)) + " " + units[index];
+      }
+
+      function attachmentDataUrl(message) {
+        if (message && message.attachmentUrl) return message.attachmentUrl;
+        if (!message || !message.attachmentBase64) return "";
+        return (
+          "data:" +
+          (message.attachmentContentType || "application/octet-stream") +
+          ";base64," +
+          message.attachmentBase64
+        );
+      }
+
+      function buildAttachment(message) {
+        if (!message || (!message.attachmentBase64 && !message.attachmentUrl)) return null;
+        const wrap = document.createElement("div");
+        wrap.className = "message-attachment";
+
+        const label = document.createElement("strong");
+        label.textContent = message.attachmentName || "attachment";
+        wrap.appendChild(label);
+
+        const href = attachmentDataUrl(message);
+        const type = String(message.attachmentContentType || "");
+
+        if (type.startsWith("video/")) {
+          const video = document.createElement("video");
+          video.controls = true;
+          video.preload = "metadata";
+          video.src = href;
+          wrap.appendChild(video);
+        } else if (type.startsWith("image/")) {
+          const image = document.createElement("img");
+          image.loading = "lazy";
+          image.alt = message.attachmentName || "Attachment";
+          image.src = href;
+          wrap.appendChild(image);
+        }
+
+        const meta = document.createElement("small");
+        meta.textContent =
+          (message.attachmentContentType || "application/octet-stream") +
+          (message.attachmentSize ? " - " + formatBytes(message.attachmentSize) : "");
+        wrap.appendChild(meta);
+
+        const download = document.createElement("a");
+        download.href = href;
+        download.download = message.attachmentName || "attachment";
+        download.target = "_blank";
+        download.rel = "noopener noreferrer";
+        download.textContent = type.startsWith("video/")
+          ? "Download video"
+          : type.startsWith("image/")
+            ? "Open image"
+            : "Download file";
+        wrap.appendChild(download);
+
+        return wrap;
+      }
+
+      function messagePreview(message, sent, sender) {
+        const prefix = sent ? "You" : sender;
+        const text = String((message && message.content) || "").trim();
+        if (message && message.attachmentName) {
+          const kind = String(message.attachmentContentType || "").startsWith("video/")
+            ? "video"
+            : "file";
+          return prefix + ": " + (text || "[" + kind + "] " + message.attachmentName);
+        }
+        return prefix + ": " + text;
+      }
+
+      function addMessage(message, sent, sender, timestamp) {
         if (el.messagesArea.querySelector(".empty-state")) el.messagesArea.innerHTML = "";
         const row = document.createElement("div");
         row.className = "message-row" + (sent ? " sent" : "");
@@ -1053,7 +1218,18 @@
           "</strong><span>" +
           formatTime(timestamp) +
           '</span></div><div class="message-bubble"></div></div>';
-        row.querySelector(".message-bubble").textContent = content;
+        const bubble = row.querySelector(".message-bubble");
+        const text = String((message && message.content) || "").trim();
+        if (text) {
+          const copy = document.createElement("div");
+          copy.className = "message-copy";
+          copy.textContent = text;
+          bubble.appendChild(copy);
+        }
+        const attachment = buildAttachment(message);
+        if (attachment) {
+          bubble.appendChild(attachment);
+        }
         el.messagesArea.appendChild(row);
         el.messagesArea.scrollTop = el.messagesArea.scrollHeight;
       }
@@ -1367,24 +1543,15 @@
         el.messagesArea.innerHTML = "";
         messages.forEach((message) => {
           const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-          addMessage(
-            message.content,
-            sent,
-            message.senderName || message.senderEmail || "User",
-            message.timestamp,
-          );
+          addMessage(message, sent, message.senderName || message.senderEmail || "User", message.timestamp);
         });
         const last = messages[messages.length - 1];
         if (last) {
-          setPreview(
-            "direct",
-            normalizeEmail(otherEmail),
-            (normalizeEmail(last.senderEmail) === normalizeEmail(currentUser.email)
+          const sender =
+            normalizeEmail(last.senderEmail) === normalizeEmail(currentUser.email)
               ? "You"
-              : last.senderName || last.senderEmail || "User") +
-              ": " +
-              last.content,
-          );
+              : last.senderName || last.senderEmail || "User";
+          setPreview("direct", normalizeEmail(otherEmail), messagePreview(last, sender === "You", sender));
         }
       }
 
@@ -1409,24 +1576,15 @@
         el.messagesArea.innerHTML = "";
         messages.forEach((message) => {
           const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-          addMessage(
-            message.content,
-            sent,
-            message.senderName || message.senderEmail || "User",
-            message.timestamp,
-          );
+          addMessage(message, sent, message.senderName || message.senderEmail || "User", message.timestamp);
         });
         const last = messages[messages.length - 1];
         if (last) {
-          setPreview(
-            "group",
-            groupId,
-            (normalizeEmail(last.senderEmail) === normalizeEmail(currentUser.email)
+          const sender =
+            normalizeEmail(last.senderEmail) === normalizeEmail(currentUser.email)
               ? "You"
-              : last.senderName || last.senderEmail || "User") +
-              ": " +
-              last.content,
-          );
+              : last.senderName || last.senderEmail || "User";
+          setPreview("group", groupId, messagePreview(last, sender === "You", sender));
         }
       }
 
@@ -1454,11 +1612,11 @@
         disconnectSubscription();
         activeSubscription = stompClient.subscribe("/topic/groups/" + groupId, (payload) => {
           const message = JSON.parse(payload.body || "{}");
-          if (!message.content) return;
+          if (!String(message.content || "").trim() && !message.attachmentBase64 && !message.attachmentUrl) return;
           const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
           const sender = message.senderName || message.senderEmail || "User";
-          setPreview("group", groupId, (sent ? "You" : sender) + ": " + message.content);
-          addMessage(message.content, sent, sender, message.timestamp);
+          setPreview("group", groupId, messagePreview(message, sent, sender));
+          addMessage(message, sent, sender, message.timestamp);
         });
       }
 
@@ -1468,11 +1626,11 @@
         const key = conversationKey(currentUser.email, otherEmail);
         activeSubscription = stompClient.subscribe("/topic/direct/" + key, (payload) => {
           const message = JSON.parse(payload.body || "{}");
-          if (!message.content) return;
+          if (!String(message.content || "").trim() && !message.attachmentBase64 && !message.attachmentUrl) return;
           const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
           const sender = message.senderName || message.senderEmail || "User";
-          setPreview("direct", normalizeEmail(otherEmail), (sent ? "You" : sender) + ": " + message.content);
-          addMessage(message.content, sent, sender, message.timestamp);
+          setPreview("direct", normalizeEmail(otherEmail), messagePreview(message, sent, sender));
+          addMessage(message, sent, sender, message.timestamp);
         });
       }
 
@@ -1502,6 +1660,43 @@
             content,
           }),
         );
+      }
+
+      async function uploadDirectAttachment(file) {
+        if (!file || activeChannel.type !== "direct") return;
+        const formData = new FormData();
+        formData.append("file", file);
+        const caption = el.messageInput.value.trim();
+        if (caption) {
+          formData.append("caption", caption);
+        }
+
+        el.attachBtn.disabled = true;
+        el.attachBtn.textContent = "Uploading...";
+        const result = await authorizedRequest(
+          "/api/messages/direct/" + encodeURIComponent(activeChannel.email) + "/attachments",
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+        el.attachBtn.textContent = "Video/File";
+        syncComposer();
+        el.attachmentInput.value = "";
+
+        if (!result.ok) {
+          showToast(result.data.error || "Could not send the file.");
+          return;
+        }
+
+        if (!stompClient || !stompClient.connected) {
+          const sender = result.data.senderName || currentUser.username || currentUser.email;
+          setPreview("direct", activeChannel.id, messagePreview(result.data, true, sender));
+          addMessage(result.data, true, sender, result.data.timestamp);
+        }
+
+        el.messageInput.value = "";
+        showToast("Attachment sent.");
       }
 
       async function respondFriendRequest(id, action) {
@@ -1591,6 +1786,19 @@
           return;
         }
         el.messageInput.value = "";
+      });
+
+      el.attachBtn.addEventListener("click", () => {
+        if (activeChannel.type !== "direct") {
+          return showToast("Video/file upload is available in direct chat.");
+        }
+        el.attachmentInput.click();
+      });
+
+      el.attachmentInput.addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        await uploadDirectAttachment(file);
       });
 
       el.homeRailButton.addEventListener("click", selectHome);

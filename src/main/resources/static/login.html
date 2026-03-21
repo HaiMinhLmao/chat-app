@@ -146,6 +146,8 @@
 </div>
 
 <script>
+    const AUTH_SESSION_KEY = 'authSession';
+    const LEGACY_SESSION_KEY = 'supabaseSession';
     const loginForm = document.getElementById('loginForm');
     const loginBtn = document.getElementById('loginBtn');
     const errorMessage = document.getElementById('errorMessage');
@@ -193,8 +195,9 @@
                 return;
             }
 
-            // Keep the full Supabase response for debugging
-            sessionStorage.setItem('supabaseSession', JSON.stringify(data));
+            // Keep the auth session payload for the rest of the app
+            sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(data));
+            sessionStorage.removeItem(LEGACY_SESSION_KEY);
 
             // A minimal "currentUser" object for existing index.html logic
             const user = data.user || (data?.data && data.data.user) || null;

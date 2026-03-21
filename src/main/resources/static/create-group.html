@@ -648,6 +648,8 @@
 </div>
 
 <script>
+    const AUTH_SESSION_KEY = 'authSession';
+    const LEGACY_SESSION_KEY = 'supabaseSession';
     const errorBox = document.getElementById('errorBox');
     const successBox = document.getElementById('successBox');
     const submitBtn = document.getElementById('submitBtn');
@@ -695,8 +697,20 @@
         }
     }
 
-    function getSupabaseSession() {
-        return parseJson(sessionStorage.getItem('supabaseSession'));
+    function getAuthSession() {
+        const current = parseJson(sessionStorage.getItem(AUTH_SESSION_KEY));
+        if (current) {
+            return current;
+        }
+
+        const legacy = parseJson(sessionStorage.getItem(LEGACY_SESSION_KEY));
+        if (!legacy) {
+            return null;
+        }
+
+        sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(legacy));
+        sessionStorage.removeItem(LEGACY_SESSION_KEY);
+        return legacy;
     }
 
     function getCurrentUser() {
@@ -705,7 +719,7 @@
             return currentUser;
         }
 
-        const session = getSupabaseSession();
+        const session = getAuthSession();
         const user = session && session.user ? session.user : null;
         if (!user) {
             return null;
@@ -722,7 +736,8 @@
     }
 
     function persistSession(session) {
-        sessionStorage.setItem('supabaseSession', JSON.stringify(session));
+        sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+        sessionStorage.removeItem(LEGACY_SESSION_KEY);
 
         const user = session && session.user ? session.user : null;
         if (!user) {
@@ -740,7 +755,8 @@
     }
 
     function clearSession() {
-        sessionStorage.removeItem('supabaseSession');
+        sessionStorage.removeItem(AUTH_SESSION_KEY);
+        sessionStorage.removeItem(LEGACY_SESSION_KEY);
         sessionStorage.removeItem('currentUser');
     }
 
@@ -781,7 +797,7 @@
     }
 
     async function refreshSession() {
-        const session = getSupabaseSession();
+        const session = getAuthSession();
         const refreshToken = session && session.refresh_token ? session.refresh_token : null;
         if (!refreshToken) {
             return null;
@@ -809,7 +825,7 @@
     }
 
     async function getValidAccessToken() {
-        const session = getSupabaseSession();
+        const session = getAuthSession();
         if (!session || !session.access_token) {
             return null;
         }
@@ -838,7 +854,7 @@
     }
 
     function updateAuthState() {
-        const session = getSupabaseSession();
+        const session = getAuthSession();
         const user = getCurrentUser();
 
         loginLink.href = '/login.html?returnTo=/create-group.html';

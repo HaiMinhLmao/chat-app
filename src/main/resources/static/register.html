@@ -197,7 +197,7 @@
             <div class="logo-section">
                 <div class="logo">MC</div>
                 <div class="logo-text">MyClassRoom</div>
-                <div class="logo-subtitle">Classroom Chat Platform</div>
+                <div class="logo-subtitle">Create your account with Supabase Auth</div>
             </div>
 
             <div class="error-message" id="errorMessage"></div>
@@ -250,6 +250,8 @@
     </div>
 
     <script>
+        const AUTH_SESSION_KEY = 'authSession';
+        const LEGACY_SESSION_KEY = 'supabaseSession';
         const registerForm = document.getElementById('registerForm');
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
@@ -297,7 +299,8 @@
                 console.log('Register response:', data);
 
                 if (response.ok) {
-                    sessionStorage.removeItem('supabaseSession');
+                    sessionStorage.removeItem(AUTH_SESSION_KEY);
+                    sessionStorage.removeItem(LEGACY_SESSION_KEY);
                     sessionStorage.removeItem('currentUser');
                     sessionStorage.setItem('registrationEmail', email);
 

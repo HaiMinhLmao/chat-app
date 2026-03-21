@@ -5,13 +5,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class SupabaseAuthService {
+
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);
 
     private final WebClient client;
     private final String anonKey;
@@ -30,7 +35,7 @@ public class SupabaseAuthService {
 
     public AuthSessionResponse register(String email, String password, String fullName) {
         validateConfigured();
-        return client.post()
+        return execute("signup", client.post()
                 .uri("/signup")
                 .header("apikey", anonKey)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + anonKey)
@@ -48,14 +53,12 @@ public class SupabaseAuthService {
                                         "HTTP " + response.statusCode().value() + " from Supabase: " + body
                                 )))
                 )
-                .bodyToMono(AuthSessionResponse.class)
-                .onErrorResume(e -> Mono.error(new RuntimeException("Supabase signup error: " + e.getMessage())))
-                .block();
+                .bodyToMono(AuthSessionResponse.class));
     }
 
     public AuthSessionResponse login(String email, String password) {
         validateConfigured();
-        return client.post()
+        return execute("login", client.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/token")
                         .queryParam("grant_type", "password")
@@ -75,14 +78,12 @@ public class SupabaseAuthService {
                                         "HTTP " + response.statusCode().value() + " from Supabase: " + body
                                 )))
                 )
-                .bodyToMono(AuthSessionResponse.class)
-                .onErrorResume(e -> Mono.error(new RuntimeException("Supabase login error: " + e.getMessage())))
-                .block();
+                .bodyToMono(AuthSessionResponse.class));
     }
 
     public AuthSessionResponse refresh(String refreshToken) {
         validateConfigured();
-        return client.post()
+        return execute("refresh", client.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/token")
                         .queryParam("grant_type", "refresh_token")
@@ -101,9 +102,7 @@ public class SupabaseAuthService {
                                         "HTTP " + response.statusCode().value() + " from Supabase: " + body
                                 )))
                 )
-                .bodyToMono(AuthSessionResponse.class)
-                .onErrorResume(e -> Mono.error(new RuntimeException("Supabase refresh error: " + e.getMessage())))
-                .block();
+                .bodyToMono(AuthSessionResponse.class));
     }
 
     private void validateConfigured() {
@@ -112,5 +111,21 @@ public class SupabaseAuthService {
                     "Missing Supabase anon key. Set environment variable SUPABASE_ANON_KEY (sb_publishable_...)."
             );
         }
+    }
+
+    private AuthSessionResponse execute(String operation, Mono<AuthSessionResponse> request) {
+        return request
+                .timeout(REQUEST_TIMEOUT)
+                .onErrorMap(
+                        TimeoutException.class,
+                        exception -> new RuntimeException(
+                                "Supabase " + operation + " timed out after " + REQUEST_TIMEOUT.toSeconds() + " seconds."
+                        )
+                )
+                .onErrorMap(
+                        WebClientRequestException.class,
+                        exception -> new RuntimeException("Supabase " + operation + " request failed: " + exception.getMessage())
+                )
+                .block();
     }
 }
