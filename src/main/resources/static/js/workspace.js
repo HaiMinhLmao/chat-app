@@ -12,10 +12,13 @@ const el = {
   userEmail: document.getElementById("userEmail"),
   friendCard: document.getElementById("friendCard"),
   friendCardToggle: document.getElementById("friendCardToggle"),
+  friendsCard: document.getElementById("friendsCard"),
+  friendsCardToggle: document.getElementById("friendsCardToggle"),
   friendRequestForm: document.getElementById("friendRequestForm"),
   friendEmailInput: document.getElementById("friendEmailInput"),
   friendSubmitBtn: document.getElementById("friendSubmitBtn"),
   friendRequestFeedback: document.getElementById("friendRequestFeedback"),
+  friendsSearchInput: document.getElementById("friendsSearchInput"),
   attachmentInput: document.getElementById("attachmentInput"),
   attachBtn: document.getElementById("attachBtn"),
   friendsList: document.getElementById("friendsList"),
@@ -63,10 +66,12 @@ let activeSubscription = null;
 let reconnectTimer = null;
 let workspaceRefreshTimer = null;
 let notificationsPrimed = false;
+let friendSearchQuery = "";
 const previews = new Map();
 const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
 const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
+const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
 const INBOX_BREAKPOINT = 1380;
 
 // Session and auth helpers
@@ -282,6 +287,29 @@ function setFriendCardCollapsed(collapsed) {
 function loadFriendCardPreference() {
   try {
     return window.localStorage.getItem(FRIEND_CARD_STORAGE_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function setFriendsCardCollapsed(collapsed) {
+  if (!el.friendsCard || !el.friendsCardToggle) return;
+  el.friendsCard.classList.toggle("is-collapsed", collapsed);
+  el.friendsCardToggle.setAttribute("aria-expanded", String(!collapsed));
+  el.friendsCardToggle.setAttribute(
+    "aria-label",
+    collapsed ? "Expand friends list" : "Collapse friends list",
+  );
+  try {
+    window.localStorage.setItem(FRIENDS_CARD_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch (_) {
+    // no-op
+  }
+}
+
+function loadFriendsCardPreference() {
+  try {
+    return window.localStorage.getItem(FRIENDS_CARD_STORAGE_KEY) === "1";
   } catch (_) {
     return false;
   }
@@ -602,8 +630,18 @@ function renderChannel(type, id, name, preview, role, onClick) {
 function renderFriends() {
   el.friendsList.innerHTML = "";
   el.friendsCount.textContent = String(socialState.friends.length);
-  el.friendsEmpty.style.display = socialState.friends.length ? "none" : "block";
-  socialState.friends.forEach((friend) => {
+  const query = friendSearchQuery.trim().toLowerCase();
+  const visibleFriends = socialState.friends.filter((friend) => {
+    if (!query) return true;
+    const name = displayName(friend).toLowerCase();
+    const email = String(friend.email || "").toLowerCase();
+    return name.includes(query) || email.includes(query);
+  });
+  el.friendsEmpty.textContent = socialState.friends.length
+    ? "No friends match your search."
+    : "No accepted friends yet.";
+  el.friendsEmpty.style.display = visibleFriends.length ? "none" : "block";
+  visibleFriends.forEach((friend) => {
     const email = normalizeEmail(friend.email);
     el.friendsList.appendChild(
       renderChannel(
@@ -1018,6 +1056,7 @@ async function bootstrap() {
   el.userEmail.textContent = currentUser.email;
   el.selfRailLabel.textContent = initials(name);
   setFriendCardCollapsed(loadFriendCardPreference());
+  setFriendsCardCollapsed(loadFriendsCardPreference());
   syncInboxToggleState();
   selectHome();
   await refreshWorkspace();
@@ -1031,6 +1070,19 @@ if (el.friendCardToggle) {
   el.friendCardToggle.addEventListener("click", () =>
     setFriendCardCollapsed(!el.friendCard.classList.contains("is-collapsed")),
   );
+}
+
+if (el.friendsCardToggle) {
+  el.friendsCardToggle.addEventListener("click", () =>
+    setFriendsCardCollapsed(!el.friendsCard.classList.contains("is-collapsed")),
+  );
+}
+
+if (el.friendsSearchInput) {
+  el.friendsSearchInput.addEventListener("input", (event) => {
+    friendSearchQuery = event.target.value || "";
+    renderFriends();
+  });
 }
 
 el.friendRequestForm.addEventListener("submit", async (event) => {

@@ -27,20 +27,50 @@
         <div class="rail-divider" aria-hidden="true"></div>
         <div class="rail-stack rail-stack-bottom">
           <button
-            class="rail-btn rail-action-btn rail-btn-label"
+            class="rail-btn rail-action-btn"
             id="notificationToggleButton"
             type="button"
             title="Thông báo"
             aria-label="Thông báo"
           >
-            <span class="rail-btn-short">TB</span>
+            <span class="rail-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M9.5 18.5a2.5 2.5 0 0 0 5 0"></path>
+                <path
+                  d="M18 16.5H6l1.4-1.6a2 2 0 0 0 .5-1.3V11a4.1 4.1 0 1 1 8.2 0v2.6a2 2 0 0 0 .5 1.3z"
+                ></path>
+              </svg>
+            </span>
             <span class="badge" id="notificationBadge" hidden>0</span>
           </button>
-          <button class="rail-btn rail-action-btn" id="newGroupBtn" type="button" title="Tạo nhóm">
-            +
+          <button
+            class="rail-btn rail-action-btn"
+            id="newGroupBtn"
+            type="button"
+            title="Tạo nhóm"
+            aria-label="Tạo nhóm"
+          >
+            <span class="rail-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 5v14"></path>
+                <path d="M5 12h14"></path>
+              </svg>
+            </span>
           </button>
-          <button class="rail-btn rail-action-btn" id="logoutBtn" type="button" title="Đăng xuất">
-            LO
+          <button
+            class="rail-btn rail-action-btn"
+            id="logoutBtn"
+            type="button"
+            title="Đăng xuất"
+            aria-label="Đăng xuất"
+          >
+            <span class="rail-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M14 17v1.5A1.5 1.5 0 0 1 12.5 20h-5A1.5 1.5 0 0 1 6 18.5v-13A1.5 1.5 0 0 1 7.5 4h5A1.5 1.5 0 0 1 14 5.5V7"></path>
+                <path d="M10 12h10"></path>
+                <path d="m17 8 4 4-4 4"></path>
+              </svg>
+            </span>
           </button>
         </div>
       </aside>
@@ -80,13 +110,33 @@
           </div>
         </section>
 
-        <section class="list-card section-card">
-          <div class="section-head">
-            <strong>Friends</strong>
-            <span class="count-pill" id="friendsCount">0</span>
+        <section class="list-card section-card collapsible-card" id="friendsCard">
+          <div class="card-heading">
+            <div class="section-head-title">
+              <strong>Friends</strong>
+              <span class="count-pill" id="friendsCount">0</span>
+            </div>
+            <button
+              class="card-collapse-btn"
+              id="friendsCardToggle"
+              type="button"
+              aria-expanded="true"
+              aria-controls="friendsCardBody"
+              aria-label="Collapse friends list"
+            ></button>
           </div>
-          <div class="channel-list" id="friendsList"></div>
-          <div class="mini muted" id="friendsEmpty">No accepted friends yet.</div>
+          <div class="collapsible-body" id="friendsCardBody">
+            <div class="friends-search">
+              <input
+                class="friends-search-input"
+                id="friendsSearchInput"
+                type="search"
+                placeholder="Search friends..."
+              />
+            </div>
+            <div class="channel-list" id="friendsList"></div>
+            <div class="mini muted" id="friendsEmpty">No accepted friends yet.</div>
+          </div>
         </section>
 
         <div class="sidebar-divider" aria-hidden="true"></div>

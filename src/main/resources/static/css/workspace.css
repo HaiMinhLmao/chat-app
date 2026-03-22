@@ -96,6 +96,9 @@ input {
   align-items: center;
   gap: 10px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
   padding: 4px 0;
 }
 
@@ -138,6 +141,24 @@ input {
 
 .rail-btn-short {
   letter-spacing: 0.08em;
+}
+
+.rail-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  line-height: 0;
+}
+
+.rail-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .rail-btn.active,
@@ -272,6 +293,13 @@ input {
   gap: 12px;
 }
 
+.section-head-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .card-collapse-btn {
   width: 36px;
   height: 36px;
@@ -308,6 +336,13 @@ input {
   transition: max-height 0.22s ease, opacity 0.16s ease, margin-top 0.22s ease;
 }
 
+.list-card.collapsible-card .collapsible-body {
+  max-height: min(460px, 52vh);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .collapsible-card .headline-offset {
   margin-top: 0;
 }
@@ -335,6 +370,21 @@ input {
 
 .support-copy {
   line-height: 1.7;
+}
+
+.friends-search {
+  margin-bottom: 10px;
+}
+
+#friendsList {
+  flex: 1;
+  min-height: 0;
+  max-height: clamp(200px, 34vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
 }
 
 .eyebrow {
@@ -366,6 +416,7 @@ input {
 }
 
 .friend-form input,
+.friends-search-input,
 .composer .composer-input {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.3);
@@ -376,6 +427,7 @@ input {
 }
 
 .friend-form input:focus,
+.friends-search-input:focus,
 .composer .composer-input:focus {
   outline: none;
   border-color: rgba(37, 99, 235, 0.45);
@@ -452,6 +504,22 @@ input {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.rail-group-list::-webkit-scrollbar,
+#friendsList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rail-group-list::-webkit-scrollbar-thumb,
+#friendsList::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.55);
+}
+
+.rail-group-list::-webkit-scrollbar-track,
+#friendsList::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .channel-item,
