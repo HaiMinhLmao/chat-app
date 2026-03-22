@@ -21,12 +21,11 @@
         <button class="rail-btn active" id="homeRailButton" type="button">
           <span id="selfRailLabel">ME</span>
         </button>
-        <div class="rail-group-list" id="groupRailList"></div>
-        <button class="rail-btn" id="notificationToggleButton" type="button">
-          IN
+        <div class="rail-spacer" aria-hidden="true"></div>
+        <button class="rail-btn rail-btn-label" id="notificationToggleButton" type="button">
+          Inbox
           <span class="badge" id="notificationBadge" hidden>0</span>
         </button>
-        <button class="rail-btn" id="newGroupBtn" type="button">+</button>
         <button class="rail-btn" id="logoutBtn" type="button">LO</button>
       </aside>
 
@@ -61,6 +60,8 @@
           <div class="channel-list" id="friendsList"></div>
           <div class="mini muted" id="friendsEmpty">No accepted friends yet.</div>
         </section>
+
+        <div class="sidebar-divider" aria-hidden="true"></div>
 
         <section class="list-card section-card">
           <div class="section-head">

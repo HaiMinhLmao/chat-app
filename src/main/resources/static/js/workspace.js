@@ -2,10 +2,8 @@
 const el = {
   homeRailButton: document.getElementById("homeRailButton"),
   selfRailLabel: document.getElementById("selfRailLabel"),
-  groupRailList: document.getElementById("groupRailList"),
   notificationToggleButton: document.getElementById("notificationToggleButton"),
   notificationBadge: document.getElementById("notificationBadge"),
-  newGroupBtn: document.getElementById("newGroupBtn"),
   logoutBtn: document.getElementById("logoutBtn"),
   userAvatar: document.getElementById("userAvatar"),
   userName: document.getElementById("userName"),
@@ -515,13 +513,6 @@ function highlightSelection() {
     "active",
     activeChannel.type === "home" || activeChannel.type === "direct",
   );
-  document.querySelectorAll(".rail-group").forEach((item) => {
-    item.classList.toggle(
-      "active",
-      activeChannel.type === "group" &&
-        item.dataset.id === String(activeChannel.id || ""),
-    );
-  });
 }
 
 function renderChannel(type, id, name, preview, role, onClick) {
@@ -564,7 +555,6 @@ function renderFriends() {
 
 function renderGroups() {
   el.groupsList.innerHTML = "";
-  el.groupRailList.innerHTML = "";
   el.groupsEmpty.style.display = groups.length ? "none" : "block";
   groups.forEach((group) => {
     el.groupsList.appendChild(
@@ -577,13 +567,6 @@ function renderGroups() {
         () => selectGroup(group),
       ),
     );
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "rail-btn rail-group";
-    button.dataset.id = String(group.id);
-    button.textContent = initials(group.name || "Group");
-    button.addEventListener("click", () => selectGroup(group));
-    el.groupRailList.appendChild(button);
   });
   el.overviewGroups.textContent = String(groups.length);
   highlightSelection();
@@ -1021,7 +1004,6 @@ el.attachmentInput.addEventListener("change", async (event) => {
 });
 
 el.homeRailButton.addEventListener("click", selectHome);
-el.newGroupBtn.addEventListener("click", () => (window.location.href = "/create-group.html"));
 el.createGroupSidebarBtn.addEventListener(
   "click",
   () => (window.location.href = "/create-group.html"),
