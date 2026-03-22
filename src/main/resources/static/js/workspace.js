@@ -5,6 +5,7 @@ const el = {
   groupRailList: document.getElementById("groupRailList"),
   notificationToggleButton: document.getElementById("notificationToggleButton"),
   notificationBadge: document.getElementById("notificationBadge"),
+  newGroupBtn: document.getElementById("newGroupBtn"),
   logoutBtn: document.getElementById("logoutBtn"),
   userAvatar: document.getElementById("userAvatar"),
   userName: document.getElementById("userName"),
@@ -63,6 +64,7 @@ let notificationsPrimed = false;
 const previews = new Map();
 const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
+const INBOX_BREAKPOINT = 1380;
 
 // Session and auth helpers
 function parseJson(value) {
@@ -278,16 +280,44 @@ async function parseResponsePayload(response) {
 }
 
 // Surface state and composer behavior
-function openInboxPanel() {
-  if (window.innerWidth <= 1380) {
-    document.body.classList.add("inbox-open");
-    return;
+function isWideLayout() {
+  return window.innerWidth > INBOX_BREAKPOINT;
+}
+
+function isInboxPanelOpen() {
+  return isWideLayout()
+    ? !document.body.classList.contains("notifications-collapsed")
+    : document.body.classList.contains("inbox-open");
+}
+
+function syncInboxToggleState() {
+  const open = isInboxPanelOpen();
+  el.notificationToggleButton.classList.toggle("active", open);
+  el.notificationToggleButton.setAttribute("aria-pressed", String(open));
+  el.headerInboxButton.classList.toggle("active", open);
+  el.headerInboxButton.setAttribute("aria-pressed", String(open));
+}
+
+function setInboxPanelOpen(nextOpen) {
+  if (isWideLayout()) {
+    document.body.classList.toggle("notifications-collapsed", !nextOpen);
+    document.body.classList.remove("inbox-open");
+  } else {
+    document.body.classList.toggle("inbox-open", nextOpen);
   }
-  el.utilityPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  syncInboxToggleState();
+}
+
+function openInboxPanel() {
+  setInboxPanelOpen(true);
 }
 
 function closeInboxPanel() {
-  document.body.classList.remove("inbox-open");
+  setInboxPanelOpen(false);
+}
+
+function toggleInboxPanel() {
+  setInboxPanelOpen(!isInboxPanelOpen());
 }
 
 function showBanner(message, variant) {
@@ -332,13 +362,13 @@ function setConnectionState(text, online) {
 
 function clearMessages(title, copy, kicker) {
   el.messagesArea.innerHTML =
-    '<div class="empty-state"><div class="eyebrow">' +
-    kicker +
-    "</div><h2>" +
+    '<div class="empty-state">' +
+    (kicker ? '<div class="eyebrow">' + kicker + "</div>" : "") +
+    "<h2>" +
     title +
     '</h2><div class="muted">' +
-  copy +
-  "</div></div>";
+    copy +
+    "</div></div>";
 }
 
 // Message rendering
@@ -479,7 +509,7 @@ function selectDirect(friend) {
     name: displayName(friend),
   };
   syncSurfaceMode();
-  el.chatKicker.textContent = "Direct";
+  el.chatKicker.textContent = "";
   el.chatTitle.textContent = displayName(friend);
   el.chatSubtitle.textContent = friend.email || "";
   showBanner("", "info");
@@ -657,7 +687,7 @@ function renderNotifications() {
     el.incomingFriendRequests.appendChild(
       renderNotificationCard(
         request.requesterName || defaultName(request.requesterEmail),
-        "Sent a friend request to unlock direct chat.",
+        "Sent a friend request to unlock chat.",
         formatAgo(request.createdAt),
         [accept, decline],
       ),
@@ -747,18 +777,18 @@ async function loadGroups() {
 }
 
 async function loadDirectHistory(otherEmail) {
-  clearMessages("Loading chat", "Pulling the latest messages.", "Direct");
+  clearMessages("Loading chat", "Pulling the latest messages.", "");
   const result = await authorizedRequest(
     "/api/messages/direct/" + encodeURIComponent(otherEmail),
   );
   if (!result.ok) {
     clearMessages(
       "Chat unavailable",
-      result.data.error || "Direct messaging unlocks after a friend request is accepted.",
-      "Direct",
+      result.data.error || "Messaging unlocks after a friend request is accepted.",
+      "",
     );
     showBanner(
-      result.data.error || "Direct messaging unlocks after a friend request is accepted.",
+      result.data.error || "Messaging unlocks after a friend request is accepted.",
       "error",
     );
     return;
@@ -766,7 +796,7 @@ async function loadDirectHistory(otherEmail) {
   showBanner("", "info");
   const messages = Array.isArray(result.data) ? result.data : [];
   if (!messages.length) {
-    clearMessages("No messages yet", "Start the conversation here.", "Direct");
+    clearMessages("No messages yet", "Start the conversation here.", "");
     return;
   }
   el.messagesArea.innerHTML = "";
@@ -959,6 +989,7 @@ async function bootstrap() {
   el.userName.textContent = name;
   el.userEmail.textContent = currentUser.email;
   el.selfRailLabel.textContent = initials(name);
+  syncInboxToggleState();
   selectHome();
   await refreshWorkspace();
   connectWs();
@@ -990,7 +1021,7 @@ el.friendRequestForm.addEventListener("submit", async (event) => {
   el.friendSubmitBtn.textContent = "Add";
   if (result.ok) {
     el.friendEmailInput.value = "";
-    setFriendFeedback("Friend request sent. They can accept it from Inbox.", "success");
+    setFriendFeedback("Friend request sent. They can accept it from Thông báo.", "success");
     showToast("Friend request sent.");
     await loadSocialState();
   } else {
@@ -1031,14 +1062,17 @@ el.attachmentInput.addEventListener("change", async (event) => {
 });
 
 el.homeRailButton.addEventListener("click", selectHome);
+if (el.newGroupBtn) {
+  el.newGroupBtn.addEventListener("click", () => (window.location.href = "/create-group.html"));
+}
 if (el.createGroupSidebarBtn) {
   el.createGroupSidebarBtn.addEventListener(
     "click",
     () => (window.location.href = "/create-group.html"),
   );
 }
-el.headerInboxButton.addEventListener("click", openInboxPanel);
-el.notificationToggleButton.addEventListener("click", openInboxPanel);
+el.headerInboxButton.addEventListener("click", toggleInboxPanel);
+el.notificationToggleButton.addEventListener("click", toggleInboxPanel);
 el.closeInboxButton.addEventListener("click", closeInboxPanel);
 el.logoutBtn.addEventListener("click", () => {
   clearSession();
@@ -1058,7 +1092,10 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshWorkspace();
 });
 window.addEventListener("resize", () => {
-  if (window.innerWidth > 1380) closeInboxPanel();
+  if (isWideLayout()) {
+    document.body.classList.remove("inbox-open");
+  }
+  syncInboxToggleState();
 });
 window.addEventListener("load", bootstrap);
 

@@ -41,14 +41,16 @@ input {
 
 /* Shell layout */
 .app-shell {
+  --inbox-width: 320px;
   width: 100%;
   max-width: 1680px;
   margin: 0 auto;
   min-height: 100vh;
   padding: 14px;
   display: grid;
-  grid-template-columns: 78px 310px minmax(0, 1fr) 320px;
+  grid-template-columns: 78px 310px minmax(0, 1fr) var(--inbox-width);
   gap: 14px;
+  transition: grid-template-columns 0.22s ease;
 }
 
 .panel {
@@ -141,6 +143,17 @@ input {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.inbox {
+  min-width: 0;
+  overflow: hidden;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    padding 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .profile,
@@ -281,6 +294,11 @@ input {
 .tiny-btn {
   color: var(--text);
   background: rgba(37, 99, 235, 0.08);
+}
+
+.btn.secondary.active {
+  color: var(--accent);
+  background: rgba(37, 99, 235, 0.14);
 }
 
 .tiny-btn {
@@ -674,6 +692,26 @@ body.compact-chat .empty-state {
 
 body.compact-chat .empty-state h2 {
   font-size: 30px;
+}
+
+@media (min-width: 1381px) {
+  body.notifications-collapsed {
+    --inbox-width: 0px;
+  }
+
+  body.notifications-collapsed .inbox {
+    opacity: 0;
+    pointer-events: none;
+    padding-left: 0;
+    padding-right: 0;
+    border-color: transparent;
+    box-shadow: none;
+    transform: translateX(18px);
+  }
+
+  body.notifications-collapsed .inbox > * {
+    opacity: 0;
+  }
 }
 
 /* Responsive layouts */

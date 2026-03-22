@@ -23,9 +23,10 @@
         </button>
         <div class="rail-group-list" id="groupRailList"></div>
         <button class="rail-btn rail-btn-label" id="notificationToggleButton" type="button">
-          Inbox
+          Thông báo
           <span class="badge" id="notificationBadge" hidden>0</span>
         </button>
+        <button class="rail-btn" id="newGroupBtn" type="button">+</button>
         <button class="rail-btn" id="logoutBtn" type="button">LO</button>
       </aside>
 
@@ -43,7 +44,7 @@
           <div class="eyebrow">Add Friend</div>
           <div class="headline headline-offset">Send request by email</div>
           <p class="muted mini support-copy">
-            Only existing MyClassRoom accounts can receive requests. It appears in Inbox, not Gmail.
+            Only existing MyClassRoom accounts can receive requests. It appears in Thông báo, not Gmail.
           </p>
           <form class="friend-form" id="friendRequestForm">
             <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
@@ -75,7 +76,7 @@
           </div>
           <div class="main-actions">
             <div class="status-pill" id="connectionState">Reconnecting</div>
-            <button class="btn secondary" id="headerInboxButton" type="button">Inbox</button>
+            <button class="btn secondary" id="headerInboxButton" type="button">Thông báo</button>
           </div>
         </div>
 
@@ -114,7 +115,7 @@
       <aside class="inbox panel" id="utilityPanel">
         <div class="section-head">
           <div>
-            <div class="headline">Inbox</div>
+            <div class="headline">Thông báo</div>
             <div class="mini muted">Friend requests and group invites appear here inside the app.</div>
           </div>
           <button class="btn secondary" id="closeInboxButton" type="button">Hide</button>
