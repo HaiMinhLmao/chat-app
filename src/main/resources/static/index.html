@@ -21,7 +21,7 @@
         <button class="rail-btn active" id="homeRailButton" type="button">
           <span id="selfRailLabel">ME</span>
         </button>
-        <div class="rail-spacer" aria-hidden="true"></div>
+        <div class="rail-group-list" id="groupRailList"></div>
         <button class="rail-btn rail-btn-label" id="notificationToggleButton" type="button">
           Inbox
           <span class="badge" id="notificationBadge" hidden>0</span>
@@ -62,19 +62,6 @@
         </section>
 
         <div class="sidebar-divider" aria-hidden="true"></div>
-
-        <section class="list-card section-card">
-          <div class="section-head">
-            <strong>Groups</strong>
-            <button class="tiny-btn" id="createGroupSidebarBtn" type="button">
-              Create
-            </button>
-          </div>
-          <div class="channel-list" id="groupsList"></div>
-          <div class="mini muted" id="groupsEmpty">
-            Accept a group invite or create a new room.
-          </div>
-        </section>
       </aside>
 
       <main class="main panel">
@@ -157,4 +144,3 @@
     <script src="/js/workspace.js"></script>
   </body>
 </html>
-

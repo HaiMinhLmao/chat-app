@@ -2,6 +2,7 @@
 const el = {
   homeRailButton: document.getElementById("homeRailButton"),
   selfRailLabel: document.getElementById("selfRailLabel"),
+  groupRailList: document.getElementById("groupRailList"),
   notificationToggleButton: document.getElementById("notificationToggleButton"),
   notificationBadge: document.getElementById("notificationBadge"),
   logoutBtn: document.getElementById("logoutBtn"),
@@ -513,6 +514,13 @@ function highlightSelection() {
     "active",
     activeChannel.type === "home" || activeChannel.type === "direct",
   );
+  document.querySelectorAll(".rail-group").forEach((item) => {
+    item.classList.toggle(
+      "active",
+      activeChannel.type === "group" &&
+        item.dataset.id === String(activeChannel.id || ""),
+    );
+  });
 }
 
 function renderChannel(type, id, name, preview, role, onClick) {
@@ -554,20 +562,39 @@ function renderFriends() {
 }
 
 function renderGroups() {
-  el.groupsList.innerHTML = "";
-  el.groupsEmpty.style.display = groups.length ? "none" : "block";
-  groups.forEach((group) => {
-    el.groupsList.appendChild(
-      renderChannel(
-        "group",
-        group.id,
-        group.name || "Study Group",
-        getPreview("group", group.id, group.category || "Accepted room"),
-        group.role || "",
-        () => selectGroup(group),
-      ),
-    );
-  });
+  if (el.groupRailList) {
+    el.groupRailList.innerHTML = "";
+  }
+  if (el.groupsList) {
+    el.groupsList.innerHTML = "";
+    groups.forEach((group) => {
+      el.groupsList.appendChild(
+        renderChannel(
+          "group",
+          group.id,
+          group.name || "Study Group",
+          getPreview("group", group.id, group.category || "Accepted room"),
+          group.role || "",
+          () => selectGroup(group),
+        ),
+      );
+    });
+  }
+  if (el.groupRailList) {
+    groups.forEach((group) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "rail-btn rail-group";
+      button.dataset.id = String(group.id);
+      button.textContent = initials(group.name || "Group");
+      button.title = group.name || "Study Group";
+      button.addEventListener("click", () => selectGroup(group));
+      el.groupRailList.appendChild(button);
+    });
+  }
+  if (el.groupsEmpty) {
+    el.groupsEmpty.style.display = groups.length ? "none" : "block";
+  }
   el.overviewGroups.textContent = String(groups.length);
   highlightSelection();
 }
@@ -1004,10 +1031,12 @@ el.attachmentInput.addEventListener("change", async (event) => {
 });
 
 el.homeRailButton.addEventListener("click", selectHome);
-el.createGroupSidebarBtn.addEventListener(
-  "click",
-  () => (window.location.href = "/create-group.html"),
-);
+if (el.createGroupSidebarBtn) {
+  el.createGroupSidebarBtn.addEventListener(
+    "click",
+    () => (window.location.href = "/create-group.html"),
+  );
+}
 el.headerInboxButton.addEventListener("click", openInboxPanel);
 el.notificationToggleButton.addEventListener("click", openInboxPanel);
 el.closeInboxButton.addEventListener("click", closeInboxPanel);
