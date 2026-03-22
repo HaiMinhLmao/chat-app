@@ -17,17 +17,32 @@
   <body>
     <div class="app-shell">
       <aside class="rail panel">
-        <button class="rail-btn brand" type="button">MC</button>
-        <button class="rail-btn active" id="homeRailButton" type="button">
-          <span id="selfRailLabel">ME</span>
-        </button>
-        <div class="rail-group-list" id="groupRailList"></div>
-        <button class="rail-btn rail-btn-label" id="notificationToggleButton" type="button">
-          Thông báo
-          <span class="badge" id="notificationBadge" hidden>0</span>
-        </button>
-        <button class="rail-btn" id="newGroupBtn" type="button">+</button>
-        <button class="rail-btn" id="logoutBtn" type="button">LO</button>
+        <div class="rail-stack rail-stack-top">
+          <button class="rail-btn brand" type="button" title="MyClassRoom">MC</button>
+          <button class="rail-btn active" id="homeRailButton" type="button" title="Workspace">
+            <span id="selfRailLabel">ME</span>
+          </button>
+          <div class="rail-group-list" id="groupRailList"></div>
+        </div>
+        <div class="rail-divider" aria-hidden="true"></div>
+        <div class="rail-stack rail-stack-bottom">
+          <button
+            class="rail-btn rail-action-btn rail-btn-label"
+            id="notificationToggleButton"
+            type="button"
+            title="Thông báo"
+            aria-label="Thông báo"
+          >
+            <span class="rail-btn-short">TB</span>
+            <span class="badge" id="notificationBadge" hidden>0</span>
+          </button>
+          <button class="rail-btn rail-action-btn" id="newGroupBtn" type="button" title="Tạo nhóm">
+            +
+          </button>
+          <button class="rail-btn rail-action-btn" id="logoutBtn" type="button" title="Đăng xuất">
+            LO
+          </button>
+        </div>
       </aside>
 
       <aside class="sidebar panel">
