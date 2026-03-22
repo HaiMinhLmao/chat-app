@@ -10,6 +10,8 @@ const el = {
   userAvatar: document.getElementById("userAvatar"),
   userName: document.getElementById("userName"),
   userEmail: document.getElementById("userEmail"),
+  friendCard: document.getElementById("friendCard"),
+  friendCardToggle: document.getElementById("friendCardToggle"),
   friendRequestForm: document.getElementById("friendRequestForm"),
   friendEmailInput: document.getElementById("friendEmailInput"),
   friendSubmitBtn: document.getElementById("friendSubmitBtn"),
@@ -64,6 +66,7 @@ let notificationsPrimed = false;
 const previews = new Map();
 const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
+const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const INBOX_BREAKPOINT = 1380;
 
 // Session and auth helpers
@@ -261,6 +264,29 @@ function setFriendFeedback(message, variant) {
   );
 }
 
+function setFriendCardCollapsed(collapsed) {
+  if (!el.friendCard || !el.friendCardToggle) return;
+  el.friendCard.classList.toggle("is-collapsed", collapsed);
+  el.friendCardToggle.setAttribute("aria-expanded", String(!collapsed));
+  el.friendCardToggle.setAttribute(
+    "aria-label",
+    collapsed ? "Expand add friend" : "Collapse add friend",
+  );
+  try {
+    window.localStorage.setItem(FRIEND_CARD_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch (_) {
+    // no-op
+  }
+}
+
+function loadFriendCardPreference() {
+  try {
+    return window.localStorage.getItem(FRIEND_CARD_STORAGE_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
 async function parseResponsePayload(response) {
   const text = await response.text();
   if (!text) return {};
@@ -294,8 +320,10 @@ function syncInboxToggleState() {
   const open = isInboxPanelOpen();
   el.notificationToggleButton.classList.toggle("active", open);
   el.notificationToggleButton.setAttribute("aria-pressed", String(open));
-  el.headerInboxButton.classList.toggle("active", open);
-  el.headerInboxButton.setAttribute("aria-pressed", String(open));
+  if (el.headerInboxButton) {
+    el.headerInboxButton.classList.toggle("active", open);
+    el.headerInboxButton.setAttribute("aria-pressed", String(open));
+  }
 }
 
 function setInboxPanelOpen(nextOpen) {
@@ -989,6 +1017,7 @@ async function bootstrap() {
   el.userName.textContent = name;
   el.userEmail.textContent = currentUser.email;
   el.selfRailLabel.textContent = initials(name);
+  setFriendCardCollapsed(loadFriendCardPreference());
   syncInboxToggleState();
   selectHome();
   await refreshWorkspace();
@@ -998,6 +1027,12 @@ async function bootstrap() {
 }
 
 // Event wiring
+if (el.friendCardToggle) {
+  el.friendCardToggle.addEventListener("click", () =>
+    setFriendCardCollapsed(!el.friendCard.classList.contains("is-collapsed")),
+  );
+}
+
 el.friendRequestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const email = el.friendEmailInput.value.trim();
@@ -1071,7 +1106,9 @@ if (el.createGroupSidebarBtn) {
     () => (window.location.href = "/create-group.html"),
   );
 }
-el.headerInboxButton.addEventListener("click", toggleInboxPanel);
+if (el.headerInboxButton) {
+  el.headerInboxButton.addEventListener("click", toggleInboxPanel);
+}
 el.notificationToggleButton.addEventListener("click", toggleInboxPanel);
 el.closeInboxButton.addEventListener("click", closeInboxPanel);
 el.logoutBtn.addEventListener("click", () => {

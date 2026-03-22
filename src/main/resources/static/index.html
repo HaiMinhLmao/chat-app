@@ -40,17 +40,29 @@
           </div>
         </div>
 
-        <section class="card section-card">
-          <div class="eyebrow">Add Friend</div>
-          <div class="headline headline-offset">Send request by email</div>
-          <p class="muted mini support-copy">
-            Only existing MyClassRoom accounts can receive requests. It appears in Thông báo, not Gmail.
-          </p>
-          <form class="friend-form" id="friendRequestForm">
-            <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
-            <button class="btn" id="friendSubmitBtn" type="submit">Add</button>
-          </form>
-          <div class="mini friend-feedback" id="friendRequestFeedback"></div>
+        <section class="card section-card collapsible-card" id="friendCard">
+          <div class="card-heading">
+            <div class="eyebrow">Add Friend</div>
+            <button
+              class="card-collapse-btn"
+              id="friendCardToggle"
+              type="button"
+              aria-expanded="true"
+              aria-controls="friendCardBody"
+              aria-label="Collapse add friend"
+            ></button>
+          </div>
+          <div class="collapsible-body" id="friendCardBody">
+            <div class="headline headline-offset">Send request by email</div>
+            <p class="muted mini support-copy">
+              Only existing MyClassRoom accounts can receive requests. It appears in Thông báo, not Gmail.
+            </p>
+            <form class="friend-form" id="friendRequestForm">
+              <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
+              <button class="btn" id="friendSubmitBtn" type="submit">Add</button>
+            </form>
+            <div class="mini friend-feedback" id="friendRequestFeedback"></div>
+          </div>
         </section>
 
         <section class="list-card section-card">
@@ -76,7 +88,6 @@
           </div>
           <div class="main-actions">
             <div class="status-pill" id="connectionState">Reconnecting</div>
-            <button class="btn secondary" id="headerInboxButton" type="button">Thông báo</button>
           </div>
         </div>
 
