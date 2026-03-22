@@ -8,6 +8,11 @@ public record DirectChatMessage(
         String senderName,
         String recipientEmail,
         String content,
+        String attachmentName,
+        String attachmentContentType,
+        String attachmentBase64,
+        String attachmentUrl,
+        Long attachmentSize,
         Instant timestamp
 ) {
 }

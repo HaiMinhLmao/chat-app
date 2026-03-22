@@ -48,6 +48,20 @@ public class Message {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(length = 255)
+    private String attachmentName;
+
+    @Column(length = 120)
+    private String attachmentContentType;
+
+    @Column(columnDefinition = "TEXT")
+    private String attachmentBase64;
+
+    @Column(length = 1024)
+    private String attachmentStoragePath;
+
+    private Long attachmentSize;
+
     @Column(nullable = false, updatable = false)
     private Instant timestamp;
 

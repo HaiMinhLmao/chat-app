@@ -6,6 +6,7 @@ import com.myclass.chat_app.dto.AuthUserResponse;
 import com.myclass.chat_app.entity.LocalCredential;
 import com.myclass.chat_app.entity.User;
 import com.myclass.chat_app.repository.LocalCredentialRepository;
+import com.myclass.chat_app.support.UserIdentitySupport;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -23,7 +24,6 @@ import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
-import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -51,20 +51,8 @@ public class LocalUserAuthService {
         this.jwtSecret = jwtSecret.getBytes(StandardCharsets.UTF_8);
     }
 
-    public boolean supportsIdentifier(String identifier) {
-        String normalized = normalize(identifier);
-        if (normalized == null) {
-            return false;
-        }
-        try {
-            return localCredentialRepository.existsByUserEmailIgnoreCase(normalized);
-        } catch (RuntimeException exception) {
-            return false;
-        }
-    }
-
     public AuthSessionResponse register(String email, String password, String fullName) {
-        String normalizedEmail = normalize(email);
+        String normalizedEmail = UserIdentitySupport.normalizeEmail(email);
         if (normalizedEmail == null) {
             throw new IllegalArgumentException("Email is required.");
         }
@@ -115,16 +103,16 @@ public class LocalUserAuthService {
             throw new IllegalArgumentException("Invalid refresh token.");
         }
 
-        String email = normalize(claims.getSubject());
+        String email = UserIdentitySupport.normalizeEmail(claims.getSubject());
         LocalCredential credential = loadCredential(email)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown local account."));
         return buildAuthResponse(credential.getUser());
     }
 
     private AuthSessionResponse buildAuthResponse(User user) {
-        String email = normalize(user.getEmail());
-        String fullName = displayName(user);
-        String username = defaultDisplayName(email);
+        String email = UserIdentitySupport.normalizeEmail(user.getEmail());
+        String fullName = UserIdentitySupport.displayName(user);
+        String username = UserIdentitySupport.defaultDisplayName(email);
 
         AuthUserMetadataResponse userMetadata = new AuthUserMetadataResponse(
                 fullName,
@@ -195,30 +183,10 @@ public class LocalUserAuthService {
     }
 
     private Optional<LocalCredential> loadCredential(String email) {
-        String normalized = normalize(email);
+        String normalized = UserIdentitySupport.normalizeEmail(email);
         if (normalized == null) {
             return Optional.empty();
         }
         return localCredentialRepository.findByUserEmailIgnoreCase(normalized);
-    }
-
-    private String displayName(User user) {
-        if (user.getFullName() != null && !user.getFullName().isBlank()) {
-            return user.getFullName().trim();
-        }
-        return defaultDisplayName(user.getEmail());
-    }
-
-    private String defaultDisplayName(String email) {
-        int index = email.indexOf('@');
-        return index > 0 ? email.substring(0, index) : email;
-    }
-
-    private String normalize(String value) {
-        if (value == null) {
-            return null;
-        }
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        return normalized.isBlank() ? null : normalized;
     }
 }

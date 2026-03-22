@@ -3,6 +3,7 @@ package com.myclass.chat_app.service;
 import com.myclass.chat_app.dto.AuthSessionResponse;
 import com.myclass.chat_app.dto.AuthUserMetadataResponse;
 import com.myclass.chat_app.dto.AuthUserResponse;
+import com.myclass.chat_app.support.UserIdentitySupport;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -46,7 +47,7 @@ public class LocalAdminAuthService {
         this.userService = userService;
         this.jwtSecret = jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         this.primaryLogin = normalize(primaryLogin);
-        this.adminEmail = normalize(adminEmail);
+        this.adminEmail = UserIdentitySupport.normalizeEmail(adminEmail);
         this.adminDisplayName = adminDisplayName == null || adminDisplayName.isBlank() ? "Admin" : adminDisplayName.trim();
         this.adminPassword = adminPassword == null ? "" : adminPassword;
     }
