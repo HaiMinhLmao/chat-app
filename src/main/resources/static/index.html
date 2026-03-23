@@ -229,22 +229,51 @@
       </div>
       <div class="settings-popover-body">
         <div class="settings-account">
-          <div class="mini muted">Signed in as</div>
-          <strong id="settingsUserName">Workspace user</strong>
-          <div class="mini muted" id="settingsUserEmail">user@example.com</div>
+          <div class="settings-account-top">
+            <div class="settings-avatar-preview" id="settingsAvatarPreview">ME</div>
+            <div class="settings-account-copy">
+              <div class="mini muted">Signed in as</div>
+              <strong id="settingsUserName">Workspace user</strong>
+              <div class="mini muted" id="settingsUserEmail">user@example.com</div>
+            </div>
+          </div>
           <form class="settings-profile-form" id="settingsProfileForm">
             <label class="settings-field" for="settingsDisplayNameInput">
-              <span class="settings-field-label">Display name</span>
-            </label>
-            <div class="settings-inline-row">
+              <span class="settings-field-label">Họ và tên</span>
               <input
                 class="settings-text-input"
                 id="settingsDisplayNameInput"
                 type="text"
                 maxlength="60"
-                placeholder="How everyone sees your name"
+                placeholder="Tên hiển thị của bạn"
               />
-              <button class="tiny-btn" id="settingsDisplayNameSaveBtn" type="submit">Save</button>
+            </label>
+            <label class="settings-field" for="settingsAvatarUrlInput">
+              <span class="settings-field-label">Avatar</span>
+              <input
+                class="settings-text-input"
+                id="settingsAvatarUrlInput"
+                type="url"
+                maxlength="1000"
+                placeholder="https://example.com/avatar.jpg"
+              />
+            </label>
+            <div class="mini muted settings-avatar-hint">Dán link ảnh đại diện để hiển thị trong workspace.</div>
+            <div class="settings-inline-row">
+              <label class="settings-field" for="settingsBirthDateInput">
+                <span class="settings-field-label">Ngày sinh</span>
+                <input class="settings-text-input" id="settingsBirthDateInput" type="date" />
+              </label>
+              <label class="settings-field" for="settingsLanguageSelect">
+                <span class="settings-field-label">Ngôn ngữ</span>
+                <select class="settings-select-input" id="settingsLanguageSelect">
+                  <option value="vi">Tiếng Việt</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+            </div>
+            <div class="settings-action-row">
+              <button class="tiny-btn" id="settingsDisplayNameSaveBtn" type="submit">Lưu thay đổi</button>
             </div>
             <div class="mini settings-feedback" id="settingsProfileFeedback"></div>
           </form>
@@ -289,47 +318,6 @@
                 <span class="settings-radio">
                   <input id="settingsThemeAuto" name="settingsThemeMode" type="radio" value="auto" />
                   <span class="settings-radio-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-            </div>
-          </section>
-          <section class="settings-appearance-card" aria-labelledby="settingsLayoutHeading">
-            <div class="settings-appearance-header">
-              <div class="settings-appearance-icon" aria-hidden="true">UI</div>
-              <div>
-                <strong id="settingsLayoutHeading">Bố cục</strong>
-                <div class="mini muted">Giữ sẵn những khu vực bạn dùng nhiều trong workspace.</div>
-              </div>
-            </div>
-            <div class="settings-toggle-list">
-              <label class="settings-item settings-toggle-row" for="settingsAddFriendVisible">
-                <div>
-                  <strong>Mở sẵn ô thêm bạn</strong>
-                  <div class="mini muted">Giữ form thêm bạn hiển thị ở thanh bên.</div>
-                </div>
-                <span class="settings-switch">
-                  <input id="settingsAddFriendVisible" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-              <label class="settings-item settings-toggle-row" for="settingsFriendsVisible">
-                <div>
-                  <strong>Mở sẵn danh sách bạn bè</strong>
-                  <div class="mini muted">Không thu gọn danh sách bạn sau khi tải lại trang.</div>
-                </div>
-                <span class="settings-switch">
-                  <input id="settingsFriendsVisible" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-              <label class="settings-item settings-toggle-row" for="settingsNotificationsVisible">
-                <div>
-                  <strong>Giữ cột thông báo mở</strong>
-                  <div class="mini muted">Áp dụng mặc định khi dùng màn hình rộng.</div>
-                </div>
-                <span class="settings-switch">
-                  <input id="settingsNotificationsVisible" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
                 </span>
               </label>
             </div>

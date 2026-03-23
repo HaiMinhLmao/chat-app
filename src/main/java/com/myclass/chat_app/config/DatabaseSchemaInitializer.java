@@ -25,6 +25,9 @@ public class DatabaseSchemaInitializer {
                                 id bigserial primary key,
                                 email varchar(320) not null unique,
                                 full_name varchar(200),
+                                avatar_url varchar(1000),
+                                birth_date date,
+                                preferred_language varchar(20),
                                 created_at timestamptz not null default now()
                             )
                             """,
@@ -94,6 +97,9 @@ public class DatabaseSchemaInitializer {
                                 created_at timestamptz not null default now()
                             )
                             """,
+                    "alter table users add column if not exists avatar_url varchar(1000)",
+                    "alter table users add column if not exists birth_date date",
+                    "alter table users add column if not exists preferred_language varchar(20)",
                     "alter table messages add column if not exists sender_email varchar(320)",
                     "alter table messages add column if not exists recipient_email varchar(320)",
                     "alter table messages add column if not exists group_id bigint",

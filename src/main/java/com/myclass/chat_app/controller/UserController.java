@@ -32,6 +32,15 @@ public class UserController {
         return ResponseEntity.ok(userService.listUsers(email));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe(@AuthenticationPrincipal Jwt jwt) {
+        String email = jwt == null ? null : jwt.getClaimAsString("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
+        }
+        return ResponseEntity.ok(userService.getProfile(email));
+    }
+
     @PatchMapping("/me")
     public ResponseEntity<?> updateMe(
             @AuthenticationPrincipal Jwt jwt,
@@ -45,7 +54,7 @@ public class UserController {
             return ResponseEntity.badRequest().body(Map.of("error", "Display name is required"));
         }
         try {
-            return ResponseEntity.ok(userService.updateProfile(email, request.fullName()));
+            return ResponseEntity.ok(userService.updateProfile(email, request));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

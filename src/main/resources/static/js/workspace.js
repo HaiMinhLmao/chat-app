@@ -24,16 +24,17 @@ const el = {
   settingsScrim: document.getElementById("settingsScrim"),
   settingsUserName: document.getElementById("settingsUserName"),
   settingsUserEmail: document.getElementById("settingsUserEmail"),
+  settingsAvatarPreview: document.getElementById("settingsAvatarPreview"),
   settingsProfileForm: document.getElementById("settingsProfileForm"),
   settingsDisplayNameInput: document.getElementById("settingsDisplayNameInput"),
+  settingsAvatarUrlInput: document.getElementById("settingsAvatarUrlInput"),
+  settingsBirthDateInput: document.getElementById("settingsBirthDateInput"),
+  settingsLanguageSelect: document.getElementById("settingsLanguageSelect"),
   settingsDisplayNameSaveBtn: document.getElementById("settingsDisplayNameSaveBtn"),
   settingsProfileFeedback: document.getElementById("settingsProfileFeedback"),
   settingsThemeLight: document.getElementById("settingsThemeLight"),
   settingsThemeDark: document.getElementById("settingsThemeDark"),
   settingsThemeAuto: document.getElementById("settingsThemeAuto"),
-  settingsAddFriendVisible: document.getElementById("settingsAddFriendVisible"),
-  settingsFriendsVisible: document.getElementById("settingsFriendsVisible"),
-  settingsNotificationsVisible: document.getElementById("settingsNotificationsVisible"),
   sidebarLogoutBtn: document.getElementById("sidebarLogoutBtn"),
   createGroupPopover: document.getElementById("createGroupPopover"),
   createGroupCloseButton: document.getElementById("createGroupCloseButton"),
@@ -99,7 +100,6 @@ const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
 const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
-const NOTIFICATIONS_OPEN_STORAGE_KEY = "workspaceNotificationsOpen";
 const THEME_STORAGE_KEY = "workspaceTheme";
 const INBOX_BREAKPOINT = 1380;
 const SETTINGS_DRAWER_BREAKPOINT = 760;
@@ -267,6 +267,14 @@ function displayName(user) {
     : "User";
 }
 
+function activeLanguage() {
+  return currentUser && currentUser.preferredLanguage === "en" ? "en" : "vi";
+}
+
+function activeLocale() {
+  return activeLanguage() === "en" ? "en-US" : "vi-VN";
+}
+
 function initials(value) {
   const words = String(value || "")
     .trim()
@@ -291,6 +299,16 @@ function saveStoredFlag(key, value) {
     window.localStorage.setItem(key, value ? "1" : "0");
   } catch (_) {
     // no-op
+  }
+}
+
+function normalizeAvatarUrl(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  try {
+    return new URL(trimmed, window.location.origin).toString();
+  } catch (_) {
+    return null;
   }
 }
 
@@ -331,17 +349,19 @@ function applyTheme(nextTheme) {
 }
 
 function formatAgo(timestamp) {
-  if (!timestamp) return "Just now";
+  const language = activeLanguage();
+  if (!timestamp) return language === "en" ? "Just now" : "Vừa xong";
   const minutes = Math.max(1, Math.round((Date.now() - new Date(timestamp)) / 60000));
-  if (minutes < 60) return minutes + "m ago";
+  if (minutes < 60) return language === "en" ? minutes + "m ago" : minutes + " phút trước";
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return hours + "h ago";
-  return Math.round(hours / 24) + "d ago";
+  if (hours < 24) return language === "en" ? hours + "h ago" : hours + " giờ trước";
+  const days = Math.round(hours / 24);
+  return language === "en" ? days + "d ago" : days + " ngày trước";
 }
 
 function formatTime(timestamp) {
-  if (!timestamp) return "Now";
-  return new Intl.DateTimeFormat("en-US", {
+  if (!timestamp) return activeLanguage() === "en" ? "Now" : "Bây giờ";
+  return new Intl.DateTimeFormat(activeLocale(), {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(timestamp));
@@ -395,16 +415,45 @@ function setCreateGroupFeedback(message, variant) {
   setInlineFeedback(el.createGroupFeedback, message, variant);
 }
 
+function syncAvatarNode(node, name, avatarUrl) {
+  if (!node) return;
+  const nextUrl = String(avatarUrl || "").trim();
+  node.classList.toggle("has-image", Boolean(nextUrl));
+  node.style.backgroundImage = nextUrl ? 'url("' + nextUrl.replace(/"/g, '\\"') + '")' : "";
+  node.textContent = nextUrl ? "" : initials(name);
+}
+
+function refreshSettingsAvatarPreview() {
+  const fallbackName = currentUser ? displayName(currentUser) : "User";
+  const name =
+    (el.settingsDisplayNameInput && el.settingsDisplayNameInput.value.trim()) || fallbackName;
+  const avatarUrl =
+    (el.settingsAvatarUrlInput && el.settingsAvatarUrlInput.value.trim()) ||
+    (currentUser && currentUser.avatarUrl) ||
+    "";
+  syncAvatarNode(el.settingsAvatarPreview, name, avatarUrl);
+}
+
 function syncCurrentUserUi() {
   if (!currentUser) return;
-  const name = currentUser.username || defaultName(currentUser.email);
-  el.userAvatar.textContent = initials(name);
+  const name = displayName(currentUser);
+  syncAvatarNode(el.userAvatar, name, currentUser.avatarUrl);
   el.userName.textContent = name;
   el.userEmail.textContent = currentUser.email;
-  el.selfRailLabel.textContent = initials(name);
+  syncAvatarNode(el.selfRailLabel, name, currentUser.avatarUrl);
+  syncAvatarNode(el.settingsAvatarPreview, name, currentUser.avatarUrl);
   if (el.settingsUserName) el.settingsUserName.textContent = name;
   if (el.settingsUserEmail) el.settingsUserEmail.textContent = currentUser.email;
-  if (el.settingsDisplayNameInput) el.settingsDisplayNameInput.value = name;
+  if (el.settingsDisplayNameInput) el.settingsDisplayNameInput.value = currentUser.fullName || name;
+  if (el.settingsAvatarUrlInput) el.settingsAvatarUrlInput.value = currentUser.avatarUrl || "";
+  if (el.settingsBirthDateInput) {
+    el.settingsBirthDateInput.value = currentUser.birthDate || "";
+    el.settingsBirthDateInput.max = new Date().toISOString().slice(0, 10);
+  }
+  if (el.settingsLanguageSelect) {
+    el.settingsLanguageSelect.value = currentUser.preferredLanguage || "vi";
+  }
+  document.documentElement.lang = activeLanguage();
   if (activeChannel.type === "home") {
     el.chatTitle.textContent = name;
     refreshHomeOverviewIfNeeded();
@@ -420,7 +469,6 @@ function setFriendCardCollapsed(collapsed) {
     collapsed ? "Expand add friend" : "Collapse add friend",
   );
   saveStoredFlag(FRIEND_CARD_STORAGE_KEY, collapsed);
-  syncLayoutPreferenceInputs();
 }
 
 function loadFriendCardPreference() {
@@ -436,27 +484,10 @@ function setFriendsCardCollapsed(collapsed) {
     collapsed ? "Expand friends list" : "Collapse friends list",
   );
   saveStoredFlag(FRIENDS_CARD_STORAGE_KEY, collapsed);
-  syncLayoutPreferenceInputs();
 }
 
 function loadFriendsCardPreference() {
   return loadStoredFlag(FRIENDS_CARD_STORAGE_KEY, true);
-}
-
-function loadAutoOpenNotificationsPreference() {
-  return loadStoredFlag(NOTIFICATIONS_OPEN_STORAGE_KEY, true);
-}
-
-function syncLayoutPreferenceInputs() {
-  if (el.settingsAddFriendVisible && el.friendCard) {
-    el.settingsAddFriendVisible.checked = !el.friendCard.classList.contains("is-collapsed");
-  }
-  if (el.settingsFriendsVisible && el.friendsCard) {
-    el.settingsFriendsVisible.checked = !el.friendsCard.classList.contains("is-collapsed");
-  }
-  if (el.settingsNotificationsVisible) {
-    el.settingsNotificationsVisible.checked = loadAutoOpenNotificationsPreference();
-  }
 }
 
 function isFlyoutMobile() {
@@ -593,6 +624,27 @@ async function parseResponsePayload(response) {
   }
 }
 
+async function loadCurrentUserProfile() {
+  if (!currentUser || !currentUser.email) return;
+  const result = await authorizedRequest("/api/users/me");
+  if (!result.ok || !result.data) return;
+  const nextName =
+    result.data.username ||
+    result.data.fullName ||
+    currentUser.username ||
+    defaultName(currentUser.email);
+  persistCurrentUser({
+    ...currentUser,
+    username: nextName,
+    fullName: result.data.fullName || "",
+    email: result.data.email || currentUser.email,
+    avatarUrl: result.data.avatarUrl || "",
+    birthDate: result.data.birthDate || "",
+    preferredLanguage: result.data.preferredLanguage || "vi",
+  });
+  persistSessionUserName(nextName);
+}
+
 // Surface state and composer behavior
 function isWideLayout() {
   return window.innerWidth > INBOX_BREAKPOINT;
@@ -618,12 +670,10 @@ function setInboxPanelOpen(nextOpen) {
   if (isWideLayout()) {
     document.body.classList.toggle("notifications-collapsed", !nextOpen);
     document.body.classList.remove("inbox-open");
-    saveStoredFlag(NOTIFICATIONS_OPEN_STORAGE_KEY, nextOpen);
   } else {
     document.body.classList.toggle("inbox-open", nextOpen);
   }
   syncInboxToggleState();
-  syncLayoutPreferenceInputs();
 }
 
 function openInboxPanel() {
@@ -858,37 +908,52 @@ function clearCreateGroupForm() {
   setCreateGroupFeedback("", "success");
 }
 
-async function saveDisplayName(event) {
+async function saveProfileSettings(event) {
   event.preventDefault();
   if (!currentUser || !el.settingsDisplayNameInput || !el.settingsDisplayNameSaveBtn) return;
   const fullName = el.settingsDisplayNameInput.value.trim();
   if (!fullName) {
-    setSettingsProfileFeedback("Enter a display name first.", "error");
+    setSettingsProfileFeedback("Vui lòng nhập họ và tên.", "error");
     return;
   }
+  const avatarUrl = normalizeAvatarUrl(el.settingsAvatarUrlInput ? el.settingsAvatarUrlInput.value : "");
+  if (avatarUrl === null) {
+    setSettingsProfileFeedback("Avatar phải là một đường dẫn hợp lệ.", "error");
+    return;
+  }
+  const birthDate =
+    el.settingsBirthDateInput && el.settingsBirthDateInput.value ? el.settingsBirthDateInput.value : null;
+  const preferredLanguage = el.settingsLanguageSelect ? el.settingsLanguageSelect.value : "vi";
   el.settingsDisplayNameSaveBtn.disabled = true;
-  el.settingsDisplayNameSaveBtn.textContent = "Saving...";
+  el.settingsDisplayNameSaveBtn.textContent = "Đang lưu...";
   const result = await authorizedRequest("/api/users/me", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fullName }),
+    body: JSON.stringify({ fullName, avatarUrl, birthDate, preferredLanguage }),
   });
   el.settingsDisplayNameSaveBtn.disabled = false;
-  el.settingsDisplayNameSaveBtn.textContent = "Save";
+  el.settingsDisplayNameSaveBtn.textContent = "Lưu thay đổi";
   if (!result.ok) {
-    setSettingsProfileFeedback(result.data.error || "Could not update your name.", "error");
+    setSettingsProfileFeedback(result.data.error || "Không thể cập nhật hồ sơ.", "error");
     return;
   }
   const nextName = result.data.username || result.data.fullName || fullName;
+  const nextLanguage = result.data.preferredLanguage || preferredLanguage;
   persistCurrentUser({
     ...currentUser,
     username: nextName,
     fullName: result.data.fullName || nextName,
+    avatarUrl: result.data.avatarUrl || "",
+    birthDate: result.data.birthDate || "",
+    preferredLanguage: nextLanguage,
   });
   persistSessionUserName(nextName);
   syncCurrentUserUi();
-  setSettingsProfileFeedback("Display name updated.", "success");
-  showToast("Display name updated.");
+  setSettingsProfileFeedback(
+    nextLanguage === "en" ? "Profile updated." : "Đã cập nhật hồ sơ.",
+    "success",
+  );
+  showToast(nextLanguage === "en" ? "Profile updated." : "Đã cập nhật hồ sơ.");
 }
 
 async function submitCreateGroup(event) {
@@ -1057,7 +1122,7 @@ function selectHome() {
   activeChannel = { type: "home" };
   syncSurfaceMode();
   el.chatKicker.textContent = "Overview";
-  el.chatTitle.textContent = currentUser.username || defaultName(currentUser.email);
+  el.chatTitle.textContent = displayName(currentUser);
   el.chatSubtitle.textContent = "Friends, invites, and groups in one place.";
   showBanner("", "info");
   disconnectSubscription();
@@ -1482,7 +1547,7 @@ function sendGroupMessage(content) {
     JSON.stringify({
       groupId: activeChannel.id,
       senderEmail: currentUser.email,
-      senderName: currentUser.username || currentUser.email,
+      senderName: displayName(currentUser),
       content,
     }),
   );
@@ -1496,7 +1561,7 @@ function sendDirectMessage(content) {
     JSON.stringify({
       conversationKey: key,
       senderEmail: currentUser.email,
-      senderName: currentUser.username || currentUser.email,
+      senderName: displayName(currentUser),
       recipientEmail: activeChannel.email,
       content,
     }),
@@ -1531,7 +1596,7 @@ async function uploadDirectAttachment(file) {
   }
 
   if (!stompClient || !stompClient.connected) {
-    const sender = result.data.senderName || currentUser.username || currentUser.email;
+    const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
     setPreview("direct", activeChannel.id, messagePreview(result.data, true, sender));
     addMessage(result.data, true, sender, result.data.timestamp);
   }
@@ -1566,7 +1631,7 @@ async function uploadGroupAttachment(file) {
   }
 
   if (!stompClient || !stompClient.connected) {
-    const sender = result.data.senderName || currentUser.username || currentUser.email;
+    const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
     setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
     addMessage(result.data, true, sender, result.data.timestamp);
   }
@@ -1612,11 +1677,11 @@ function handlePanelQuery() {
 async function bootstrap() {
   currentUser = requireAuth();
   if (!currentUser) return;
+  await loadCurrentUserProfile();
   applyTheme(loadThemePreference());
   syncCurrentUserUi();
   setFriendCardCollapsed(loadFriendCardPreference());
   setFriendsCardCollapsed(loadFriendsCardPreference());
-  setInboxPanelOpen(isWideLayout() ? loadAutoOpenNotificationsPreference() : false);
   if (el.settingsToggleButton) {
     el.settingsToggleButton.title = "Settings";
     el.settingsToggleButton.setAttribute("aria-label", "Settings");
@@ -1626,7 +1691,7 @@ async function bootstrap() {
   renderCreateGroupMembersPreview();
   setSettingsProfileFeedback("", "success");
   setCreateGroupFeedback("", "success");
-  syncLayoutPreferenceInputs();
+  syncInboxToggleState();
   selectHome();
   await refreshWorkspace();
   handlePanelQuery();
@@ -1676,36 +1741,32 @@ if (window.matchMedia) {
 }
 
 if (el.settingsProfileForm) {
-  el.settingsProfileForm.addEventListener("submit", saveDisplayName);
+  el.settingsProfileForm.addEventListener("submit", saveProfileSettings);
 }
 
 if (el.settingsDisplayNameInput) {
   el.settingsDisplayNameInput.addEventListener("input", () => {
     setSettingsProfileFeedback("", "success");
+    refreshSettingsAvatarPreview();
   });
 }
 
-if (el.settingsAddFriendVisible) {
-  el.settingsAddFriendVisible.addEventListener("change", (event) => {
-    setFriendCardCollapsed(!event.target.checked);
+if (el.settingsAvatarUrlInput) {
+  el.settingsAvatarUrlInput.addEventListener("input", () => {
+    setSettingsProfileFeedback("", "success");
+    refreshSettingsAvatarPreview();
   });
 }
 
-if (el.settingsFriendsVisible) {
-  el.settingsFriendsVisible.addEventListener("change", (event) => {
-    setFriendsCardCollapsed(!event.target.checked);
+if (el.settingsBirthDateInput) {
+  el.settingsBirthDateInput.addEventListener("input", () => {
+    setSettingsProfileFeedback("", "success");
   });
 }
 
-if (el.settingsNotificationsVisible) {
-  el.settingsNotificationsVisible.addEventListener("change", (event) => {
-    const nextOpen = Boolean(event.target.checked);
-    saveStoredFlag(NOTIFICATIONS_OPEN_STORAGE_KEY, nextOpen);
-    if (isWideLayout()) {
-      setInboxPanelOpen(nextOpen);
-      return;
-    }
-    syncLayoutPreferenceInputs();
+if (el.settingsLanguageSelect) {
+  el.settingsLanguageSelect.addEventListener("change", () => {
+    setSettingsProfileFeedback("", "success");
   });
 }
 
@@ -1884,12 +1945,8 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("resize", () => {
   if (isWideLayout()) {
     document.body.classList.remove("inbox-open");
-    document.body.classList.toggle("notifications-collapsed", !loadAutoOpenNotificationsPreference());
-  } else {
-    document.body.classList.remove("notifications-collapsed");
   }
   syncInboxToggleState();
-  syncLayoutPreferenceInputs();
   if (isSettingsPopoverOpen()) {
     positionSettingsPopover();
   }

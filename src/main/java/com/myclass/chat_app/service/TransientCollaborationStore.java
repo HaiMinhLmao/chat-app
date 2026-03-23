@@ -14,6 +14,7 @@ import com.myclass.chat_app.support.UserIdentitySupport;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -42,11 +43,17 @@ public class TransientCollaborationStore {
     private final Map<Long, StoredGroupInvitation> groupInvitationsById = new ConcurrentHashMap<>();
 
     public User upsertUser(String email, String fullName) {
+        return upsertUser(email, fullName, null, null, null);
+    }
+
+    public User upsertUser(String email, String fullName, String avatarUrl, LocalDate birthDate, String preferredLanguage) {
         String normalized = UserIdentitySupport.normalizeEmail(email);
         if (normalized == null) {
             throw new IllegalArgumentException("Email is required");
         }
         String trimmedFullName = UserIdentitySupport.trimToNull(fullName);
+        String trimmedAvatarUrl = UserIdentitySupport.trimToNull(avatarUrl);
+        String trimmedLanguage = UserIdentitySupport.trimToNull(preferredLanguage);
 
         return usersByEmail.compute(normalized, (key, existing) -> {
             User user = existing != null ? existing : new User();
@@ -59,11 +66,39 @@ public class TransientCollaborationStore {
             } else if (user.getFullName() == null || user.getFullName().isBlank()) {
                 user.setFullName(UserIdentitySupport.defaultDisplayName(normalized));
             }
+            if (trimmedAvatarUrl != null) {
+                user.setAvatarUrl(trimmedAvatarUrl);
+            }
+            if (birthDate != null) {
+                user.setBirthDate(birthDate);
+            }
+            if (trimmedLanguage != null) {
+                user.setPreferredLanguage(trimmedLanguage);
+            } else if (user.getPreferredLanguage() == null || user.getPreferredLanguage().isBlank()) {
+                user.setPreferredLanguage("vi");
+            }
             if (user.getCreatedAt() == null) {
                 user.setCreatedAt(Instant.now());
             }
             return user;
         });
+    }
+
+    public User updateUserProfile(String email, String fullName, String avatarUrl, LocalDate birthDate, String preferredLanguage) {
+        String normalized = UserIdentitySupport.normalizeEmail(email);
+        if (normalized == null) {
+            throw new IllegalArgumentException("Email is required");
+        }
+        String trimmedFullName = UserIdentitySupport.trimToNull(fullName);
+        if (trimmedFullName == null) {
+            throw new IllegalArgumentException("Display name is required");
+        }
+
+        User user = upsertUser(normalized, trimmedFullName);
+        user.setAvatarUrl(UserIdentitySupport.trimToNull(avatarUrl));
+        user.setBirthDate(birthDate);
+        user.setPreferredLanguage(UserIdentitySupport.trimToNull(preferredLanguage) == null ? "vi" : preferredLanguage.trim());
+        return user;
     }
 
     public List<User> listUsers() {
@@ -363,7 +398,10 @@ public class TransientCollaborationStore {
                 user.getId(),
                 UserIdentitySupport.displayName(user),
                 user.getEmail(),
-                user.getFullName()
+                user.getFullName(),
+                user.getAvatarUrl(),
+                user.getBirthDate(),
+                user.getPreferredLanguage()
         );
     }
 

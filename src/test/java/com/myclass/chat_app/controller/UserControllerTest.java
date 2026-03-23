@@ -20,7 +20,7 @@ class UserControllerTest {
     void listUsersPassesAuthenticatedEmailToService() {
         UserService userService = mock(UserService.class);
         Jwt jwt = mock(Jwt.class);
-        List<UserResponse> users = List.of(new UserResponse(1L, "Minh", "minh@example.com", "Minh"));
+        List<UserResponse> users = List.of(new UserResponse(1L, "Minh", "minh@example.com", "Minh", null, null, "vi"));
         when(jwt.getClaimAsString("email")).thenReturn("viewer@example.com");
         when(userService.listUsers("viewer@example.com")).thenReturn(users);
 
@@ -37,7 +37,7 @@ class UserControllerTest {
         UserService userService = mock(UserService.class);
         UserController controller = new UserController(userService);
 
-        ResponseEntity<?> response = controller.updateMe(null, new UpdateProfileRequest("Minh Quang"));
+        ResponseEntity<?> response = controller.updateMe(null, new UpdateProfileRequest("Minh Quang", null, null, "vi"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
@@ -50,7 +50,7 @@ class UserControllerTest {
 
         UserController controller = new UserController(userService);
 
-        ResponseEntity<?> response = controller.updateMe(jwt, new UpdateProfileRequest("   "));
+        ResponseEntity<?> response = controller.updateMe(jwt, new UpdateProfileRequest("   ", null, null, "vi"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -59,13 +59,14 @@ class UserControllerTest {
     void updateMeReturnsUpdatedProfile() {
         UserService userService = mock(UserService.class);
         Jwt jwt = mock(Jwt.class);
-        UserResponse updated = new UserResponse(7L, "Minh Quang", "minh@example.com", "Minh Quang");
+        UpdateProfileRequest request = new UpdateProfileRequest("Minh Quang", null, null, "vi");
+        UserResponse updated = new UserResponse(7L, "Minh Quang", "minh@example.com", "Minh Quang", null, null, "vi");
         when(jwt.getClaimAsString("email")).thenReturn("minh@example.com");
-        when(userService.updateProfile("minh@example.com", "Minh Quang")).thenReturn(updated);
+        when(userService.updateProfile("minh@example.com", request)).thenReturn(updated);
 
         UserController controller = new UserController(userService);
 
-        ResponseEntity<?> response = controller.updateMe(jwt, new UpdateProfileRequest("Minh Quang"));
+        ResponseEntity<?> response = controller.updateMe(jwt, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(updated);

@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "users")
@@ -28,6 +29,14 @@ public class User {
 
     @Column(length = 200)
     private String fullName;
+
+    @Column(length = 1000)
+    private String avatarUrl;
+
+    private LocalDate birthDate;
+
+    @Column(length = 20)
+    private String preferredLanguage;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt = Instant.now();

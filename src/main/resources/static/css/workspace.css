@@ -182,6 +182,14 @@ select {
   line-height: 1;
 }
 
+#selfRailLabel {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  display: grid;
+  place-items: center;
+}
+
 .rail-btn-short {
   letter-spacing: 0.08em;
 }
@@ -296,6 +304,16 @@ select {
   width: 52px;
   height: 52px;
   border-radius: 18px;
+}
+
+.avatar.has-image,
+.channel-avatar.has-image,
+.settings-avatar-preview.has-image,
+#selfRailLabel.has-image {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: transparent;
 }
 
 .headline,
@@ -505,6 +523,28 @@ body.create-group-open .create-group-popover {
   background: var(--floating-soft-bg);
 }
 
+.settings-account-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-account-copy {
+  min-width: 0;
+}
+
+.settings-avatar-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #7cb7ff, #59e0a8);
+  color: #04101f;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
 .settings-account strong {
   display: block;
   margin: 4px 0;
@@ -556,12 +596,6 @@ body.create-group-open .create-group-popover {
 .settings-theme-options {
   display: flex;
   flex-direction: column;
-}
-
-.settings-toggle-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .settings-theme-option {
@@ -667,10 +701,6 @@ body.create-group-open .create-group-popover {
   font-size: 14px;
 }
 
-.settings-toggle-row {
-  cursor: pointer;
-}
-
 .settings-item-action {
   flex-shrink: 0;
   color: var(--accent);
@@ -692,53 +722,8 @@ body.create-group-open .create-group-popover {
   font-size: 14px;
 }
 
-.settings-switch {
-  flex-shrink: 0;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.settings-switch input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.settings-switch-ui {
-  width: 44px;
-  height: 26px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.35);
-  position: relative;
-  transition: background 0.18s ease;
-}
-
-.settings-switch-ui::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
-  transition: transform 0.18s ease;
-}
-
-.settings-switch input:checked + .settings-switch-ui {
-  background: rgba(37, 99, 235, 0.9);
-}
-
-.settings-switch input:checked + .settings-switch-ui::after {
-  transform: translateX(18px);
-}
-
-.settings-switch input:focus-visible + .settings-switch-ui {
-  outline: 3px solid rgba(37, 99, 235, 0.18);
-  outline-offset: 2px;
+.settings-avatar-hint {
+  margin-top: -6px;
 }
 
 .settings-reset-btn {
@@ -761,6 +746,10 @@ body.create-group-open .create-group-popover {
 .settings-action-row {
   display: flex;
   gap: 10px;
+}
+
+.settings-inline-row .settings-field {
+  flex: 1;
 }
 
 .settings-field {
