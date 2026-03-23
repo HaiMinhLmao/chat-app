@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MessageService {
 
     private static final int HISTORY_LIMIT = 100;
-    private static final int MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+    private static final int MAX_ATTACHMENT_BYTES = 30 * 1024 * 1024;
 
     private final MessageRepository messageRepository;
     private final SupabaseStorageService storageService;
@@ -109,7 +109,7 @@ public class MessageService {
             throw new IllegalArgumentException("Choose a file before sending.");
         }
         if (attachmentBytes.length > MAX_ATTACHMENT_BYTES) {
-            throw new IllegalArgumentException("File size must be 15MB or smaller.");
+            throw new IllegalArgumentException("File size must be 30MB or smaller.");
         }
 
         String storagePath;
@@ -216,7 +216,7 @@ public class MessageService {
             throw new IllegalArgumentException("Choose a file before sending.");
         }
         if (attachmentBytes.length > MAX_ATTACHMENT_BYTES) {
-            throw new IllegalArgumentException("File size must be 15MB or smaller.");
+            throw new IllegalArgumentException("File size must be 30MB or smaller.");
         }
 
         String conversationKey = buildConversationKey(normalizedSender, normalizedRecipient);
