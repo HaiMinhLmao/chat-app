@@ -46,6 +46,16 @@ public class SupabaseStorageService {
     public String uploadDirectAttachment(String conversationKey, String originalFilename, byte[] bytes, String contentType) {
         validateConfigured();
         String objectPath = "direct/" + sanitizePathSegment(conversationKey) + "/" + buildObjectName(originalFilename);
+        return uploadObject(objectPath, bytes, contentType);
+    }
+
+    public String uploadGroupAttachment(Long groupId, String originalFilename, byte[] bytes, String contentType) {
+        validateConfigured();
+        String objectPath = "groups/" + sanitizePathSegment(String.valueOf(groupId)) + "/" + buildObjectName(originalFilename);
+        return uploadObject(objectPath, bytes, contentType);
+    }
+
+    private String uploadObject(String objectPath, byte[] bytes, String contentType) {
         String encodedPath = encodeObjectPath(objectPath);
 
         client.post()

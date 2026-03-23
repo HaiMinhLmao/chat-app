@@ -80,21 +80,68 @@ public class MessageService {
 
         try {
             Message saved = messageRepository.save(message);
-            return new GroupChatMessage(
-                    groupId,
-                    senderEmail,
-                    saved.getSender(),
-                    saved.getContent(),
-                    saved.getTimestamp()
-            );
+            return toGroupChatMessage(saved);
         } catch (RuntimeException exception) {
-            GroupChatMessage stored = new GroupChatMessage(
+            GroupChatMessage stored = toGroupChatMessage(copyMessage(message));
+            storeTransientGroupMessage(groupId, stored);
+            return stored;
+        }
+    }
+
+    public GroupChatMessage saveGroupAttachment(
+            Long groupId,
+            String senderEmail,
+            String senderName,
+            String caption,
+            String attachmentName,
+            String attachmentContentType,
+            byte[] attachmentBytes
+    ) {
+        String normalizedSender = UserIdentitySupport.normalizeEmail(senderEmail);
+        String trimmedSenderName = UserIdentitySupport.trimToNull(senderName);
+        String trimmedCaption = UserIdentitySupport.trimToNull(caption);
+        String trimmedAttachmentName = UserIdentitySupport.trimToNull(attachmentName);
+        String trimmedContentType = UserIdentitySupport.trimToNull(attachmentContentType);
+        if (groupId == null || normalizedSender == null) {
+            throw new IllegalArgumentException("Group and sender are required.");
+        }
+        if (attachmentBytes == null || attachmentBytes.length == 0) {
+            throw new IllegalArgumentException("Choose a file before sending.");
+        }
+        if (attachmentBytes.length > MAX_ATTACHMENT_BYTES) {
+            throw new IllegalArgumentException("File size must be 15MB or smaller.");
+        }
+
+        String storagePath;
+        try {
+            storagePath = storageService.uploadGroupAttachment(
                     groupId,
-                    senderEmail,
-                    message.getSender(),
-                    content,
-                    Instant.now()
+                    trimmedAttachmentName != null ? trimmedAttachmentName : "attachment",
+                    attachmentBytes,
+                    trimmedContentType
             );
+        } catch (IllegalStateException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("Could not upload the attachment to Supabase Storage.", exception);
+        }
+
+        Message message = new Message();
+        message.setSender(trimmedSenderName != null ? trimmedSenderName : UserIdentitySupport.defaultDisplayName(normalizedSender));
+        message.setSenderEmail(normalizedSender);
+        message.setGroupId(groupId);
+        message.setRoom("group:" + groupId);
+        message.setContent(trimmedCaption != null ? trimmedCaption : "");
+        message.setAttachmentName(trimmedAttachmentName != null ? trimmedAttachmentName : "attachment");
+        message.setAttachmentContentType(trimmedContentType != null ? trimmedContentType : "application/octet-stream");
+        message.setAttachmentStoragePath(storagePath);
+        message.setAttachmentSize((long) attachmentBytes.length);
+        message.setType(MessageType.GROUP);
+
+        try {
+            return toGroupChatMessage(messageRepository.save(message));
+        } catch (RuntimeException exception) {
+            GroupChatMessage stored = toGroupChatMessage(copyMessage(message));
             storeTransientGroupMessage(groupId, stored);
             return stored;
         }
@@ -221,13 +268,7 @@ public class MessageService {
     public List<GroupChatMessage> getGroupMessages(Long groupId) {
         try {
             return reverseChronological(messageRepository.findTop100ByTypeAndGroupIdOrderByTimestampDesc(MessageType.GROUP, groupId)).stream()
-                    .map(message -> new GroupChatMessage(
-                            message.getGroupId(),
-                            message.getSenderEmail(),
-                            message.getSender(),
-                            message.getContent(),
-                            message.getTimestamp()
-                    ))
+                    .map(this::toGroupChatMessage)
                     .toList();
         } catch (RuntimeException exception) {
             return latestTransientGroupMessages(groupId);
@@ -345,6 +386,30 @@ public class MessageService {
                 message.getSenderEmail(),
                 message.getSender(),
                 message.getRecipientEmail(),
+                message.getContent(),
+                message.getAttachmentName(),
+                message.getAttachmentContentType(),
+                message.getAttachmentBase64(),
+                attachmentUrl,
+                message.getAttachmentSize(),
+                message.getTimestamp()
+        );
+    }
+
+    private GroupChatMessage toGroupChatMessage(Message message) {
+        String attachmentUrl = null;
+        String attachmentStoragePath = message.getAttachmentStoragePath();
+        if (attachmentStoragePath != null && !attachmentStoragePath.isBlank() && storageService.isConfigured()) {
+            try {
+                attachmentUrl = storageService.createSignedDownloadUrl(attachmentStoragePath);
+            } catch (RuntimeException ignored) {
+                attachmentUrl = null;
+            }
+        }
+        return new GroupChatMessage(
+                message.getGroupId(),
+                message.getSenderEmail(),
+                message.getSender(),
                 message.getContent(),
                 message.getAttachmentName(),
                 message.getAttachmentContentType(),

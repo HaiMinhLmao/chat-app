@@ -7,6 +7,11 @@ public record GroupChatMessage(
         String senderEmail,
         String senderName,
         String content,
+        String attachmentName,
+        String attachmentContentType,
+        String attachmentBase64,
+        String attachmentUrl,
+        Long attachmentSize,
         Instant timestamp
 ) {
 }

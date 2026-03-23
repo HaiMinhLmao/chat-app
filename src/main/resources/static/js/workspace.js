@@ -6,7 +6,7 @@ const el = {
   notificationToggleButton: document.getElementById("notificationToggleButton"),
   notificationBadge: document.getElementById("notificationBadge"),
   newGroupBtn: document.getElementById("newGroupBtn"),
-  logoutBtn: document.getElementById("logoutBtn"),
+  settingsToggleButton: document.getElementById("settingsToggleButton"),
   userAvatar: document.getElementById("userAvatar"),
   userName: document.getElementById("userName"),
   userEmail: document.getElementById("userEmail"),
@@ -19,6 +19,16 @@ const el = {
   friendSubmitBtn: document.getElementById("friendSubmitBtn"),
   friendRequestFeedback: document.getElementById("friendRequestFeedback"),
   friendsSearchInput: document.getElementById("friendsSearchInput"),
+  settingsCard: document.getElementById("settingsCard"),
+  settingsCardToggle: document.getElementById("settingsCardToggle"),
+  settingsUserName: document.getElementById("settingsUserName"),
+  settingsUserEmail: document.getElementById("settingsUserEmail"),
+  settingsAutoOpenNotifications: document.getElementById("settingsAutoOpenNotifications"),
+  settingsFriendCardCollapsed: document.getElementById("settingsFriendCardCollapsed"),
+  settingsFriendsCardCollapsed: document.getElementById("settingsFriendsCardCollapsed"),
+  settingsNotificationsBtn: document.getElementById("settingsNotificationsBtn"),
+  settingsCreateGroupBtn: document.getElementById("settingsCreateGroupBtn"),
+  sidebarLogoutBtn: document.getElementById("sidebarLogoutBtn"),
   attachmentInput: document.getElementById("attachmentInput"),
   attachBtn: document.getElementById("attachBtn"),
   friendsList: document.getElementById("friendsList"),
@@ -72,6 +82,8 @@ const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
 const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
+const SETTINGS_CARD_STORAGE_KEY = "workspaceSettingsCardCollapsed";
+const AUTO_OPEN_NOTIFICATIONS_KEY = "workspaceAutoOpenNotifications";
 const INBOX_BREAKPOINT = 1380;
 
 // Session and auth helpers
@@ -277,6 +289,9 @@ function setFriendCardCollapsed(collapsed) {
     "aria-label",
     collapsed ? "Expand add friend" : "Collapse add friend",
   );
+  if (el.settingsFriendCardCollapsed) {
+    el.settingsFriendCardCollapsed.checked = collapsed;
+  }
   try {
     window.localStorage.setItem(FRIEND_CARD_STORAGE_KEY, collapsed ? "1" : "0");
   } catch (_) {
@@ -300,6 +315,9 @@ function setFriendsCardCollapsed(collapsed) {
     "aria-label",
     collapsed ? "Expand friends list" : "Collapse friends list",
   );
+  if (el.settingsFriendsCardCollapsed) {
+    el.settingsFriendsCardCollapsed.checked = collapsed;
+  }
   try {
     window.localStorage.setItem(FRIENDS_CARD_STORAGE_KEY, collapsed ? "1" : "0");
   } catch (_) {
@@ -313,6 +331,63 @@ function loadFriendsCardPreference() {
   } catch (_) {
     return false;
   }
+}
+
+function setSettingsCardCollapsed(collapsed) {
+  if (!el.settingsCard || !el.settingsCardToggle) return;
+  el.settingsCard.classList.toggle("is-collapsed", collapsed);
+  el.settingsCardToggle.setAttribute("aria-expanded", String(!collapsed));
+  el.settingsCardToggle.setAttribute(
+    "aria-label",
+    collapsed ? "Expand settings" : "Collapse settings",
+  );
+  if (el.settingsToggleButton) {
+    el.settingsToggleButton.classList.toggle("active", !collapsed);
+    el.settingsToggleButton.setAttribute("aria-pressed", String(!collapsed));
+  }
+  try {
+    window.localStorage.setItem(SETTINGS_CARD_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch (_) {
+    // no-op
+  }
+}
+
+function loadSettingsCardPreference() {
+  try {
+    return window.localStorage.getItem(SETTINGS_CARD_STORAGE_KEY) !== "0";
+  } catch (_) {
+    return true;
+  }
+}
+
+function setAutoOpenNotificationsPreference(enabled) {
+  if (el.settingsAutoOpenNotifications) {
+    el.settingsAutoOpenNotifications.checked = enabled;
+  }
+  try {
+    window.localStorage.setItem(AUTO_OPEN_NOTIFICATIONS_KEY, enabled ? "1" : "0");
+  } catch (_) {
+    // no-op
+  }
+}
+
+function loadAutoOpenNotificationsPreference() {
+  try {
+    return window.localStorage.getItem(AUTO_OPEN_NOTIFICATIONS_KEY) !== "0";
+  } catch (_) {
+    return true;
+  }
+}
+
+function focusSettingsCard() {
+  if (!el.settingsCard) return;
+  setSettingsCardCollapsed(false);
+  el.settingsCard.scrollIntoView({ behavior: "smooth", block: "end" });
+}
+
+function logout() {
+  clearSession();
+  window.location.href = "/login.html";
 }
 
 async function parseResponsePayload(response) {
@@ -394,7 +469,7 @@ function syncSurfaceMode() {
 function syncComposer() {
   const inConversation = activeChannel.type !== "home";
   const canSendText = inConversation && stompClient && stompClient.connected;
-  const canAttach = activeChannel.type === "direct";
+  const canAttach = activeChannel.type === "direct" || activeChannel.type === "group";
   el.messageInput.disabled = !inConversation;
   el.sendBtn.disabled = !canSendText;
   el.attachBtn.disabled = !canAttach;
@@ -958,7 +1033,11 @@ async function loadSocialState() {
   };
   const nextTotal =
     socialState.incomingFriendRequests.length + socialState.groupInvitations.length;
-  if (notificationsPrimed && nextTotal > previousTotal) {
+  if (
+    notificationsPrimed &&
+    nextTotal > previousTotal &&
+    loadAutoOpenNotificationsPreference()
+  ) {
     showToast(
       nextTotal - previousTotal === 1
         ? "You have a new invitation."
@@ -1169,6 +1248,41 @@ async function uploadDirectAttachment(file) {
   showToast("Attachment sent.");
 }
 
+async function uploadGroupAttachment(file) {
+  if (!file || activeChannel.type !== "group") return;
+  const activeGroupId = String(activeChannel.id);
+  const formData = new FormData();
+  formData.append("file", file);
+  const caption = el.messageInput.value.trim();
+  if (caption) {
+    formData.append("caption", caption);
+  }
+
+  el.attachBtn.disabled = true;
+  el.attachBtn.textContent = "Uploading...";
+  const result = await authorizedRequest("/api/messages/groups/" + activeGroupId + "/attachments", {
+    method: "POST",
+    body: formData,
+  });
+  el.attachBtn.textContent = "Video/File";
+  syncComposer();
+  el.attachmentInput.value = "";
+
+  if (!result.ok) {
+    showToast(result.data.error || "Could not send the file.");
+    return;
+  }
+
+  if (!stompClient || !stompClient.connected) {
+    const sender = result.data.senderName || currentUser.username || currentUser.email;
+    setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
+    addMessage(result.data, true, sender, result.data.timestamp);
+  }
+
+  el.messageInput.value = "";
+  showToast("Attachment sent.");
+}
+
 // User actions and bootstrap
 async function respondFriendRequest(id, action) {
   const result = await authorizedRequest(
@@ -1199,8 +1313,16 @@ async function bootstrap() {
   el.userName.textContent = name;
   el.userEmail.textContent = currentUser.email;
   el.selfRailLabel.textContent = initials(name);
+  if (el.settingsUserName) el.settingsUserName.textContent = name;
+  if (el.settingsUserEmail) el.settingsUserEmail.textContent = currentUser.email;
   setFriendCardCollapsed(loadFriendCardPreference());
   setFriendsCardCollapsed(loadFriendsCardPreference());
+  setSettingsCardCollapsed(loadSettingsCardPreference());
+  setAutoOpenNotificationsPreference(loadAutoOpenNotificationsPreference());
+  if (el.settingsToggleButton) {
+    el.settingsToggleButton.title = "Settings";
+    el.settingsToggleButton.setAttribute("aria-label", "Settings");
+  }
   syncInboxToggleState();
   selectHome();
   await refreshWorkspace();
@@ -1222,10 +1344,34 @@ if (el.friendsCardToggle) {
   );
 }
 
+if (el.settingsCardToggle) {
+  el.settingsCardToggle.addEventListener("click", () =>
+    setSettingsCardCollapsed(!el.settingsCard.classList.contains("is-collapsed")),
+  );
+}
+
 if (el.friendsSearchInput) {
   el.friendsSearchInput.addEventListener("input", (event) => {
     friendSearchQuery = event.target.value || "";
     renderFriends();
+  });
+}
+
+if (el.settingsAutoOpenNotifications) {
+  el.settingsAutoOpenNotifications.addEventListener("change", (event) => {
+    setAutoOpenNotificationsPreference(Boolean(event.target.checked));
+  });
+}
+
+if (el.settingsFriendCardCollapsed) {
+  el.settingsFriendCardCollapsed.addEventListener("change", (event) => {
+    setFriendCardCollapsed(Boolean(event.target.checked));
+  });
+}
+
+if (el.settingsFriendsCardCollapsed) {
+  el.settingsFriendsCardCollapsed.addEventListener("change", (event) => {
+    setFriendsCardCollapsed(Boolean(event.target.checked));
   });
 }
 
@@ -1316,8 +1462,8 @@ el.messageForm.addEventListener("submit", (event) => {
 });
 
 el.attachBtn.addEventListener("click", () => {
-  if (activeChannel.type !== "direct") {
-    return showToast("Video/file upload is available in direct chat.");
+  if (activeChannel.type === "home") {
+    return showToast("Pick a chat before sending a file.");
   }
   el.attachmentInput.click();
 });
@@ -1325,15 +1471,33 @@ el.attachBtn.addEventListener("click", () => {
 el.attachmentInput.addEventListener("change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
-  await uploadDirectAttachment(file);
+  if (activeChannel.type === "direct") {
+    await uploadDirectAttachment(file);
+    return;
+  }
+  if (activeChannel.type === "group") {
+    await uploadGroupAttachment(file);
+  }
 });
 
 el.homeRailButton.addEventListener("click", selectHome);
 if (el.newGroupBtn) {
   el.newGroupBtn.addEventListener("click", () => (window.location.href = "/create-group.html"));
 }
+if (el.settingsToggleButton) {
+  el.settingsToggleButton.addEventListener("click", focusSettingsCard);
+}
 if (el.createGroupSidebarBtn) {
   el.createGroupSidebarBtn.addEventListener(
+    "click",
+    () => (window.location.href = "/create-group.html"),
+  );
+}
+if (el.settingsNotificationsBtn) {
+  el.settingsNotificationsBtn.addEventListener("click", openInboxPanel);
+}
+if (el.settingsCreateGroupBtn) {
+  el.settingsCreateGroupBtn.addEventListener(
     "click",
     () => (window.location.href = "/create-group.html"),
   );
@@ -1343,10 +1507,9 @@ if (el.headerInboxButton) {
 }
 el.notificationToggleButton.addEventListener("click", toggleInboxPanel);
 el.closeInboxButton.addEventListener("click", closeInboxPanel);
-el.logoutBtn.addEventListener("click", () => {
-  clearSession();
-  window.location.href = "/login.html";
-});
+if (el.sidebarLogoutBtn) {
+  el.sidebarLogoutBtn.addEventListener("click", logout);
+}
 window.addEventListener("beforeunload", () => {
   try {
     if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);

@@ -114,4 +114,43 @@ public class MessageController {
                     .body(Map.of("error", "Could not read the uploaded file."));
         }
     }
+
+    @PostMapping(value = "/groups/{groupId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadGroupAttachment(
+            @PathVariable Long groupId,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "caption", required = false) String caption
+    ) {
+        String currentEmail = jwt == null ? null : jwt.getClaimAsString("email");
+        if (currentEmail == null || currentEmail.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Sign in again."));
+        }
+        if (!groupService.isMember(groupId, currentEmail)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "You are not a member of this group."));
+        }
+        try {
+            GroupChatMessage saved = messageService.saveGroupAttachment(
+                    groupId,
+                    currentEmail,
+                    jwt == null ? null : jwt.getClaimAsString("name"),
+                    caption,
+                    file == null ? null : file.getOriginalFilename(),
+                    file == null ? null : file.getContentType(),
+                    file == null ? null : file.getBytes()
+            );
+            messagingTemplate.convertAndSend("/topic/groups/" + groupId, saved);
+            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", exception.getMessage()));
+        } catch (IOException exception) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Could not read the uploaded file."));
+        }
+    }
 }

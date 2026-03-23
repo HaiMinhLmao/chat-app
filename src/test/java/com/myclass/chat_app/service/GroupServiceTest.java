@@ -53,7 +53,7 @@ class GroupServiceTest {
         when(userRepository.findByEmailIgnoreCase("friend@example.com")).thenReturn(Optional.of(invitedUser));
         when(groupRepository.save(any())).thenThrow(new RuntimeException("database unavailable"));
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -103,7 +103,7 @@ class GroupServiceTest {
         when(userRepository.findByEmailIgnoreCase("creator@example.com")).thenReturn(Optional.of(creator));
         when(groupRepository.save(any())).thenThrow(new RuntimeException("database unavailable"));
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -157,7 +157,7 @@ class GroupServiceTest {
         when(userRepository.findByEmailIgnoreCase("creator@example.com")).thenReturn(Optional.of(creator));
         when(userRepository.findByEmailIgnoreCase("friend@example.com")).thenReturn(Optional.empty());
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -205,14 +205,14 @@ class GroupServiceTest {
         when(userRepository.findByEmailIgnoreCase("creator@example.com")).thenReturn(Optional.of(creator));
         when(userRepository.findByEmailIgnoreCase("friend@example.com")).thenReturn(Optional.of(invitedUser));
         when(groupRepository.save(any(ChatGroup.class))).thenAnswer(invocation -> {
-            ChatGroup group = invocation.getArgument(0);
+            ChatGroup group = invocation.getArgument(0, ChatGroup.class);
             group.setId(7L);
             return group;
         });
-        when(memberRepository.save(any(GroupMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(groupInvitationRepository.save(any(GroupInvitation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(memberRepository.save(any(GroupMember.class))).thenAnswer(invocation -> invocation.getArgument(0, GroupMember.class));
+        when(groupInvitationRepository.save(any(GroupInvitation.class))).thenAnswer(invocation -> invocation.getArgument(0, GroupInvitation.class));
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -238,5 +238,10 @@ class GroupServiceTest {
         ArgumentCaptor<GroupInvitation> invitationCaptor = ArgumentCaptor.forClass(GroupInvitation.class);
         verify(groupInvitationRepository).save(invitationCaptor.capture());
         assertThat(invitationCaptor.getValue().getInvitedUser().getEmail()).isEqualTo("friend@example.com");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static TransactionCallback<Object> transactionCallback(org.mockito.invocation.InvocationOnMock invocation) {
+        return (TransactionCallback<Object>) invocation.getArgument(0, TransactionCallback.class);
     }
 }

@@ -68,7 +68,7 @@ class MessageServiceTest {
         MessageRepository repository = mock(MessageRepository.class);
         SupabaseStorageService storageService = storageService(false);
         when(repository.save(any(Message.class))).thenAnswer(invocation -> {
-            Message saved = invocation.getArgument(0);
+            Message saved = invocation.getArgument(0, Message.class);
             saved.setId(1L);
             saved.setTimestamp(Instant.parse("2026-03-19T10:00:00Z"));
             return saved;
@@ -78,7 +78,18 @@ class MessageServiceTest {
 
         GroupChatMessage saved = service.saveGroupMessage(
                 12L,
-                new GroupChatMessage(12L, "alice@example.com", " ", "hello group", null)
+                new GroupChatMessage(
+                        12L,
+                        "alice@example.com",
+                        " ",
+                        "hello group",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
         );
 
         assertThat(saved.senderName()).isEqualTo("alice");
@@ -115,7 +126,7 @@ class MessageServiceTest {
         MessageRepository repository = mock(MessageRepository.class);
         SupabaseStorageService storageService = storageService(true);
         when(repository.save(any(Message.class))).thenAnswer(invocation -> {
-            Message saved = invocation.getArgument(0);
+            Message saved = invocation.getArgument(0, Message.class);
             saved.setId(7L);
             saved.setTimestamp(Instant.parse("2026-03-21T08:30:00Z"));
             return saved;

@@ -44,13 +44,13 @@ class SocialServiceTest {
         when(userRepository.findByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("bob@example.com")).thenReturn(Optional.of(recipient));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
+            User user = invocation.getArgument(0, User.class);
             user.setId(1L);
             return user;
         });
         when(friendRequestRepository.save(any())).thenThrow(new RuntimeException("database unavailable"));
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -99,7 +99,7 @@ class SocialServiceTest {
         when(userRepository.findByEmailIgnoreCase("alice@gmail.com")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("bob@gmail.com")).thenReturn(Optional.of(recipient));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
+            User user = invocation.getArgument(0, User.class);
             if (user.getId() == null) {
                 user.setId(user.getEmail().startsWith("alice") ? 1L : 2L);
             }
@@ -107,7 +107,7 @@ class SocialServiceTest {
         });
         when(friendRequestRepository.save(any())).thenThrow(new RuntimeException("database unavailable"));
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -142,12 +142,12 @@ class SocialServiceTest {
         when(userRepository.findByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("ghost@example.com")).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
+            User user = invocation.getArgument(0, User.class);
             user.setId(1L);
             return user;
         });
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -182,7 +182,7 @@ class SocialServiceTest {
         when(friendRequestRepository.findBetweenUsers("alice@example.com", "bob@example.com"))
                 .thenAnswer(invocation -> List.copyOf(savedRequests));
         when(friendRequestRepository.save(any(FriendRequest.class))).thenAnswer(invocation -> {
-            FriendRequest request = invocation.getArgument(0);
+            FriendRequest request = invocation.getArgument(0, FriendRequest.class);
             request.setId(10L);
             savedRequests.add(request);
             return request;
@@ -201,7 +201,7 @@ class SocialServiceTest {
                 InvitationStatus.PENDING
         )).thenReturn(List.of());
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -302,7 +302,7 @@ class SocialServiceTest {
         when(groupInvitationRepository.findByInvitedUserEmailIgnoreCaseAndStatusOrderByCreatedAtDesc(any(), any()))
                 .thenThrow(new RuntimeException("database unavailable"));
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
+            TransactionCallback<Object> callback = transactionCallback(invocation);
             return callback.doInTransaction(null);
         });
 
@@ -344,5 +344,10 @@ class SocialServiceTest {
         user.setEmail(email);
         user.setFullName(fullName);
         return user;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static TransactionCallback<Object> transactionCallback(org.mockito.invocation.InvocationOnMock invocation) {
+        return (TransactionCallback<Object>) invocation.getArgument(0, TransactionCallback.class);
     }
 }

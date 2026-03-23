@@ -36,7 +36,7 @@ class LocalUserAuthServiceTest {
         when(repository.existsByUserEmailIgnoreCase("student@example.com")).thenReturn(false, true);
         when(userService.upsertByEmail("student@example.com", "Student")).thenReturn(user);
         when(repository.save(any(LocalCredential.class))).thenAnswer(invocation -> {
-            LocalCredential saved = invocation.getArgument(0);
+            LocalCredential saved = invocation.getArgument(0, LocalCredential.class);
             saved.setId(3L);
             return saved;
         });
