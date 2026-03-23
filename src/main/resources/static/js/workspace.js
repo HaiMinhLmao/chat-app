@@ -388,6 +388,7 @@ function showBanner(message, variant) {
 
 function syncSurfaceMode() {
   document.body.classList.toggle("compact-chat", activeChannel.type !== "home");
+  document.body.classList.toggle("home-surface", activeChannel.type === "home");
 }
 
 function syncComposer() {
@@ -425,6 +426,146 @@ function clearMessages(title, copy, kicker) {
     '</h2><div class="muted">' +
     copy +
     "</div></div>";
+}
+
+function createHomeAction(label, copy, action) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "home-action-card";
+  button.dataset.homeAction = action;
+
+  const title = document.createElement("strong");
+  title.textContent = label;
+  const body = document.createElement("span");
+  body.textContent = copy;
+
+  button.append(title, body);
+  return button;
+}
+
+function createHomeShortcut(name, meta, datasetKey, datasetValue) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "home-shortcut";
+  button.dataset[datasetKey] = String(datasetValue);
+
+  const avatar = document.createElement("div");
+  avatar.className = "channel-avatar";
+  avatar.textContent = initials(name);
+
+  const copy = document.createElement("div");
+  copy.className = "home-shortcut-copy";
+
+  const title = document.createElement("div");
+  title.className = "home-shortcut-title";
+  title.textContent = name;
+
+  const subtitle = document.createElement("div");
+  subtitle.className = "home-shortcut-meta";
+  subtitle.textContent = meta;
+
+  copy.append(title, subtitle);
+  button.append(avatar, copy);
+  return button;
+}
+
+function createHomePanel(title, meta, buttons, emptyCopy) {
+  const panel = document.createElement("section");
+  panel.className = "home-panel";
+
+  const head = document.createElement("div");
+  head.className = "home-section-head";
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+  const detail = document.createElement("span");
+  detail.className = "mini muted";
+  detail.textContent = meta;
+  head.append(heading, detail);
+
+  const body = document.createElement("div");
+  body.className = "home-shortcut-list";
+  if (buttons.length) {
+    buttons.forEach((button) => body.appendChild(button));
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "home-empty";
+    empty.textContent = emptyCopy;
+    body.appendChild(empty);
+  }
+
+  panel.append(head, body);
+  return panel;
+}
+
+function renderHomeOverview() {
+  el.messagesArea.innerHTML = "";
+
+  const wrap = document.createElement("div");
+  wrap.className = "home-overview";
+
+  const hero = document.createElement("section");
+  hero.className = "home-hero";
+  const kicker = document.createElement("div");
+  kicker.className = "eyebrow";
+  kicker.textContent = "Workspace";
+  const heading = document.createElement("h2");
+  heading.textContent = "Everything is ready to continue.";
+  const copy = document.createElement("p");
+  copy.textContent =
+    "Jump back into a friend chat, open one of your groups, or handle requests from one place.";
+  const actions = document.createElement("div");
+  actions.className = "home-actions";
+  actions.append(
+    createHomeAction("Add Friend", "Send a request and unlock direct chat.", "add-friend"),
+    createHomeAction("Open Notifications", "Review invites and friend requests.", "notifications"),
+    createHomeAction("Create Group", "Start a fresh room for your class or team.", "create-group"),
+  );
+  hero.append(kicker, heading, copy, actions);
+
+  const sections = document.createElement("div");
+  sections.className = "home-sections";
+
+  const friendButtons = socialState.friends.slice(0, 4).map((friend) => {
+    const email = normalizeEmail(friend.email);
+    return createHomeShortcut(
+      displayName(friend),
+      getPreview("direct", email, friend.email || "Ready to chat"),
+      "homeFriend",
+      email,
+    );
+  });
+
+  const groupButtons = groups.slice(0, 4).map((group) =>
+    createHomeShortcut(
+      group.name || "Study Group",
+      getPreview("group", group.id, group.category || "Open room"),
+      "homeGroup",
+      group.id,
+    ),
+  );
+
+  sections.append(
+    createHomePanel(
+      "Recent friends",
+      socialState.friends.length + " total",
+      friendButtons,
+      "Your accepted friends will appear here for quick access.",
+    ),
+    createHomePanel(
+      "Your groups",
+      groups.length + " active",
+      groupButtons,
+      "Join or create a group to see room shortcuts here.",
+    ),
+  );
+
+  wrap.append(hero, sections);
+  el.messagesArea.appendChild(wrap);
+  el.messagesArea.scrollTop = 0;
+}
+
+function refreshHomeOverviewIfNeeded() {
+  if (activeChannel.type === "home") renderHomeOverview();
 }
 
 // Message rendering
@@ -549,11 +690,7 @@ function selectHome() {
   showBanner("", "info");
   disconnectSubscription();
   highlightSelection();
-  clearMessages(
-    "Pick a chat",
-    "Open a friend or group from the left to start talking.",
-    "Workspace",
-  );
+  renderHomeOverview();
   syncComposer();
 }
 
@@ -655,6 +792,7 @@ function renderFriends() {
     );
   });
   highlightSelection();
+  refreshHomeOverviewIfNeeded();
 }
 
 function renderGroups() {
@@ -693,6 +831,7 @@ function renderGroups() {
   }
   el.overviewGroups.textContent = String(groups.length);
   highlightSelection();
+  refreshHomeOverviewIfNeeded();
 }
 
 function renderNotificationCard(title, body, time, actions) {
@@ -784,6 +923,7 @@ function renderNotifications() {
       ),
     );
   });
+  refreshHomeOverviewIfNeeded();
 }
 
 // Workspace refresh and subscriptions
@@ -843,10 +983,12 @@ async function loadGroups() {
 }
 
 async function loadDirectHistory(otherEmail) {
+  const directId = normalizeEmail(otherEmail);
   clearMessages("Loading chat", "Pulling the latest messages.", "");
   const result = await authorizedRequest(
     "/api/messages/direct/" + encodeURIComponent(otherEmail),
   );
+  if (activeChannel.type !== "direct" || normalizeEmail(activeChannel.email) !== directId) return;
   if (!result.ok) {
     clearMessages(
       "Chat unavailable",
@@ -876,13 +1018,15 @@ async function loadDirectHistory(otherEmail) {
       normalizeEmail(last.senderEmail) === normalizeEmail(currentUser.email)
         ? "You"
         : last.senderName || last.senderEmail || "User";
-    setPreview("direct", normalizeEmail(otherEmail), messagePreview(last, sender === "You", sender));
+    setPreview("direct", directId, messagePreview(last, sender === "You", sender));
   }
 }
 
 async function loadGroupHistory(groupId) {
+  const currentGroupId = String(groupId);
   clearMessages("Loading room", "Pulling the latest messages.", "Group");
   const result = await authorizedRequest("/api/messages/groups/" + groupId);
+  if (activeChannel.type !== "group" || String(activeChannel.id) !== currentGroupId) return;
   if (!result.ok) {
     clearMessages(
       "Group unavailable",
@@ -1084,6 +1228,42 @@ if (el.friendsSearchInput) {
     renderFriends();
   });
 }
+
+el.messagesArea.addEventListener("click", (event) => {
+  const actionButton = event.target.closest("[data-home-action]");
+  if (actionButton) {
+    const action = actionButton.dataset.homeAction;
+    if (action === "add-friend") {
+      setFriendCardCollapsed(false);
+      el.friendCard.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.friendEmailInput.focus();
+      return;
+    }
+    if (action === "notifications") {
+      openInboxPanel();
+      return;
+    }
+    if (action === "create-group") {
+      window.location.href = "/create-group.html";
+    }
+    return;
+  }
+
+  const friendShortcut = event.target.closest("[data-home-friend]");
+  if (friendShortcut) {
+    const email = normalizeEmail(friendShortcut.dataset.homeFriend || "");
+    const friend = socialState.friends.find((item) => normalizeEmail(item.email) === email);
+    if (friend) selectDirect(friend);
+    return;
+  }
+
+  const groupShortcut = event.target.closest("[data-home-group]");
+  if (groupShortcut) {
+    const groupId = String(groupShortcut.dataset.homeGroup || "");
+    const group = groups.find((item) => String(item.id) === groupId);
+    if (group) selectGroup(group);
+  }
+});
 
 el.friendRequestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
