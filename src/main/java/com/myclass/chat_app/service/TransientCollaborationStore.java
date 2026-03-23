@@ -112,7 +112,10 @@ public class TransientCollaborationStore {
         if (creator == null) {
             throw new IllegalArgumentException("Unauthorized");
         }
-        String groupName = request == null ? null : UserIdentitySupport.trimToNull(request.groupName());
+        if (request == null) {
+            throw new IllegalArgumentException("group request is required");
+        }
+        String groupName = UserIdentitySupport.trimToNull(request.groupName());
         if (groupName == null) {
             throw new IllegalArgumentException("groupName is required");
         }

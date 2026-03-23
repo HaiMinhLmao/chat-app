@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -93,15 +94,15 @@ public class MessageController {
                     .body(Map.of("error", "Direct messages unlock after the friend request is accepted."));
         }
         try {
-            DirectChatMessage saved = messageService.saveDirectAttachment(
+            DirectChatMessage saved = Objects.requireNonNull(messageService.saveDirectAttachment(
                     currentEmail,
                     jwt == null ? null : jwt.getClaimAsString("name"),
                     otherEmail,
                     caption,
-                    file == null ? null : file.getOriginalFilename(),
-                    file == null ? null : file.getContentType(),
-                    file == null ? null : file.getBytes()
-            );
+                    file.getOriginalFilename(),
+                    file.getContentType(),
+                    file.getBytes()
+            ));
             messagingTemplate.convertAndSend("/topic/direct/" + saved.conversationKey(), saved);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (IllegalArgumentException exception) {
@@ -132,15 +133,15 @@ public class MessageController {
                     .body(Map.of("error", "You are not a member of this group."));
         }
         try {
-            GroupChatMessage saved = messageService.saveGroupAttachment(
+            GroupChatMessage saved = Objects.requireNonNull(messageService.saveGroupAttachment(
                     groupId,
                     currentEmail,
                     jwt == null ? null : jwt.getClaimAsString("name"),
                     caption,
-                    file == null ? null : file.getOriginalFilename(),
-                    file == null ? null : file.getContentType(),
-                    file == null ? null : file.getBytes()
-            );
+                    file.getOriginalFilename(),
+                    file.getContentType(),
+                    file.getBytes()
+            ));
             messagingTemplate.convertAndSend("/topic/groups/" + groupId, saved);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (IllegalArgumentException exception) {
