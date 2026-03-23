@@ -418,9 +418,9 @@ function resolveTheme(nextTheme) {
 }
 
 function syncThemeInputs(preference) {
-  if (el.settingsThemeLight) el.settingsThemeLight.checked = preference === "light";
-  if (el.settingsThemeDark) el.settingsThemeDark.checked = preference === "dark";
-  if (el.settingsThemeAuto) el.settingsThemeAuto.checked = preference === "auto";
+  el.settingsThemeLight.checked = preference === "light";
+  el.settingsThemeDark.checked = preference === "dark";
+  el.settingsThemeAuto.checked = preference === "auto";
 }
 
 function applyTheme(nextTheme) {
@@ -512,17 +512,12 @@ function syncAvatarNode(node, name, avatarUrl) {
 
 function refreshSettingsAvatarPreview() {
   const fallbackName = currentUser ? displayName(currentUser) : "User";
-  const name =
-    (el.settingsDisplayNameInput && el.settingsDisplayNameInput.value.trim()) || fallbackName;
-  const avatarUrl =
-    (el.settingsAvatarUrlInput && el.settingsAvatarUrlInput.value.trim()) ||
-    (currentUser && currentUser.avatarUrl) ||
-    "";
+  const name = el.settingsDisplayNameInput.value.trim() || fallbackName;
+  const avatarUrl = el.settingsAvatarUrlInput.value.trim() || (currentUser && currentUser.avatarUrl) || "";
   syncAvatarNode(el.settingsAvatarPreview, name, avatarUrl);
 }
 
 function removeLanguageSettingsField() {
-  if (!el.settingsLanguageSelect) return;
   const field = el.settingsLanguageSelect.closest("label");
   if (field) field.remove();
 }
@@ -535,15 +530,13 @@ function syncCurrentUserUi() {
   el.userEmail.textContent = currentUser.email;
   syncAvatarNode(el.selfRailLabel, name, currentUser.avatarUrl);
   syncAvatarNode(el.settingsAvatarPreview, name, currentUser.avatarUrl);
-  if (el.settingsUserName) el.settingsUserName.textContent = name;
-  if (el.settingsUserEmail) el.settingsUserEmail.textContent = currentUser.email;
-  if (el.settingsDisplayNameInput) el.settingsDisplayNameInput.value = currentUser.fullName || name;
-  if (el.settingsAvatarUrlInput) el.settingsAvatarUrlInput.value = currentUser.avatarUrl || "";
-  if (el.settingsBirthDateInput) {
-    el.settingsBirthDateInput.value = currentUser.birthDate || "";
-    el.settingsBirthDateInput.max = new Date().toISOString().slice(0, 10);
-  }
-  if (el.settingsLanguageSelect && el.settingsLanguageSelect.isConnected) {
+  el.settingsUserName.textContent = name;
+  el.settingsUserEmail.textContent = currentUser.email;
+  el.settingsDisplayNameInput.value = currentUser.fullName || name;
+  el.settingsAvatarUrlInput.value = currentUser.avatarUrl || "";
+  el.settingsBirthDateInput.value = currentUser.birthDate || "";
+  el.settingsBirthDateInput.max = new Date().toISOString().slice(0, 10);
+  if (el.settingsLanguageSelect.isConnected) {
     el.settingsLanguageSelect.value = currentUser.preferredLanguage || "vi";
   }
   document.documentElement.lang = activeLanguage();
@@ -1174,7 +1167,7 @@ function createStudyTimerPanel() {
   shortcuts.className = "study-timer-shortcuts";
   shortcuts.innerHTML =
     '<button type="button" class="study-timer-shortcut" data-study-action="toggle">' +
-    '<span class="study-timer-shortcut-key">' + localizeText("Phim cach", "Space") + "</span>" +
+    '<span class="study-timer-shortcut-key">' + localizeText("Dau cach", "Space") + "</span>" +
     '<span class="study-timer-shortcut-copy"><strong>' +
     localizeText("Bắt đầu/Tạm dừng", "Start/Pause") +
     "</strong><span>" +
@@ -1292,9 +1285,7 @@ function isStudyTimerPopoverOpen() {
 function syncFlyoutScrim() {
   const isOpen = isSettingsPopoverOpen() || isCreateGroupPopoverOpen() || isStudyTimerPopoverOpen();
   document.body.classList.toggle("flyout-open", isOpen);
-  if (el.settingsScrim) {
-    el.settingsScrim.hidden = !isOpen;
-  }
+  el.settingsScrim.hidden = !isOpen;
 }
 
 function setSettingsPopoverOpen(nextOpen) {
@@ -1305,13 +1296,9 @@ function setSettingsPopoverOpen(nextOpen) {
     setStudyTimerPopoverOpen(false);
   }
   document.body.classList.toggle("settings-open", nextOpen);
-  if (el.settingsPopover) {
-    el.settingsPopover.setAttribute("aria-hidden", String(!nextOpen));
-  }
-  if (el.settingsToggleButton) {
-    el.settingsToggleButton.classList.toggle("active", nextOpen);
-    el.settingsToggleButton.setAttribute("aria-pressed", String(nextOpen));
-  }
+  el.settingsPopover.setAttribute("aria-hidden", String(!nextOpen));
+  el.settingsToggleButton.classList.toggle("active", nextOpen);
+  el.settingsToggleButton.setAttribute("aria-pressed", String(nextOpen));
   syncFlyoutScrim();
   if (nextOpen) {
     requestAnimationFrame(positionSettingsPopover);
@@ -1334,18 +1321,14 @@ function setCreateGroupPopoverOpen(nextOpen) {
     setStudyTimerPopoverOpen(false);
   }
   document.body.classList.toggle("create-group-open", nextOpen);
-  if (el.createGroupPopover) {
-    el.createGroupPopover.setAttribute("aria-hidden", String(!nextOpen));
-  }
-  if (el.newGroupBtn) {
-    el.newGroupBtn.classList.toggle("active", nextOpen);
-    el.newGroupBtn.setAttribute("aria-pressed", String(nextOpen));
-  }
+  el.createGroupPopover.setAttribute("aria-hidden", String(!nextOpen));
+  el.newGroupBtn.classList.toggle("active", nextOpen);
+  el.newGroupBtn.setAttribute("aria-pressed", String(nextOpen));
   syncFlyoutScrim();
   if (nextOpen) {
     requestAnimationFrame(() => {
       positionCreateGroupPopover();
-      if (el.createGroupNameInput) el.createGroupNameInput.focus();
+      el.createGroupNameInput.focus();
     });
   }
 }
@@ -1366,18 +1349,14 @@ function setStudyTimerPopoverOpen(nextOpen) {
     setCreateGroupPopoverOpen(false);
   }
   document.body.classList.toggle("study-timer-open", nextOpen);
-  if (el.studyTimerPopover) {
-    el.studyTimerPopover.setAttribute("aria-hidden", String(!nextOpen));
-  }
-  if (el.studyTimerToggleButton) {
-    el.studyTimerToggleButton.classList.toggle("active", nextOpen);
-    el.studyTimerToggleButton.setAttribute("aria-pressed", String(nextOpen));
-  }
+  el.studyTimerPopover.setAttribute("aria-hidden", String(!nextOpen));
+  el.studyTimerToggleButton.classList.toggle("active", nextOpen);
+  el.studyTimerToggleButton.setAttribute("aria-pressed", String(nextOpen));
   syncFlyoutScrim();
   if (nextOpen) {
     requestAnimationFrame(() => {
       refreshStudyTimerUi();
-      const primaryButton = el.studyTimerPopover && el.studyTimerPopover.querySelector("[data-study-action='toggle']");
+      const primaryButton = el.studyTimerPopover.querySelector("[data-study-action='toggle']");
       if (primaryButton) primaryButton.focus();
     });
   }
@@ -1699,7 +1678,7 @@ function renderCreateGroupMembersPreview() {
 }
 
 function clearCreateGroupForm() {
-  if (el.createGroupForm) el.createGroupForm.reset();
+  el.createGroupForm.reset();
   renderCreateGroupMembersPreview();
   setCreateGroupFeedback("", "success");
 }
@@ -2492,21 +2471,17 @@ async function bootstrap() {
   applyTheme(loadThemePreference());
   startStudyTimerTicker();
   removeLanguageSettingsField();
-  if (el.studyTimerPanelMount && !el.studyTimerPanelMount.firstChild) {
+  if (!el.studyTimerPanelMount.firstChild) {
     el.studyTimerPanelMount.appendChild(createStudyTimerPanel());
     refreshStudyTimerUi();
   }
   syncCurrentUserUi();
   setFriendCardCollapsed(loadFriendCardPreference());
   setFriendsCardCollapsed(loadFriendsCardPreference());
-  if (el.settingsToggleButton) {
-    el.settingsToggleButton.title = "Settings";
-    el.settingsToggleButton.setAttribute("aria-label", "Settings");
-  }
-  if (el.studyTimerToggleButton) {
-    el.studyTimerToggleButton.title = "Study timer";
-    el.studyTimerToggleButton.setAttribute("aria-label", "Study timer");
-  }
+  el.settingsToggleButton.title = "Settings";
+  el.settingsToggleButton.setAttribute("aria-label", "Settings");
+  el.studyTimerToggleButton.title = "Study timer";
+  el.studyTimerToggleButton.setAttribute("aria-label", "Study timer");
   closeSettingsPopover();
   closeStudyTimerPopover();
   closeCreateGroupPopover();
@@ -2523,25 +2498,19 @@ async function bootstrap() {
 }
 
 // Event wiring
-if (el.friendCardToggle) {
-  el.friendCardToggle.addEventListener("click", () =>
-    setFriendCardCollapsed(!el.friendCard.classList.contains("is-collapsed")),
-  );
-}
+el.friendCardToggle.addEventListener("click", () =>
+  setFriendCardCollapsed(!el.friendCard.classList.contains("is-collapsed")),
+);
 
-if (el.friendsCardToggle) {
-  el.friendsCardToggle.addEventListener("click", () =>
-    setFriendsCardCollapsed(!el.friendsCard.classList.contains("is-collapsed")),
-  );
-}
+el.friendsCardToggle.addEventListener("click", () =>
+  setFriendsCardCollapsed(!el.friendsCard.classList.contains("is-collapsed")),
+);
 
-if (el.friendsSearchInput) {
-  el.friendsSearchInput.addEventListener("input", (event) => {
-    const input = /** @type {HTMLInputElement} */ (event.currentTarget);
-    friendSearchQuery = input.value || "";
-    renderFriends();
-  });
-}
+el.friendsSearchInput.addEventListener("input", (event) => {
+  const input = /** @type {HTMLInputElement} */ (event.currentTarget);
+  friendSearchQuery = input.value || "";
+  renderFriends();
+});
 
 [el.settingsThemeLight, el.settingsThemeDark, el.settingsThemeAuto]
   .filter(Boolean)
@@ -2564,89 +2533,72 @@ if (window.matchMedia) {
   }
 }
 
-if (el.settingsProfileForm) {
-  el.settingsProfileForm.addEventListener("submit", saveProfileSettings);
-}
+el.settingsProfileForm.addEventListener("submit", saveProfileSettings);
 
-if (el.settingsDisplayNameInput) {
-  el.settingsDisplayNameInput.addEventListener("input", () => {
-    setSettingsProfileFeedback("", "success");
-    refreshSettingsAvatarPreview();
-  });
-}
+el.settingsDisplayNameInput.addEventListener("input", () => {
+  setSettingsProfileFeedback("", "success");
+  refreshSettingsAvatarPreview();
+});
 
-if (el.settingsAvatarUrlInput) {
-  el.settingsAvatarUrlInput.addEventListener("input", () => {
-    setSettingsProfileFeedback("", "success");
-    refreshSettingsAvatarPreview();
-  });
-}
+el.settingsAvatarUrlInput.addEventListener("input", () => {
+  setSettingsProfileFeedback("", "success");
+  refreshSettingsAvatarPreview();
+});
 
-if (el.settingsBirthDateInput) {
-  el.settingsBirthDateInput.addEventListener("input", () => {
-    setSettingsProfileFeedback("", "success");
-  });
-}
+el.settingsBirthDateInput.addEventListener("input", () => {
+  setSettingsProfileFeedback("", "success");
+});
 
-if (el.settingsLanguageSelect) {
-  el.settingsLanguageSelect.addEventListener("change", () => {
-    setSettingsProfileFeedback("", "success");
-  });
-}
+el.settingsLanguageSelect.addEventListener("change", () => {
+  setSettingsProfileFeedback("", "success");
+});
 
-if (el.createGroupMembersInput) {
-  el.createGroupMembersInput.addEventListener("input", () => {
-    renderCreateGroupMembersPreview();
-    setCreateGroupFeedback("", "success");
-  });
-}
+el.createGroupMembersInput.addEventListener("input", () => {
+  renderCreateGroupMembersPreview();
+  setCreateGroupFeedback("", "success");
+});
 
-if (el.createGroupForm) {
-  el.createGroupForm.addEventListener("submit", submitCreateGroup);
-}
+el.createGroupForm.addEventListener("submit", submitCreateGroup);
 
-if (el.studyTimerPanelMount) {
-  el.studyTimerPanelMount.addEventListener("click", (event) => {
-    const target = asElement(event.target);
-    if (!target) return;
+el.studyTimerPanelMount.addEventListener("click", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
 
-    const studyModeButton = target.closest("[data-study-mode]");
-    if (studyModeButton) {
-      setStudyTimerMode(studyModeButton.dataset.studyMode || "stopwatch");
-      return;
-    }
+  const studyModeButton = target.closest("[data-study-mode]");
+  if (studyModeButton) {
+    setStudyTimerMode(studyModeButton.dataset.studyMode || "stopwatch");
+    return;
+  }
 
-    const shortcutButton = target.closest("[data-study-shortcut]");
-    if (shortcutButton) {
-      triggerStudyTimerAuxAction();
-      return;
-    }
+  const shortcutButton = target.closest("[data-study-shortcut]");
+  if (shortcutButton) {
+    triggerStudyTimerAuxAction();
+    return;
+  }
 
-    const studyActionButton = target.closest("[data-study-action]");
-    if (studyActionButton) {
-      if (studyActionButton.dataset.studyAction === "toggle") {
-        toggleStudyTimer();
-      } else if (studyActionButton.dataset.studyAction === "reset") {
-        resetStudyTimer();
-      } else if (studyActionButton.dataset.studyAction === "fullscreen") {
-        toggleStudyTimerFullscreen();
-      }
-      return;
-    }
-  });
+  const studyActionButton = target.closest("[data-study-action]");
+  if (!studyActionButton) return;
 
-  el.studyTimerPanelMount.addEventListener("input", (event) => {
-    const target = asElement(event.target);
-    if (!target) return;
+  if (studyActionButton.dataset.studyAction === "toggle") {
+    toggleStudyTimer();
+  } else if (studyActionButton.dataset.studyAction === "reset") {
+    resetStudyTimer();
+  } else if (studyActionButton.dataset.studyAction === "fullscreen") {
+    toggleStudyTimerFullscreen();
+  }
+});
 
-    const studyField = target.closest("[data-study-field]");
-    if (!studyField) return;
-    updateStudyTimerField(
-      studyField.dataset.studyField || "",
-      /** @type {HTMLInputElement} */ (studyField).value,
-    );
-  });
-}
+el.studyTimerPanelMount.addEventListener("input", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
+
+  const studyField = target.closest("[data-study-field]");
+  if (!studyField) return;
+  updateStudyTimerField(
+    studyField.dataset.studyField || "",
+    /** @type {HTMLInputElement} */ (studyField).value,
+  );
+});
 
 el.messagesArea.addEventListener("click", (event) => {
   const target = asElement(event.target);
@@ -2758,34 +2710,18 @@ el.attachmentInput.addEventListener("change", async (event) => {
 });
 
 el.homeRailButton.addEventListener("click", selectHome);
-if (el.newGroupBtn) {
-  el.newGroupBtn.addEventListener("click", toggleCreateGroupPopover);
-}
-if (el.studyTimerToggleButton) {
-  el.studyTimerToggleButton.addEventListener("click", toggleStudyTimerPopover);
-}
-if (el.settingsToggleButton) {
-  el.settingsToggleButton.addEventListener("click", toggleSettingsPopover);
-}
-if (el.settingsCloseButton) {
-  el.settingsCloseButton.addEventListener("click", closeSettingsPopover);
-}
-if (el.studyTimerCloseButton) {
-  el.studyTimerCloseButton.addEventListener("click", closeStudyTimerPopover);
-}
-if (el.createGroupCloseButton) {
-  el.createGroupCloseButton.addEventListener("click", closeCreateGroupPopover);
-}
-if (el.createGroupCancelBtn) {
-  el.createGroupCancelBtn.addEventListener("click", closeCreateGroupPopover);
-}
-if (el.settingsScrim) {
-  el.settingsScrim.addEventListener("click", () => {
-    closeSettingsPopover();
-    closeStudyTimerPopover();
-    closeCreateGroupPopover();
-  });
-}
+el.newGroupBtn.addEventListener("click", toggleCreateGroupPopover);
+el.studyTimerToggleButton.addEventListener("click", toggleStudyTimerPopover);
+el.settingsToggleButton.addEventListener("click", toggleSettingsPopover);
+el.settingsCloseButton.addEventListener("click", closeSettingsPopover);
+el.studyTimerCloseButton.addEventListener("click", closeStudyTimerPopover);
+el.createGroupCloseButton.addEventListener("click", closeCreateGroupPopover);
+el.createGroupCancelBtn.addEventListener("click", closeCreateGroupPopover);
+el.settingsScrim.addEventListener("click", () => {
+  closeSettingsPopover();
+  closeStudyTimerPopover();
+  closeCreateGroupPopover();
+});
 if (el.createGroupSidebarBtn) {
   el.createGroupSidebarBtn.addEventListener("click", openCreateGroupPopover);
 }
@@ -2794,9 +2730,7 @@ if (el.headerInboxButton) {
 }
 el.notificationToggleButton.addEventListener("click", toggleInboxPanel);
 el.closeInboxButton.addEventListener("click", closeInboxPanel);
-if (el.sidebarLogoutBtn) {
-  el.sidebarLogoutBtn.addEventListener("click", logout);
-}
+el.sidebarLogoutBtn.addEventListener("click", logout);
 window.addEventListener("beforeunload", () => {
   try {
     if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);

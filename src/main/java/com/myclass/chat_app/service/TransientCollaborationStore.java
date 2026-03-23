@@ -29,13 +29,22 @@ import java.util.regex.Pattern;
 @Service
 public class TransientCollaborationStore {
 
+    private static final long USER_ID_SEQUENCE_START = 10_000L;
+    private static final long GROUP_ID_SEQUENCE_START = 10_000L;
+    private static final long FRIEND_REQUEST_ID_SEQUENCE_START = 20_000L;
+    private static final long GROUP_INVITATION_ID_SEQUENCE_START = 30_000L;
+    private static final String DEFAULT_LANGUAGE = "vi";
+    private static final String EMAIL_REQUIRED_MESSAGE = "Email is required";
+    private static final String GROUP_NOT_FOUND_MESSAGE = "Group not found";
+    private static final String UNAUTHORIZED_MESSAGE = "Unauthorized";
+
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
 
-    private final AtomicLong userIdSequence = new AtomicLong(10_000);
-    private final AtomicLong groupIdSequence = new AtomicLong(10_000);
-    private final AtomicLong friendRequestIdSequence = new AtomicLong(20_000);
-    private final AtomicLong groupInvitationIdSequence = new AtomicLong(30_000);
+    private final AtomicLong userIdSequence = new AtomicLong(USER_ID_SEQUENCE_START);
+    private final AtomicLong groupIdSequence = new AtomicLong(GROUP_ID_SEQUENCE_START);
+    private final AtomicLong friendRequestIdSequence = new AtomicLong(FRIEND_REQUEST_ID_SEQUENCE_START);
+    private final AtomicLong groupInvitationIdSequence = new AtomicLong(GROUP_INVITATION_ID_SEQUENCE_START);
 
     private final Map<String, User> usersByEmail = new ConcurrentHashMap<>();
     private final Map<Long, StoredGroup> groupsById = new ConcurrentHashMap<>();
@@ -49,7 +58,7 @@ public class TransientCollaborationStore {
     public User upsertUser(String email, String fullName, String avatarUrl, LocalDate birthDate, String preferredLanguage) {
         String normalized = UserIdentitySupport.normalizeEmail(email);
         if (normalized == null) {
-            throw new IllegalArgumentException("Email is required");
+            throw new IllegalArgumentException(EMAIL_REQUIRED_MESSAGE);
         }
         String trimmedFullName = UserIdentitySupport.trimToNull(fullName);
         String trimmedAvatarUrl = UserIdentitySupport.trimToNull(avatarUrl);
@@ -75,7 +84,7 @@ public class TransientCollaborationStore {
             if (trimmedLanguage != null) {
                 user.setPreferredLanguage(trimmedLanguage);
             } else if (user.getPreferredLanguage() == null || user.getPreferredLanguage().isBlank()) {
-                user.setPreferredLanguage("vi");
+                user.setPreferredLanguage(DEFAULT_LANGUAGE);
             }
             if (user.getCreatedAt() == null) {
                 user.setCreatedAt(Instant.now());
@@ -87,7 +96,7 @@ public class TransientCollaborationStore {
     public User updateUserProfile(String email, String fullName, String avatarUrl, LocalDate birthDate, String preferredLanguage) {
         String normalized = UserIdentitySupport.normalizeEmail(email);
         if (normalized == null) {
-            throw new IllegalArgumentException("Email is required");
+            throw new IllegalArgumentException(EMAIL_REQUIRED_MESSAGE);
         }
         String trimmedFullName = UserIdentitySupport.trimToNull(fullName);
         if (trimmedFullName == null) {
@@ -97,7 +106,7 @@ public class TransientCollaborationStore {
         User user = upsertUser(normalized, trimmedFullName);
         user.setAvatarUrl(UserIdentitySupport.trimToNull(avatarUrl));
         user.setBirthDate(birthDate);
-        user.setPreferredLanguage(UserIdentitySupport.trimToNull(preferredLanguage) == null ? "vi" : preferredLanguage.trim());
+        user.setPreferredLanguage(resolvePreferredLanguage(preferredLanguage));
         return user;
     }
 
@@ -110,7 +119,7 @@ public class TransientCollaborationStore {
     public synchronized GroupResponse createGroup(String creatorEmail, CreateGroupRequest request) {
         String creator = UserIdentitySupport.normalizeEmail(creatorEmail);
         if (creator == null) {
-            throw new IllegalArgumentException("Unauthorized");
+            throw new IllegalArgumentException(UNAUTHORIZED_MESSAGE);
         }
         if (request == null) {
             throw new IllegalArgumentException("group request is required");
@@ -162,11 +171,11 @@ public class TransientCollaborationStore {
 
     public GroupResponse getGroup(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("Group not found");
+            throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
         }
         StoredGroup group = groupsById.get(id);
         if (group == null) {
-            throw new IllegalArgumentException("Group not found");
+            throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
         }
         return toResponse(group);
     }
@@ -174,7 +183,7 @@ public class TransientCollaborationStore {
     public List<GroupSummaryResponse> listMyGroups(String email) {
         String normalized = UserIdentitySupport.normalizeEmail(email);
         if (normalized == null) {
-            throw new IllegalArgumentException("Unauthorized");
+            throw new IllegalArgumentException(UNAUTHORIZED_MESSAGE);
         }
 
         return groupsById.values().stream()
@@ -196,6 +205,11 @@ public class TransientCollaborationStore {
         }
         StoredGroup group = groupsById.get(groupId);
         return group != null && group.members().containsKey(normalized);
+    }
+
+    private String resolvePreferredLanguage(String preferredLanguage) {
+        String normalizedLanguage = UserIdentitySupport.trimToNull(preferredLanguage);
+        return normalizedLanguage == null ? DEFAULT_LANGUAGE : normalizedLanguage;
     }
 
     public synchronized FriendRequestResponse sendFriendRequest(String requesterEmail, String recipientEmail) {

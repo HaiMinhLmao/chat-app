@@ -56,10 +56,9 @@ public class MessageController {
             @PathVariable Long groupId,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String currentEmail = jwt == null ? null : jwt.getClaimAsString("email");
+        String currentEmail = currentEmail(jwt);
         if (!groupService.isMember(groupId, currentEmail)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "You are not a member of this group."));
+            return errorResponse(HttpStatus.FORBIDDEN, "You are not a member of this group.");
         }
         return ResponseEntity.ok(messageService.getGroupMessages(groupId));
     }
@@ -69,10 +68,9 @@ public class MessageController {
             @PathVariable String otherEmail,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        String currentEmail = jwt == null ? null : jwt.getClaimAsString("email");
+        String currentEmail = currentEmail(jwt);
         if (!socialService.areFriends(currentEmail, otherEmail)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Direct messages unlock after the friend request is accepted."));
+            return errorResponse(HttpStatus.FORBIDDEN, "Direct messages unlock after the friend request is accepted.");
         }
         return ResponseEntity.ok(messageService.getDirectMessages(currentEmail, otherEmail));
     }
@@ -84,19 +82,17 @@ public class MessageController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "caption", required = false) String caption
     ) {
-        String currentEmail = jwt == null ? null : jwt.getClaimAsString("email");
+        String currentEmail = currentEmail(jwt);
         if (currentEmail == null || currentEmail.isBlank()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Sign in again."));
+            return errorResponse(HttpStatus.UNAUTHORIZED, "Sign in again.");
         }
         if (!socialService.areFriends(currentEmail, otherEmail)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Direct messages unlock after the friend request is accepted."));
+            return errorResponse(HttpStatus.FORBIDDEN, "Direct messages unlock after the friend request is accepted.");
         }
-        try {
+        return handleAttachmentUpload(() -> {
             DirectChatMessage saved = Objects.requireNonNull(messageService.saveDirectAttachment(
                     currentEmail,
-                    jwt == null ? null : jwt.getClaimAsString("name"),
+                    currentName(jwt),
                     otherEmail,
                     caption,
                     file.getOriginalFilename(),
@@ -104,16 +100,8 @@ public class MessageController {
                     file.getBytes()
             ));
             messagingTemplate.convertAndSend("/topic/direct/" + saved.conversationKey(), saved);
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
-        } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
-        } catch (IllegalStateException exception) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("error", exception.getMessage()));
-        } catch (IOException exception) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Could not read the uploaded file."));
-        }
+            return saved;
+        });
     }
 
     @PostMapping(value = "/groups/{groupId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -123,35 +111,54 @@ public class MessageController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "caption", required = false) String caption
     ) {
-        String currentEmail = jwt == null ? null : jwt.getClaimAsString("email");
+        String currentEmail = currentEmail(jwt);
         if (currentEmail == null || currentEmail.isBlank()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Sign in again."));
+            return errorResponse(HttpStatus.UNAUTHORIZED, "Sign in again.");
         }
         if (!groupService.isMember(groupId, currentEmail)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "You are not a member of this group."));
+            return errorResponse(HttpStatus.FORBIDDEN, "You are not a member of this group.");
         }
-        try {
+        return handleAttachmentUpload(() -> {
             GroupChatMessage saved = Objects.requireNonNull(messageService.saveGroupAttachment(
                     groupId,
                     currentEmail,
-                    jwt == null ? null : jwt.getClaimAsString("name"),
+                    currentName(jwt),
                     caption,
                     file.getOriginalFilename(),
                     file.getContentType(),
                     file.getBytes()
             ));
             messagingTemplate.convertAndSend("/topic/groups/" + groupId, saved);
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+            return saved;
+        });
+    }
+
+    private ResponseEntity<?> handleAttachmentUpload(AttachmentSupplier<?> supplier) {
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED).body(supplier.get());
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+            return errorResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
         } catch (IllegalStateException exception) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("error", exception.getMessage()));
+            return errorResponse(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
         } catch (IOException exception) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Could not read the uploaded file."));
+            return errorResponse(HttpStatus.BAD_REQUEST, "Could not read the uploaded file.");
         }
+    }
+
+    private ResponseEntity<Map<String, String>> errorResponse(HttpStatus status, String message) {
+        return ResponseEntity.status(status).body(Map.of("error", message));
+    }
+
+    private String currentEmail(Jwt jwt) {
+        return jwt == null ? null : jwt.getClaimAsString("email");
+    }
+
+    private String currentName(Jwt jwt) {
+        return jwt == null ? null : jwt.getClaimAsString("name");
+    }
+
+    @FunctionalInterface
+    private interface AttachmentSupplier<T> {
+        T get() throws IOException;
     }
 }
