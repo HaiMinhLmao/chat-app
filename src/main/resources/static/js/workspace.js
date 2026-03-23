@@ -29,9 +29,6 @@ const el = {
   settingsDisplayNameSaveBtn: document.getElementById("settingsDisplayNameSaveBtn"),
   settingsProfileFeedback: document.getElementById("settingsProfileFeedback"),
   settingsThemeDark: document.getElementById("settingsThemeDark"),
-  settingsAutoOpenNotifications: document.getElementById("settingsAutoOpenNotifications"),
-  settingsFriendCardCollapsed: document.getElementById("settingsFriendCardCollapsed"),
-  settingsFriendsCardCollapsed: document.getElementById("settingsFriendsCardCollapsed"),
   settingsResetBtn: document.getElementById("settingsResetBtn"),
   sidebarLogoutBtn: document.getElementById("sidebarLogoutBtn"),
   createGroupPopover: document.getElementById("createGroupPopover"),
@@ -98,7 +95,6 @@ const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
 const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
-const AUTO_OPEN_NOTIFICATIONS_KEY = "workspaceAutoOpenNotifications";
 const THEME_STORAGE_KEY = "workspaceTheme";
 const INBOX_BREAKPOINT = 1380;
 const SETTINGS_DRAWER_BREAKPOINT = 760;
@@ -386,9 +382,6 @@ function setFriendCardCollapsed(collapsed) {
     "aria-label",
     collapsed ? "Expand add friend" : "Collapse add friend",
   );
-  if (el.settingsFriendCardCollapsed) {
-    el.settingsFriendCardCollapsed.checked = collapsed;
-  }
   try {
     window.localStorage.setItem(FRIEND_CARD_STORAGE_KEY, collapsed ? "1" : "0");
   } catch (_) {
@@ -412,9 +405,6 @@ function setFriendsCardCollapsed(collapsed) {
     "aria-label",
     collapsed ? "Expand friends list" : "Collapse friends list",
   );
-  if (el.settingsFriendsCardCollapsed) {
-    el.settingsFriendsCardCollapsed.checked = collapsed;
-  }
   try {
     window.localStorage.setItem(FRIENDS_CARD_STORAGE_KEY, collapsed ? "1" : "0");
   } catch (_) {
@@ -430,23 +420,8 @@ function loadFriendsCardPreference() {
   }
 }
 
-function setAutoOpenNotificationsPreference(enabled) {
-  if (el.settingsAutoOpenNotifications) {
-    el.settingsAutoOpenNotifications.checked = enabled;
-  }
-  try {
-    window.localStorage.setItem(AUTO_OPEN_NOTIFICATIONS_KEY, enabled ? "1" : "0");
-  } catch (_) {
-    // no-op
-  }
-}
-
 function loadAutoOpenNotificationsPreference() {
-  try {
-    return window.localStorage.getItem(AUTO_OPEN_NOTIFICATIONS_KEY) !== "0";
-  } catch (_) {
-    return true;
-  }
+  return false;
 }
 
 function isFlyoutMobile() {
@@ -567,9 +542,8 @@ function logout() {
 
 function resetInterfacePreferences() {
   applyTheme("light");
-  setAutoOpenNotificationsPreference(true);
-  setFriendCardCollapsed(false);
-  setFriendsCardCollapsed(false);
+  setFriendCardCollapsed(true);
+  setFriendsCardCollapsed(true);
   setSettingsProfileFeedback("", "success");
   showToast("Interface preferences reset.");
 }
@@ -1327,17 +1301,12 @@ async function loadSocialState() {
   };
   const nextTotal =
     socialState.incomingFriendRequests.length + socialState.groupInvitations.length;
-  if (
-    notificationsPrimed &&
-    nextTotal > previousTotal &&
-    loadAutoOpenNotificationsPreference()
-  ) {
+  if (notificationsPrimed && nextTotal > previousTotal) {
     showToast(
       nextTotal - previousTotal === 1
         ? "You have a new invitation."
         : "You have new invitations.",
     );
-    openInboxPanel();
   }
   notificationsPrimed = true;
   renderFriends();
@@ -1616,9 +1585,8 @@ async function bootstrap() {
   if (!currentUser) return;
   applyTheme(loadThemePreference());
   syncCurrentUserUi();
-  setFriendCardCollapsed(loadFriendCardPreference());
-  setFriendsCardCollapsed(loadFriendsCardPreference());
-  setAutoOpenNotificationsPreference(loadAutoOpenNotificationsPreference());
+  setFriendCardCollapsed(true);
+  setFriendsCardCollapsed(true);
   if (el.settingsToggleButton) {
     el.settingsToggleButton.title = "Settings";
     el.settingsToggleButton.setAttribute("aria-label", "Settings");
@@ -1657,27 +1625,9 @@ if (el.friendsSearchInput) {
   });
 }
 
-if (el.settingsAutoOpenNotifications) {
-  el.settingsAutoOpenNotifications.addEventListener("change", (event) => {
-    setAutoOpenNotificationsPreference(Boolean(event.target.checked));
-  });
-}
-
 if (el.settingsThemeDark) {
   el.settingsThemeDark.addEventListener("change", (event) => {
     applyTheme(Boolean(event.target.checked) ? "dark" : "light");
-  });
-}
-
-if (el.settingsFriendCardCollapsed) {
-  el.settingsFriendCardCollapsed.addEventListener("change", (event) => {
-    setFriendCardCollapsed(Boolean(event.target.checked));
-  });
-}
-
-if (el.settingsFriendsCardCollapsed) {
-  el.settingsFriendsCardCollapsed.addEventListener("change", (event) => {
-    setFriendsCardCollapsed(Boolean(event.target.checked));
   });
 }
 
