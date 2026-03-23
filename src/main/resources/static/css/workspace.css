@@ -364,12 +364,88 @@ input {
   background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.45), transparent);
 }
 
-.settings-card {
-  margin-top: auto;
+.settings-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 34;
+  background: rgba(15, 23, 42, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
 }
 
-.settings-card .collapsible-body {
-  max-height: 320px;
+.settings-popover {
+  position: fixed;
+  top: 24px;
+  left: 112px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px) scale(0.98);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.settings-popover-header {
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-popover-title {
+  margin-top: 6px;
+  font-size: 24px;
+}
+
+.settings-close-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.06);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.settings-close-btn:hover {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.settings-close-btn span {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.settings-popover-body {
+  padding: 18px;
+  overflow-y: auto;
+}
+
+body.settings-open {
+  overflow: hidden;
+}
+
+body.settings-open .settings-scrim {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.settings-open .settings-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
 }
 
 .settings-account {
@@ -1467,6 +1543,21 @@ body.compact-chat .empty-state h2 {
     width: auto;
     border-radius: 24px;
   }
+
+  .settings-popover {
+    top: 10px !important;
+    right: 10px;
+    bottom: 10px;
+    left: 10px !important;
+    width: auto;
+    max-height: none;
+    border-radius: 24px;
+    transform: translateY(18px);
+  }
+
+  body.settings-open .settings-popover {
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 560px) {
@@ -1531,6 +1622,15 @@ body.compact-chat .empty-state h2 {
 
   .settings-actions {
     flex-direction: column;
+  }
+
+  .settings-popover-header,
+  .settings-popover-body {
+    padding: 14px;
+  }
+
+  .settings-popover-title {
+    font-size: 21px;
   }
 
   .toast {

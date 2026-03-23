@@ -139,69 +139,6 @@
         </section>
 
         <div class="sidebar-divider" aria-hidden="true"></div>
-
-        <section class="card section-card collapsible-card settings-card" id="settingsCard">
-          <div class="card-heading">
-            <div>
-              <div class="eyebrow">Settings</div>
-              <strong>Workspace controls</strong>
-            </div>
-            <button
-              class="card-collapse-btn"
-              id="settingsCardToggle"
-              type="button"
-              aria-expanded="false"
-              aria-controls="settingsCardBody"
-              aria-label="Expand settings"
-            ></button>
-          </div>
-          <div class="collapsible-body" id="settingsCardBody">
-            <div class="settings-account">
-              <div class="mini muted">Signed in as</div>
-              <strong id="settingsUserName">Workspace user</strong>
-              <div class="mini muted" id="settingsUserEmail">user@example.com</div>
-            </div>
-            <div class="settings-list">
-              <label class="settings-item settings-toggle-row">
-                <div>
-                  <strong>Auto-open notifications</strong>
-                  <div class="mini muted">Open the notifications panel when new invites arrive.</div>
-                </div>
-                <span class="settings-switch">
-                  <input id="settingsAutoOpenNotifications" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-              <label class="settings-item settings-toggle-row">
-                <div>
-                  <strong>Start with Add Friend collapsed</strong>
-                  <div class="mini muted">Keep the email request card folded by default.</div>
-                </div>
-                <span class="settings-switch">
-                  <input id="settingsFriendCardCollapsed" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-              <label class="settings-item settings-toggle-row">
-                <div>
-                  <strong>Start with Friends collapsed</strong>
-                  <div class="mini muted">Keep the friends list folded until you need it.</div>
-                </div>
-                <span class="settings-switch">
-                  <input id="settingsFriendsCardCollapsed" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-            </div>
-            <div class="settings-actions">
-              <button class="tiny-btn" id="settingsNotificationsBtn" type="button">Open notifications</button>
-              <button class="tiny-btn" id="settingsCreateGroupBtn" type="button">Create group</button>
-            </div>
-            <button class="btn secondary logout-wide-btn" id="sidebarLogoutBtn" type="button">
-              Sign out
-            </button>
-          </div>
-        </section>
       </aside>
 
       <main class="main panel">
@@ -279,6 +216,64 @@
 
       </aside>
     </div>
+    <div class="settings-scrim" id="settingsScrim" hidden></div>
+    <aside class="settings-popover panel" id="settingsPopover" aria-hidden="true">
+      <div class="settings-popover-header">
+        <div>
+          <div class="eyebrow">Settings</div>
+          <div class="headline settings-popover-title">Workspace controls</div>
+        </div>
+        <button class="settings-close-btn" id="settingsCloseButton" type="button" aria-label="Close settings">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="settings-popover-body">
+        <div class="settings-account">
+          <div class="mini muted">Signed in as</div>
+          <strong id="settingsUserName">Workspace user</strong>
+          <div class="mini muted" id="settingsUserEmail">user@example.com</div>
+        </div>
+        <div class="settings-list">
+          <label class="settings-item settings-toggle-row">
+            <div>
+              <strong>Auto-open notifications</strong>
+              <div class="mini muted">Open the notifications panel when new invites arrive.</div>
+            </div>
+            <span class="settings-switch">
+              <input id="settingsAutoOpenNotifications" type="checkbox" />
+              <span class="settings-switch-ui" aria-hidden="true"></span>
+            </span>
+          </label>
+          <label class="settings-item settings-toggle-row">
+            <div>
+              <strong>Start with Add Friend collapsed</strong>
+              <div class="mini muted">Keep the email request card folded by default.</div>
+            </div>
+            <span class="settings-switch">
+              <input id="settingsFriendCardCollapsed" type="checkbox" />
+              <span class="settings-switch-ui" aria-hidden="true"></span>
+            </span>
+          </label>
+          <label class="settings-item settings-toggle-row">
+            <div>
+              <strong>Start with Friends collapsed</strong>
+              <div class="mini muted">Keep the friends list folded until you need it.</div>
+            </div>
+            <span class="settings-switch">
+              <input id="settingsFriendsCardCollapsed" type="checkbox" />
+              <span class="settings-switch-ui" aria-hidden="true"></span>
+            </span>
+          </label>
+        </div>
+        <div class="settings-actions">
+          <button class="tiny-btn" id="settingsNotificationsBtn" type="button">Open notifications</button>
+          <button class="tiny-btn" id="settingsCreateGroupBtn" type="button">Create group</button>
+        </div>
+        <button class="btn secondary logout-wide-btn" id="sidebarLogoutBtn" type="button">
+          Sign out
+        </button>
+      </div>
+    </aside>
     <div class="toast" id="toast"></div>
     <script src="/js/workspace.js"></script>
   </body>

@@ -19,8 +19,9 @@ const el = {
   friendSubmitBtn: document.getElementById("friendSubmitBtn"),
   friendRequestFeedback: document.getElementById("friendRequestFeedback"),
   friendsSearchInput: document.getElementById("friendsSearchInput"),
-  settingsCard: document.getElementById("settingsCard"),
-  settingsCardToggle: document.getElementById("settingsCardToggle"),
+  settingsPopover: document.getElementById("settingsPopover"),
+  settingsCloseButton: document.getElementById("settingsCloseButton"),
+  settingsScrim: document.getElementById("settingsScrim"),
   settingsUserName: document.getElementById("settingsUserName"),
   settingsUserEmail: document.getElementById("settingsUserEmail"),
   settingsAutoOpenNotifications: document.getElementById("settingsAutoOpenNotifications"),
@@ -82,9 +83,9 @@ const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
 const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
-const SETTINGS_CARD_STORAGE_KEY = "workspaceSettingsCardCollapsed";
 const AUTO_OPEN_NOTIFICATIONS_KEY = "workspaceAutoOpenNotifications";
 const INBOX_BREAKPOINT = 1380;
+const SETTINGS_DRAWER_BREAKPOINT = 760;
 
 // Session and auth helpers
 function parseJson(value) {
@@ -333,33 +334,6 @@ function loadFriendsCardPreference() {
   }
 }
 
-function setSettingsCardCollapsed(collapsed) {
-  if (!el.settingsCard || !el.settingsCardToggle) return;
-  el.settingsCard.classList.toggle("is-collapsed", collapsed);
-  el.settingsCardToggle.setAttribute("aria-expanded", String(!collapsed));
-  el.settingsCardToggle.setAttribute(
-    "aria-label",
-    collapsed ? "Expand settings" : "Collapse settings",
-  );
-  if (el.settingsToggleButton) {
-    el.settingsToggleButton.classList.toggle("active", !collapsed);
-    el.settingsToggleButton.setAttribute("aria-pressed", String(!collapsed));
-  }
-  try {
-    window.localStorage.setItem(SETTINGS_CARD_STORAGE_KEY, collapsed ? "1" : "0");
-  } catch (_) {
-    // no-op
-  }
-}
-
-function loadSettingsCardPreference() {
-  try {
-    return window.localStorage.getItem(SETTINGS_CARD_STORAGE_KEY) !== "0";
-  } catch (_) {
-    return true;
-  }
-}
-
 function setAutoOpenNotificationsPreference(enabled) {
   if (el.settingsAutoOpenNotifications) {
     el.settingsAutoOpenNotifications.checked = enabled;
@@ -379,13 +353,65 @@ function loadAutoOpenNotificationsPreference() {
   }
 }
 
-function focusSettingsCard() {
-  if (!el.settingsCard) return;
-  setSettingsCardCollapsed(false);
-  el.settingsCard.scrollIntoView({ behavior: "smooth", block: "end" });
+function isSettingsPopoverMobile() {
+  return window.innerWidth <= SETTINGS_DRAWER_BREAKPOINT;
+}
+
+function positionSettingsPopover() {
+  if (!el.settingsPopover || isSettingsPopoverMobile()) {
+    if (el.settingsPopover) {
+      el.settingsPopover.style.top = "";
+      el.settingsPopover.style.left = "";
+    }
+    return;
+  }
+  const trigger = el.settingsToggleButton;
+  if (!trigger) return;
+  const triggerRect = trigger.getBoundingClientRect();
+  const popoverWidth = el.settingsPopover.offsetWidth || 360;
+  const popoverHeight = el.settingsPopover.offsetHeight || 520;
+  const gap = 16;
+  const nextLeft = Math.min(
+    window.innerWidth - popoverWidth - 16,
+    triggerRect.right + gap,
+  );
+  const centeredTop = triggerRect.top + triggerRect.height / 2 - popoverHeight / 2;
+  const nextTop = Math.max(16, Math.min(centeredTop, window.innerHeight - popoverHeight - 16));
+  el.settingsPopover.style.left = nextLeft + "px";
+  el.settingsPopover.style.top = nextTop + "px";
+}
+
+function setSettingsPopoverOpen(nextOpen) {
+  document.body.classList.toggle("settings-open", nextOpen);
+  if (el.settingsPopover) {
+    el.settingsPopover.setAttribute("aria-hidden", String(!nextOpen));
+  }
+  if (el.settingsScrim) {
+    el.settingsScrim.hidden = !nextOpen;
+  }
+  if (el.settingsToggleButton) {
+    el.settingsToggleButton.classList.toggle("active", nextOpen);
+    el.settingsToggleButton.setAttribute("aria-pressed", String(nextOpen));
+  }
+  if (nextOpen) {
+    requestAnimationFrame(positionSettingsPopover);
+  }
+}
+
+function isSettingsPopoverOpen() {
+  return document.body.classList.contains("settings-open");
+}
+
+function closeSettingsPopover() {
+  setSettingsPopoverOpen(false);
+}
+
+function toggleSettingsPopover() {
+  setSettingsPopoverOpen(!isSettingsPopoverOpen());
 }
 
 function logout() {
+  closeSettingsPopover();
   clearSession();
   window.location.href = "/login.html";
 }
@@ -1317,12 +1343,12 @@ async function bootstrap() {
   if (el.settingsUserEmail) el.settingsUserEmail.textContent = currentUser.email;
   setFriendCardCollapsed(loadFriendCardPreference());
   setFriendsCardCollapsed(loadFriendsCardPreference());
-  setSettingsCardCollapsed(loadSettingsCardPreference());
   setAutoOpenNotificationsPreference(loadAutoOpenNotificationsPreference());
   if (el.settingsToggleButton) {
     el.settingsToggleButton.title = "Settings";
     el.settingsToggleButton.setAttribute("aria-label", "Settings");
   }
+  closeSettingsPopover();
   syncInboxToggleState();
   selectHome();
   await refreshWorkspace();
@@ -1341,12 +1367,6 @@ if (el.friendCardToggle) {
 if (el.friendsCardToggle) {
   el.friendsCardToggle.addEventListener("click", () =>
     setFriendsCardCollapsed(!el.friendsCard.classList.contains("is-collapsed")),
-  );
-}
-
-if (el.settingsCardToggle) {
-  el.settingsCardToggle.addEventListener("click", () =>
-    setSettingsCardCollapsed(!el.settingsCard.classList.contains("is-collapsed")),
   );
 }
 
@@ -1485,7 +1505,13 @@ if (el.newGroupBtn) {
   el.newGroupBtn.addEventListener("click", () => (window.location.href = "/create-group.html"));
 }
 if (el.settingsToggleButton) {
-  el.settingsToggleButton.addEventListener("click", focusSettingsCard);
+  el.settingsToggleButton.addEventListener("click", toggleSettingsPopover);
+}
+if (el.settingsCloseButton) {
+  el.settingsCloseButton.addEventListener("click", closeSettingsPopover);
+}
+if (el.settingsScrim) {
+  el.settingsScrim.addEventListener("click", closeSettingsPopover);
 }
 if (el.createGroupSidebarBtn) {
   el.createGroupSidebarBtn.addEventListener(
@@ -1494,12 +1520,18 @@ if (el.createGroupSidebarBtn) {
   );
 }
 if (el.settingsNotificationsBtn) {
-  el.settingsNotificationsBtn.addEventListener("click", openInboxPanel);
+  el.settingsNotificationsBtn.addEventListener("click", () => {
+    closeSettingsPopover();
+    openInboxPanel();
+  });
 }
 if (el.settingsCreateGroupBtn) {
   el.settingsCreateGroupBtn.addEventListener(
     "click",
-    () => (window.location.href = "/create-group.html"),
+    () => {
+      closeSettingsPopover();
+      window.location.href = "/create-group.html";
+    },
   );
 }
 if (el.headerInboxButton) {
@@ -1523,11 +1555,28 @@ window.addEventListener("focus", refreshWorkspace);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshWorkspace();
 });
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && isSettingsPopoverOpen()) {
+    closeSettingsPopover();
+  }
+});
 window.addEventListener("resize", () => {
   if (isWideLayout()) {
     document.body.classList.remove("inbox-open");
   }
+  if (isSettingsPopoverOpen()) {
+    positionSettingsPopover();
+  }
   syncInboxToggleState();
 });
+window.addEventListener(
+  "scroll",
+  () => {
+    if (isSettingsPopoverOpen()) {
+      positionSettingsPopover();
+    }
+  },
+  true,
+);
 window.addEventListener("load", bootstrap);
 
