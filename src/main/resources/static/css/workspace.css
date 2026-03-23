@@ -1281,6 +1281,22 @@ body.theme-dark .message-attachment {
   border-color: rgba(148, 163, 184, 0.14);
 }
 
+body.theme-dark .study-timer-display,
+body.theme-dark .study-timer-note,
+body.theme-dark .study-timer-stat {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.14);
+}
+
+body.theme-dark .study-timer-badge {
+  background: rgba(96, 165, 250, 0.14);
+}
+
+body.theme-dark .study-timer-badge[data-variant="break"] {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+}
+
 .home-action-card {
   padding: 16px;
   display: flex;
@@ -1306,6 +1322,120 @@ body.theme-dark .message-attachment {
 
 .home-panel {
   padding: 18px;
+}
+
+.study-timer-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.study-timer-head {
+  margin-bottom: 0;
+}
+
+.study-timer-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.study-timer-badge[data-variant="break"] {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.study-timer-modes,
+.study-timer-actions,
+.study-timer-stats {
+  display: grid;
+  gap: 10px;
+}
+
+.study-timer-modes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.study-timer-actions,
+.study-timer-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.study-timer-mode {
+  min-height: 44px;
+  padding-inline: 12px;
+}
+
+.study-timer-display,
+.study-timer-note,
+.study-timer-stat {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.study-timer-display {
+  padding: 20px;
+}
+
+.study-timer-time {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(38px, 6vw, 64px);
+  line-height: 0.94;
+  letter-spacing: -0.08em;
+}
+
+.study-timer-helper {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.study-timer-config {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.study-timer-note {
+  padding: 14px 16px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.study-timer-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.study-timer-input {
+  text-align: center;
+}
+
+.study-timer-stat {
+  padding: 14px 16px;
+}
+
+.study-timer-stat span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.study-timer-stat strong {
+  display: block;
+  margin-top: 8px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 22px;
+  letter-spacing: -0.04em;
 }
 
 .home-section-head {
@@ -1634,6 +1764,10 @@ body.compact-chat .empty-state h2 {
   .home-sections {
     grid-template-columns: 1fr;
   }
+
+  .study-timer-field-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1859,6 +1993,15 @@ body.compact-chat .empty-state h2 {
 
   .home-panel {
     padding: 16px;
+  }
+
+  .study-timer-actions,
+  .study-timer-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .study-timer-display {
+    padding: 18px;
   }
 
   .inbox {

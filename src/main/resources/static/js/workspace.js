@@ -101,8 +101,11 @@ const LEGACY_SESSION_KEY = "supabaseSession";
 const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
 const THEME_STORAGE_KEY = "workspaceTheme";
+const STUDY_TIMER_STORAGE_KEY = "workspaceStudyTimer";
 const INBOX_BREAKPOINT = 1380;
 const SETTINGS_DRAWER_BREAKPOINT = 760;
+const MINUTE_MS = 60000;
+let studyTimerTicker = null;
 
 // Session and auth helpers
 function parseJson(value) {
@@ -273,6 +276,10 @@ function activeLanguage() {
 
 function activeLocale() {
   return activeLanguage() === "en" ? "en-US" : "vi-VN";
+}
+
+function localizeText(vi, en) {
+  return activeLanguage() === "en" ? en : vi;
 }
 
 function initials(value) {
@@ -458,6 +465,515 @@ function syncCurrentUserUi() {
     el.chatTitle.textContent = name;
     refreshHomeOverviewIfNeeded();
   }
+}
+
+function normalizeStudyMinutes(value, fallback, maximum) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(maximum || 180, Math.max(1, Math.round(numeric)));
+}
+
+function loadStudyTimerState() {
+  const defaults = {
+    mode: "stopwatch",
+    isRunning: false,
+    startedAt: null,
+    stopwatchElapsedMs: 0,
+    countdownMinutes: 25,
+    countdownElapsedMs: 0,
+    pomodoroFocusMinutes: 25,
+    pomodoroBreakMinutes: 5,
+    pomodoroPhase: "focus",
+    pomodoroPhaseElapsedMs: 0,
+    pomodoroCompletedCycles: 0,
+  };
+  try {
+    const parsed = parseJson(window.localStorage.getItem(STUDY_TIMER_STORAGE_KEY));
+    if (!parsed || typeof parsed !== "object") return defaults;
+    return {
+      mode: ["stopwatch", "countdown", "pomodoro"].includes(parsed.mode) ? parsed.mode : defaults.mode,
+      isRunning: Boolean(parsed.isRunning && parsed.startedAt),
+      startedAt: Number.isFinite(Number(parsed.startedAt)) ? Number(parsed.startedAt) : null,
+      stopwatchElapsedMs: Math.max(0, Number(parsed.stopwatchElapsedMs) || 0),
+      countdownMinutes: normalizeStudyMinutes(parsed.countdownMinutes, defaults.countdownMinutes, 240),
+      countdownElapsedMs: Math.max(0, Number(parsed.countdownElapsedMs) || 0),
+      pomodoroFocusMinutes: normalizeStudyMinutes(parsed.pomodoroFocusMinutes, defaults.pomodoroFocusMinutes, 180),
+      pomodoroBreakMinutes: normalizeStudyMinutes(parsed.pomodoroBreakMinutes, defaults.pomodoroBreakMinutes, 60),
+      pomodoroPhase: parsed.pomodoroPhase === "break" ? "break" : "focus",
+      pomodoroPhaseElapsedMs: Math.max(0, Number(parsed.pomodoroPhaseElapsedMs) || 0),
+      pomodoroCompletedCycles: Math.max(0, Math.round(Number(parsed.pomodoroCompletedCycles) || 0)),
+    };
+  } catch (_) {
+    return defaults;
+  }
+}
+
+const studyTimerState = loadStudyTimerState();
+
+function persistStudyTimerState() {
+  try {
+    window.localStorage.setItem(STUDY_TIMER_STORAGE_KEY, JSON.stringify(studyTimerState));
+  } catch (_) {
+    // no-op
+  }
+}
+
+function getPomodoroDurationMs(phase) {
+  return (phase === "break" ? studyTimerState.pomodoroBreakMinutes : studyTimerState.pomodoroFocusMinutes) * MINUTE_MS;
+}
+
+function getStudyTimerDisplayMs(snapshot) {
+  if (snapshot.mode === "stopwatch") return snapshot.elapsedMs;
+  return snapshot.remainingMs;
+}
+
+function formatStudyTimerClock(ms) {
+  const safe = Math.max(0, ms);
+  const totalSeconds = Math.floor(safe / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function deriveStudyTimerSnapshot(now) {
+  const currentTime = now || Date.now();
+  const runningDelta =
+    studyTimerState.isRunning && studyTimerState.startedAt ? Math.max(0, currentTime - studyTimerState.startedAt) : 0;
+
+  if (studyTimerState.mode === "countdown") {
+    const durationMs = studyTimerState.countdownMinutes * MINUTE_MS;
+    const elapsedMs = Math.min(durationMs, studyTimerState.countdownElapsedMs + runningDelta);
+    return {
+      mode: "countdown",
+      isRunning: studyTimerState.isRunning,
+      durationMs,
+      elapsedMs,
+      remainingMs: Math.max(0, durationMs - elapsedMs),
+      progress: durationMs ? elapsedMs / durationMs : 0,
+    };
+  }
+
+  if (studyTimerState.mode === "pomodoro") {
+    const phase = studyTimerState.pomodoroPhase === "break" ? "break" : "focus";
+    const durationMs = getPomodoroDurationMs(phase);
+    const elapsedMs = Math.min(durationMs, studyTimerState.pomodoroPhaseElapsedMs + runningDelta);
+    return {
+      mode: "pomodoro",
+      phase,
+      isRunning: studyTimerState.isRunning,
+      durationMs,
+      elapsedMs,
+      remainingMs: Math.max(0, durationMs - elapsedMs),
+      completedCycles: studyTimerState.pomodoroCompletedCycles,
+      progress: durationMs ? elapsedMs / durationMs : 0,
+    };
+  }
+
+  return {
+    mode: "stopwatch",
+    isRunning: studyTimerState.isRunning,
+    elapsedMs: studyTimerState.stopwatchElapsedMs + runningDelta,
+    remainingMs: 0,
+    progress: 0,
+  };
+}
+
+function refreshStudyTimerConfig(panel) {
+  if (!panel) return;
+  const config = panel.querySelector("[data-study-config]");
+  if (!config) return;
+  if (config.dataset.mode === studyTimerState.mode) {
+    const countdownInput = config.querySelector("[data-study-field='countdownMinutes']");
+    if (countdownInput) countdownInput.value = String(studyTimerState.countdownMinutes);
+    const pomodoroFocusInput = config.querySelector("[data-study-field='pomodoroFocusMinutes']");
+    if (pomodoroFocusInput) pomodoroFocusInput.value = String(studyTimerState.pomodoroFocusMinutes);
+    const pomodoroBreakInput = config.querySelector("[data-study-field='pomodoroBreakMinutes']");
+    if (pomodoroBreakInput) pomodoroBreakInput.value = String(studyTimerState.pomodoroBreakMinutes);
+    return;
+  }
+
+  config.dataset.mode = studyTimerState.mode;
+  config.innerHTML = "";
+
+  if (studyTimerState.mode === "stopwatch") {
+    const note = document.createElement("div");
+    note.className = "study-timer-note";
+    note.textContent = localizeText(
+      "Bật lên để theo dõi tổng thời gian bạn tập trung học trong phiên này.",
+      "Start it to track how long you stay focused in this study session.",
+    );
+    config.appendChild(note);
+    return;
+  }
+
+  const fields = document.createElement("div");
+  fields.className = "study-timer-field-grid";
+
+  if (studyTimerState.mode === "countdown") {
+    fields.innerHTML =
+      '<label class="settings-field">' +
+      '<span class="settings-field-label">' +
+      localizeText("Thời lượng (phút)", "Duration (minutes)") +
+      "</span>" +
+      '<input class="settings-text-input study-timer-input" type="number" min="1" max="240" step="1" data-study-field="countdownMinutes" />' +
+      "</label>";
+  } else {
+    fields.innerHTML =
+      '<label class="settings-field">' +
+      '<span class="settings-field-label">' +
+      localizeText("Phiên học (phút)", "Focus (minutes)") +
+      "</span>" +
+      '<input class="settings-text-input study-timer-input" type="number" min="1" max="180" step="1" data-study-field="pomodoroFocusMinutes" />' +
+      "</label>" +
+      '<label class="settings-field">' +
+      '<span class="settings-field-label">' +
+      localizeText("Nghỉ ngắn (phút)", "Break (minutes)") +
+      "</span>" +
+      '<input class="settings-text-input study-timer-input" type="number" min="1" max="60" step="1" data-study-field="pomodoroBreakMinutes" />' +
+      "</label>";
+  }
+
+  config.appendChild(fields);
+  refreshStudyTimerConfig(panel);
+}
+
+function refreshStudyTimerUi(now) {
+  const panel = el.messagesArea.querySelector("[data-study-timer]");
+  if (!panel) return;
+  const snapshot = deriveStudyTimerSnapshot(now);
+  refreshStudyTimerConfig(panel);
+
+  panel.querySelectorAll("[data-study-mode]").forEach((button) => {
+    const active = button.dataset.studyMode === studyTimerState.mode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+
+  const display = panel.querySelector("[data-study-display]");
+  if (display) display.textContent = formatStudyTimerClock(getStudyTimerDisplayMs(snapshot));
+
+  const helper = panel.querySelector("[data-study-helper]");
+  if (helper) {
+    if (snapshot.mode === "stopwatch") {
+      helper.textContent = localizeText(
+        "Đếm thời gian kể từ lúc bạn bắt đầu phiên học.",
+        "Keeps counting from the moment you begin studying.",
+      );
+    } else if (snapshot.mode === "countdown") {
+      helper.textContent = localizeText(
+        "Đếm ngược cho một mục tiêu học cố định.",
+        "Counts down toward a fixed study target.",
+      );
+    } else {
+      helper.textContent =
+        snapshot.phase === "break"
+          ? localizeText("Đang ở nhịp nghỉ ngắn để lấy lại tập trung.", "You are currently in a short recovery break.")
+          : localizeText("Đang ở nhịp tập trung sâu của Pomodoro.", "You are currently in the Pomodoro focus block.");
+    }
+  }
+
+  const badge = panel.querySelector("[data-study-badge]");
+  if (badge) {
+    badge.textContent =
+      snapshot.mode === "stopwatch"
+        ? localizeText("Bấm giờ", "Stopwatch")
+        : snapshot.mode === "countdown"
+          ? localizeText("Đếm ngược", "Countdown")
+          : snapshot.phase === "break"
+            ? localizeText("Nghỉ", "Break")
+            : localizeText("Tập trung", "Focus");
+    badge.dataset.variant =
+      snapshot.mode === "pomodoro" && snapshot.phase === "break"
+        ? "break"
+        : snapshot.mode === "countdown"
+          ? "countdown"
+          : "focus";
+  }
+
+  const toggleButton = panel.querySelector("[data-study-action='toggle']");
+  if (toggleButton) {
+    toggleButton.textContent = snapshot.isRunning
+      ? localizeText("Tạm dừng", "Pause")
+      : localizeText("Bắt đầu", "Start");
+  }
+
+  const meta = panel.querySelector("[data-study-meta]");
+  if (meta) {
+    if (snapshot.mode === "stopwatch") {
+      meta.textContent = localizeText("Theo dõi thời gian học tự do.", "Track free-form study time.");
+    } else if (snapshot.mode === "countdown") {
+      meta.textContent = localizeText(
+        "Mục tiêu " + studyTimerState.countdownMinutes + " phút.",
+        studyTimerState.countdownMinutes + " minute target.",
+      );
+    } else {
+      meta.textContent = localizeText(
+        studyTimerState.pomodoroFocusMinutes +
+          "/" +
+          studyTimerState.pomodoroBreakMinutes +
+          " phút mỗi vòng.",
+        studyTimerState.pomodoroFocusMinutes +
+          "/" +
+          studyTimerState.pomodoroBreakMinutes +
+          " minutes per cycle.",
+      );
+    }
+  }
+
+  const primaryStat = panel.querySelector("[data-study-stat-primary]");
+  if (primaryStat) {
+    primaryStat.textContent =
+      snapshot.mode === "stopwatch"
+        ? localizeText("Đã học", "Studied")
+        : snapshot.mode === "countdown"
+          ? localizeText("Còn lại", "Remaining")
+          : snapshot.phase === "break"
+            ? localizeText("Đang nghỉ", "On break")
+            : localizeText("Đang học", "In focus");
+  }
+
+  const primaryValue = panel.querySelector("[data-study-value-primary]");
+  if (primaryValue) primaryValue.textContent = formatStudyTimerClock(getStudyTimerDisplayMs(snapshot));
+
+  const secondaryStat = panel.querySelector("[data-study-stat-secondary]");
+  if (secondaryStat) {
+    secondaryStat.textContent =
+      snapshot.mode === "pomodoro" ? localizeText("Hoàn thành", "Completed") : localizeText("Tiến độ", "Progress");
+  }
+
+  const secondaryValue = panel.querySelector("[data-study-value-secondary]");
+  if (secondaryValue) {
+    secondaryValue.textContent =
+      snapshot.mode === "pomodoro"
+        ? snapshot.completedCycles + " " + localizeText("vòng", "cycles")
+        : Math.round((snapshot.progress || 0) * 100) + "%";
+  }
+}
+
+function syncStudyTimerState(now) {
+  const currentTime = now || Date.now();
+  if (!studyTimerState.isRunning || !studyTimerState.startedAt) return false;
+
+  if (studyTimerState.mode === "stopwatch") return false;
+
+  if (studyTimerState.mode === "countdown") {
+    const durationMs = studyTimerState.countdownMinutes * MINUTE_MS;
+    const elapsedMs = studyTimerState.countdownElapsedMs + Math.max(0, currentTime - studyTimerState.startedAt);
+    if (elapsedMs < durationMs) return false;
+    studyTimerState.countdownElapsedMs = durationMs;
+    studyTimerState.isRunning = false;
+    studyTimerState.startedAt = null;
+    persistStudyTimerState();
+    refreshStudyTimerUi(currentTime);
+    showToast(localizeText("Hết giờ học rồi.", "Countdown finished."));
+    return true;
+  }
+
+  let elapsedMs = studyTimerState.pomodoroPhaseElapsedMs + Math.max(0, currentTime - studyTimerState.startedAt);
+  let phaseChanged = false;
+  let nextToast = "";
+
+  for (let index = 0; index < 4; index += 1) {
+    const durationMs = getPomodoroDurationMs(studyTimerState.pomodoroPhase);
+    if (elapsedMs < durationMs) break;
+    elapsedMs -= durationMs;
+    if (studyTimerState.pomodoroPhase === "focus") {
+      studyTimerState.pomodoroPhase = "break";
+      studyTimerState.pomodoroCompletedCycles += 1;
+      nextToast = localizeText("Xong một phiên tập trung, chuyển sang nghỉ ngắn nhé.", "Focus block complete. Time for a short break.");
+    } else {
+      studyTimerState.pomodoroPhase = "focus";
+      nextToast = localizeText("Nghỉ xong rồi, quay lại học tiếp thôi.", "Break is over. Back to your focus block.");
+    }
+    phaseChanged = true;
+  }
+
+  if (!phaseChanged) return false;
+
+  studyTimerState.pomodoroPhaseElapsedMs = elapsedMs;
+  studyTimerState.startedAt = currentTime;
+  persistStudyTimerState();
+  refreshStudyTimerUi(currentTime);
+  if (nextToast) showToast(nextToast);
+  return true;
+}
+
+function startStudyTimerTicker() {
+  if (studyTimerTicker) window.clearInterval(studyTimerTicker);
+  studyTimerTicker = window.setInterval(() => {
+    syncStudyTimerState();
+    refreshStudyTimerUi();
+  }, 250);
+}
+
+function stopStudyTimer(now) {
+  const snapshot = deriveStudyTimerSnapshot(now);
+  if (studyTimerState.mode === "stopwatch") {
+    studyTimerState.stopwatchElapsedMs = snapshot.elapsedMs;
+  } else if (studyTimerState.mode === "countdown") {
+    studyTimerState.countdownElapsedMs = snapshot.elapsedMs;
+  } else {
+    studyTimerState.pomodoroPhaseElapsedMs = snapshot.elapsedMs;
+  }
+  studyTimerState.isRunning = false;
+  studyTimerState.startedAt = null;
+  persistStudyTimerState();
+  refreshStudyTimerUi(now);
+}
+
+function startStudyTimer(now) {
+  if (studyTimerState.mode === "countdown") {
+    const durationMs = studyTimerState.countdownMinutes * MINUTE_MS;
+    if (studyTimerState.countdownElapsedMs >= durationMs) studyTimerState.countdownElapsedMs = 0;
+  }
+  if (studyTimerState.mode === "pomodoro") {
+    const durationMs = getPomodoroDurationMs(studyTimerState.pomodoroPhase);
+    if (studyTimerState.pomodoroPhaseElapsedMs >= durationMs) studyTimerState.pomodoroPhaseElapsedMs = 0;
+  }
+  studyTimerState.isRunning = true;
+  studyTimerState.startedAt = now || Date.now();
+  persistStudyTimerState();
+  refreshStudyTimerUi(now);
+}
+
+function setStudyTimerMode(mode) {
+  if (!["stopwatch", "countdown", "pomodoro"].includes(mode)) return;
+  syncStudyTimerState();
+  if (studyTimerState.isRunning) stopStudyTimer();
+  studyTimerState.mode = mode;
+  if (mode === "countdown") {
+    const durationMs = studyTimerState.countdownMinutes * MINUTE_MS;
+    studyTimerState.countdownElapsedMs = Math.min(studyTimerState.countdownElapsedMs, durationMs);
+  }
+  if (mode === "pomodoro") {
+    studyTimerState.pomodoroPhase = studyTimerState.pomodoroPhase === "break" ? "break" : "focus";
+  }
+  persistStudyTimerState();
+  refreshStudyTimerUi();
+}
+
+function resetStudyTimer() {
+  syncStudyTimerState();
+  studyTimerState.isRunning = false;
+  studyTimerState.startedAt = null;
+  if (studyTimerState.mode === "stopwatch") {
+    studyTimerState.stopwatchElapsedMs = 0;
+  } else if (studyTimerState.mode === "countdown") {
+    studyTimerState.countdownElapsedMs = 0;
+  } else {
+    studyTimerState.pomodoroPhase = "focus";
+    studyTimerState.pomodoroPhaseElapsedMs = 0;
+    studyTimerState.pomodoroCompletedCycles = 0;
+  }
+  persistStudyTimerState();
+  refreshStudyTimerUi();
+}
+
+function toggleStudyTimer() {
+  const now = Date.now();
+  syncStudyTimerState(now);
+  if (studyTimerState.isRunning) {
+    stopStudyTimer(now);
+    return;
+  }
+  startStudyTimer(now);
+}
+
+function updateStudyTimerField(field, value) {
+  if (field === "countdownMinutes") {
+    studyTimerState.countdownMinutes = normalizeStudyMinutes(value, 25, 240);
+    studyTimerState.countdownElapsedMs = 0;
+  }
+  if (field === "pomodoroFocusMinutes") {
+    studyTimerState.pomodoroFocusMinutes = normalizeStudyMinutes(value, 25, 180);
+    studyTimerState.pomodoroPhase = "focus";
+    studyTimerState.pomodoroPhaseElapsedMs = 0;
+    studyTimerState.pomodoroCompletedCycles = 0;
+  }
+  if (field === "pomodoroBreakMinutes") {
+    studyTimerState.pomodoroBreakMinutes = normalizeStudyMinutes(value, 5, 60);
+    studyTimerState.pomodoroPhase = "focus";
+    studyTimerState.pomodoroPhaseElapsedMs = 0;
+    studyTimerState.pomodoroCompletedCycles = 0;
+  }
+  studyTimerState.isRunning = false;
+  studyTimerState.startedAt = null;
+  persistStudyTimerState();
+  refreshStudyTimerUi();
+}
+
+function createStudyTimerPanel() {
+  const panel = document.createElement("section");
+  panel.className = "home-panel study-timer-panel";
+  panel.dataset.studyTimer = "true";
+
+  const head = document.createElement("div");
+  head.className = "home-section-head study-timer-head";
+
+  const headingGroup = document.createElement("div");
+  const heading = document.createElement("strong");
+  heading.textContent = localizeText("Study timer", "Study timer");
+  const meta = document.createElement("span");
+  meta.className = "mini muted";
+  meta.dataset.studyMeta = "true";
+  headingGroup.append(heading, meta);
+
+  const badge = document.createElement("span");
+  badge.className = "study-timer-badge";
+  badge.dataset.studyBadge = "true";
+
+  head.append(headingGroup, badge);
+
+  const modes = document.createElement("div");
+  modes.className = "study-timer-modes";
+  [
+    ["stopwatch", localizeText("Bấm giờ", "Stopwatch")],
+    ["countdown", localizeText("Đếm ngược", "Countdown")],
+    ["pomodoro", "Pomodoro"],
+  ].forEach(([mode, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn secondary study-timer-mode";
+    button.dataset.studyMode = mode;
+    button.textContent = label;
+    modes.appendChild(button);
+  });
+
+  const display = document.createElement("div");
+  display.className = "study-timer-display";
+
+  const time = document.createElement("div");
+  time.className = "study-timer-time";
+  time.dataset.studyDisplay = "true";
+
+  const helper = document.createElement("p");
+  helper.className = "study-timer-helper";
+  helper.dataset.studyHelper = "true";
+
+  display.append(time, helper);
+
+  const config = document.createElement("div");
+  config.className = "study-timer-config";
+  config.dataset.studyConfig = "true";
+
+  const actions = document.createElement("div");
+  actions.className = "study-timer-actions";
+  actions.innerHTML =
+    '<button type="button" class="btn" data-study-action="toggle"></button>' +
+    '<button type="button" class="btn secondary" data-study-action="reset">' +
+    localizeText("Đặt lại", "Reset") +
+    "</button>";
+
+  const stats = document.createElement("div");
+  stats.className = "study-timer-stats";
+  stats.innerHTML =
+    '<div class="study-timer-stat"><span data-study-stat-primary="true"></span><strong data-study-value-primary="true"></strong></div>' +
+    '<div class="study-timer-stat"><span data-study-stat-secondary="true"></span><strong data-study-value-secondary="true"></strong></div>';
+
+  panel.append(head, modes, display, config, actions, stats);
+  refreshStudyTimerUi();
+  return panel;
 }
 
 function setFriendCardCollapsed(collapsed) {
@@ -833,6 +1349,7 @@ function renderHomeOverview() {
     createHomeAction("Create Group", "Start a fresh room for your class or team.", "create-group"),
   );
   hero.append(kicker, heading, copy, actions);
+  const studyTimerPanel = createStudyTimerPanel();
 
   const sections = document.createElement("div");
   sections.className = "home-sections";
@@ -871,8 +1388,9 @@ function renderHomeOverview() {
     ),
   );
 
-  wrap.append(hero, sections);
+  wrap.append(hero, studyTimerPanel, sections);
   el.messagesArea.appendChild(wrap);
+  refreshStudyTimerUi();
   el.messagesArea.scrollTop = 0;
 }
 
@@ -1694,6 +2212,7 @@ async function bootstrap() {
   if (!currentUser) return;
   await loadCurrentUserProfile();
   applyTheme(loadThemePreference());
+  startStudyTimerTicker();
   syncCurrentUserUi();
   setFriendCardCollapsed(loadFriendCardPreference());
   setFriendsCardCollapsed(loadFriendsCardPreference());
@@ -1797,6 +2316,22 @@ if (el.createGroupForm) {
 }
 
 el.messagesArea.addEventListener("click", (event) => {
+  const studyModeButton = event.target.closest("[data-study-mode]");
+  if (studyModeButton) {
+    setStudyTimerMode(studyModeButton.dataset.studyMode || "stopwatch");
+    return;
+  }
+
+  const studyActionButton = event.target.closest("[data-study-action]");
+  if (studyActionButton) {
+    if (studyActionButton.dataset.studyAction === "toggle") {
+      toggleStudyTimer();
+    } else if (studyActionButton.dataset.studyAction === "reset") {
+      resetStudyTimer();
+    }
+    return;
+  }
+
   const actionButton = event.target.closest("[data-home-action]");
   if (actionButton) {
     const action = actionButton.dataset.homeAction;
@@ -1830,6 +2365,12 @@ el.messagesArea.addEventListener("click", (event) => {
     const group = groups.find((item) => String(item.id) === groupId);
     if (group) selectGroup(group);
   }
+});
+
+el.messagesArea.addEventListener("input", (event) => {
+  const studyField = event.target.closest("[data-study-field]");
+  if (!studyField) return;
+  updateStudyTimerField(studyField.dataset.studyField || "", studyField.value);
 });
 
 el.friendRequestForm.addEventListener("submit", async (event) => {
@@ -1937,6 +2478,7 @@ if (el.sidebarLogoutBtn) {
 window.addEventListener("beforeunload", () => {
   try {
     if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
+    if (studyTimerTicker) window.clearInterval(studyTimerTicker);
     disconnectSubscription();
     if (stompClient && stompClient.connected) stompClient.disconnect();
   } catch (_) {
