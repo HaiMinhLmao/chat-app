@@ -146,14 +146,22 @@
 </div>
 
 <script>
+    function mustGetElement(id) {
+        const element = document.getElementById(id);
+        if (!element) {
+            throw new Error('Missing required element #' + id);
+        }
+        return element;
+    }
+
     const AUTH_SESSION_KEY = 'authSession';
     const LEGACY_SESSION_KEY = 'supabaseSession';
-    const loginForm = document.getElementById('loginForm');
-    const loginBtn = document.getElementById('loginBtn');
-    const errorMessage = document.getElementById('errorMessage');
-    const successMessage = document.getElementById('successMessage');
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
+    const loginForm = /** @type {HTMLFormElement} */ (mustGetElement('loginForm'));
+    const loginBtn = /** @type {HTMLButtonElement} */ (mustGetElement('loginBtn'));
+    const errorMessage = mustGetElement('errorMessage');
+    const successMessage = mustGetElement('successMessage');
+    const emailInput = /** @type {HTMLInputElement} */ (mustGetElement('email'));
+    const passwordInput = /** @type {HTMLInputElement} */ (mustGetElement('password'));
 
     const registrationEmail = sessionStorage.getItem('registrationEmail');
     if (registrationEmail) {

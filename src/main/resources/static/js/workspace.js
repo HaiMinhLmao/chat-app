@@ -1,86 +1,162 @@
+/**
+ * @param {string} id
+ * @returns {HTMLElement}
+ */
+function mustGetElement(id) {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error('Missing required element #' + id);
+  }
+  return element;
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLButtonElement}
+ */
+function mustGetButton(id) {
+  return /** @type {HTMLButtonElement} */ (mustGetElement(id));
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLInputElement}
+ */
+function mustGetInput(id) {
+  return /** @type {HTMLInputElement} */ (mustGetElement(id));
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLFormElement}
+ */
+function mustGetForm(id) {
+  return /** @type {HTMLFormElement} */ (mustGetElement(id));
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLSelectElement}
+ */
+function mustGetSelect(id) {
+  return /** @type {HTMLSelectElement} */ (mustGetElement(id));
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLTextAreaElement}
+ */
+function mustGetTextarea(id) {
+  return /** @type {HTMLTextAreaElement} */ (mustGetElement(id));
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLElement | null}
+ */
+function getOptionalElement(id) {
+  return document.getElementById(id);
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLButtonElement | null}
+ */
+function getOptionalButton(id) {
+  return /** @type {HTMLButtonElement | null} */ (document.getElementById(id));
+}
+
+/**
+ * @param {EventTarget | null} target
+ * @returns {HTMLElement | null}
+ */
+function asElement(target) {
+  return target instanceof HTMLElement ? target : null;
+}
+
 // DOM lookups stay centralized so markup changes are easy to track.
 const el = {
-  homeRailButton: document.getElementById("homeRailButton"),
-  selfRailLabel: document.getElementById("selfRailLabel"),
-  groupRailList: document.getElementById("groupRailList"),
-  notificationToggleButton: document.getElementById("notificationToggleButton"),
-  notificationBadge: document.getElementById("notificationBadge"),
-  newGroupBtn: document.getElementById("newGroupBtn"),
-  studyTimerToggleButton: document.getElementById("studyTimerToggleButton"),
-  settingsToggleButton: document.getElementById("settingsToggleButton"),
-  userAvatar: document.getElementById("userAvatar"),
-  userName: document.getElementById("userName"),
-  userEmail: document.getElementById("userEmail"),
-  friendCard: document.getElementById("friendCard"),
-  friendCardToggle: document.getElementById("friendCardToggle"),
-  friendsCard: document.getElementById("friendsCard"),
-  friendsCardToggle: document.getElementById("friendsCardToggle"),
-  friendRequestForm: document.getElementById("friendRequestForm"),
-  friendEmailInput: document.getElementById("friendEmailInput"),
-  friendSubmitBtn: document.getElementById("friendSubmitBtn"),
-  friendRequestFeedback: document.getElementById("friendRequestFeedback"),
-  friendsSearchInput: document.getElementById("friendsSearchInput"),
-  settingsPopover: document.getElementById("settingsPopover"),
-  settingsCloseButton: document.getElementById("settingsCloseButton"),
-  settingsScrim: document.getElementById("settingsScrim"),
-  studyTimerPopover: document.getElementById("studyTimerPopover"),
-  studyTimerCloseButton: document.getElementById("studyTimerCloseButton"),
-  studyTimerPanelMount: document.getElementById("studyTimerPanelMount"),
-  settingsUserName: document.getElementById("settingsUserName"),
-  settingsUserEmail: document.getElementById("settingsUserEmail"),
-  settingsAvatarPreview: document.getElementById("settingsAvatarPreview"),
-  settingsProfileForm: document.getElementById("settingsProfileForm"),
-  settingsDisplayNameInput: document.getElementById("settingsDisplayNameInput"),
-  settingsAvatarUrlInput: document.getElementById("settingsAvatarUrlInput"),
-  settingsBirthDateInput: document.getElementById("settingsBirthDateInput"),
-  settingsLanguageSelect: document.getElementById("settingsLanguageSelect"),
-  settingsDisplayNameSaveBtn: document.getElementById("settingsDisplayNameSaveBtn"),
-  settingsProfileFeedback: document.getElementById("settingsProfileFeedback"),
-  settingsThemeLight: document.getElementById("settingsThemeLight"),
-  settingsThemeDark: document.getElementById("settingsThemeDark"),
-  settingsThemeAuto: document.getElementById("settingsThemeAuto"),
-  sidebarLogoutBtn: document.getElementById("sidebarLogoutBtn"),
-  createGroupPopover: document.getElementById("createGroupPopover"),
-  createGroupCloseButton: document.getElementById("createGroupCloseButton"),
-  createGroupForm: document.getElementById("createGroupForm"),
-  createGroupNameInput: document.getElementById("createGroupNameInput"),
-  createGroupCategoryInput: document.getElementById("createGroupCategoryInput"),
-  createGroupDescriptionInput: document.getElementById("createGroupDescriptionInput"),
-  createGroupMembersInput: document.getElementById("createGroupMembersInput"),
-  createGroupMembersPreview: document.getElementById("createGroupMembersPreview"),
-  createGroupFeedback: document.getElementById("createGroupFeedback"),
-  createGroupSubmitBtn: document.getElementById("createGroupSubmitBtn"),
-  createGroupCancelBtn: document.getElementById("createGroupCancelBtn"),
-  attachmentInput: document.getElementById("attachmentInput"),
-  attachBtn: document.getElementById("attachBtn"),
-  friendsList: document.getElementById("friendsList"),
-  friendsCount: document.getElementById("friendsCount"),
-  friendsEmpty: document.getElementById("friendsEmpty"),
-  groupsList: document.getElementById("groupsList"),
-  groupsEmpty: document.getElementById("groupsEmpty"),
-  createGroupSidebarBtn: document.getElementById("createGroupSidebarBtn"),
-  chatKicker: document.getElementById("chatKicker"),
-  chatTitle: document.getElementById("chatTitle"),
-  chatSubtitle: document.getElementById("chatSubtitle"),
-  connectionState: document.getElementById("connectionState"),
-  headerInboxButton: document.getElementById("headerInboxButton"),
-  overviewFriends: document.getElementById("overviewFriends"),
-  overviewNotifications: document.getElementById("overviewNotifications"),
-  overviewGroups: document.getElementById("overviewGroups"),
-  surfaceBanner: document.getElementById("surfaceBanner"),
-  messagesArea: document.getElementById("messagesArea"),
-  messageForm: document.getElementById("messageForm"),
-  messageInput: document.getElementById("messageInput"),
-  sendBtn: document.getElementById("sendBtn"),
-  utilityPanel: document.getElementById("utilityPanel"),
-  closeInboxButton: document.getElementById("closeInboxButton"),
-  incomingFriendRequests: document.getElementById("incomingFriendRequests"),
-  incomingFriendsCount: document.getElementById("incomingFriendsCount"),
-  incomingFriendsEmpty: document.getElementById("incomingFriendsEmpty"),
-  groupInvitations: document.getElementById("groupInvitations"),
-  groupInvitationsCount: document.getElementById("groupInvitationsCount"),
-  groupInvitationsEmpty: document.getElementById("groupInvitationsEmpty"),
-  toast: document.getElementById("toast"),
+  homeRailButton: mustGetButton("homeRailButton"),
+  selfRailLabel: mustGetElement("selfRailLabel"),
+  groupRailList: mustGetElement("groupRailList"),
+  notificationToggleButton: mustGetButton("notificationToggleButton"),
+  notificationBadge: mustGetElement("notificationBadge"),
+  newGroupBtn: mustGetButton("newGroupBtn"),
+  studyTimerToggleButton: mustGetButton("studyTimerToggleButton"),
+  settingsToggleButton: mustGetButton("settingsToggleButton"),
+  userAvatar: mustGetElement("userAvatar"),
+  userName: mustGetElement("userName"),
+  userEmail: mustGetElement("userEmail"),
+  friendCard: mustGetElement("friendCard"),
+  friendCardToggle: mustGetButton("friendCardToggle"),
+  friendsCard: mustGetElement("friendsCard"),
+  friendsCardToggle: mustGetButton("friendsCardToggle"),
+  friendRequestForm: mustGetForm("friendRequestForm"),
+  friendEmailInput: mustGetInput("friendEmailInput"),
+  friendSubmitBtn: mustGetButton("friendSubmitBtn"),
+  friendRequestFeedback: mustGetElement("friendRequestFeedback"),
+  friendsSearchInput: mustGetInput("friendsSearchInput"),
+  settingsPopover: mustGetElement("settingsPopover"),
+  settingsCloseButton: mustGetButton("settingsCloseButton"),
+  settingsScrim: mustGetElement("settingsScrim"),
+  studyTimerPopover: mustGetElement("studyTimerPopover"),
+  studyTimerCloseButton: mustGetButton("studyTimerCloseButton"),
+  studyTimerPanelMount: mustGetElement("studyTimerPanelMount"),
+  settingsUserName: mustGetElement("settingsUserName"),
+  settingsUserEmail: mustGetElement("settingsUserEmail"),
+  settingsAvatarPreview: mustGetElement("settingsAvatarPreview"),
+  settingsProfileForm: mustGetForm("settingsProfileForm"),
+  settingsDisplayNameInput: mustGetInput("settingsDisplayNameInput"),
+  settingsAvatarUrlInput: mustGetInput("settingsAvatarUrlInput"),
+  settingsBirthDateInput: mustGetInput("settingsBirthDateInput"),
+  settingsLanguageSelect: mustGetSelect("settingsLanguageSelect"),
+  settingsDisplayNameSaveBtn: mustGetButton("settingsDisplayNameSaveBtn"),
+  settingsProfileFeedback: mustGetElement("settingsProfileFeedback"),
+  settingsThemeLight: mustGetInput("settingsThemeLight"),
+  settingsThemeDark: mustGetInput("settingsThemeDark"),
+  settingsThemeAuto: mustGetInput("settingsThemeAuto"),
+  sidebarLogoutBtn: mustGetButton("sidebarLogoutBtn"),
+  createGroupPopover: mustGetElement("createGroupPopover"),
+  createGroupCloseButton: mustGetButton("createGroupCloseButton"),
+  createGroupForm: mustGetForm("createGroupForm"),
+  createGroupNameInput: mustGetInput("createGroupNameInput"),
+  createGroupCategoryInput: mustGetSelect("createGroupCategoryInput"),
+  createGroupDescriptionInput: mustGetTextarea("createGroupDescriptionInput"),
+  createGroupMembersInput: mustGetInput("createGroupMembersInput"),
+  createGroupMembersPreview: mustGetElement("createGroupMembersPreview"),
+  createGroupFeedback: mustGetElement("createGroupFeedback"),
+  createGroupSubmitBtn: mustGetButton("createGroupSubmitBtn"),
+  createGroupCancelBtn: mustGetButton("createGroupCancelBtn"),
+  attachmentInput: mustGetInput("attachmentInput"),
+  attachBtn: mustGetButton("attachBtn"),
+  friendsList: mustGetElement("friendsList"),
+  friendsCount: mustGetElement("friendsCount"),
+  friendsEmpty: mustGetElement("friendsEmpty"),
+  groupsList: getOptionalElement("groupsList"),
+  groupsEmpty: getOptionalElement("groupsEmpty"),
+  createGroupSidebarBtn: getOptionalButton("createGroupSidebarBtn"),
+  chatKicker: mustGetElement("chatKicker"),
+  chatTitle: mustGetElement("chatTitle"),
+  chatSubtitle: mustGetElement("chatSubtitle"),
+  connectionState: mustGetElement("connectionState"),
+  headerInboxButton: getOptionalButton("headerInboxButton"),
+  overviewFriends: mustGetElement("overviewFriends"),
+  overviewNotifications: mustGetElement("overviewNotifications"),
+  overviewGroups: mustGetElement("overviewGroups"),
+  surfaceBanner: mustGetElement("surfaceBanner"),
+  messagesArea: mustGetElement("messagesArea"),
+  messageForm: mustGetForm("messageForm"),
+  messageInput: mustGetInput("messageInput"),
+  sendBtn: mustGetButton("sendBtn"),
+  utilityPanel: mustGetElement("utilityPanel"),
+  closeInboxButton: mustGetButton("closeInboxButton"),
+  incomingFriendRequests: mustGetElement("incomingFriendRequests"),
+  incomingFriendsCount: mustGetElement("incomingFriendsCount"),
+  incomingFriendsEmpty: mustGetElement("incomingFriendsEmpty"),
+  groupInvitations: mustGetElement("groupInvitations"),
+  groupInvitationsCount: mustGetElement("groupInvitationsCount"),
+  groupInvitationsEmpty: mustGetElement("groupInvitationsEmpty"),
+  toast: mustGetElement("toast"),
 };
 
 // Runtime state
@@ -751,9 +827,7 @@ function refreshStudyTimerUi(now) {
         ? localizeText("Đã học", "Studied")
         : snapshot.mode === "countdown"
           ? localizeText("Còn lại", "Remaining")
-          : snapshot.phase === "break"
-            ? localizeText("Đang nghỉ", "On break")
-            : localizeText("Đang học", "In focus");
+          : localizeText("Đang học", "In focus");
   }
 
   const primaryValue = panel.querySelector("[data-study-value-primary]");
@@ -1045,13 +1119,10 @@ function createStudyTimerPanel() {
   head.className = "study-timer-head";
 
   const headingGroup = document.createElement("div");
-  const heading = document.createElement("strong");
-  heading.className = "study-timer-title";
-  heading.textContent = localizeText("Bộ hẹn giờ học", "Study timer");
   const meta = document.createElement("span");
   meta.className = "mini muted";
   meta.dataset.studyMeta = "true";
-  headingGroup.append(heading, meta);
+  headingGroup.append(meta);
 
   const badge = document.createElement("span");
   badge.className = "study-timer-badge";
@@ -1103,7 +1174,7 @@ function createStudyTimerPanel() {
   shortcuts.className = "study-timer-shortcuts";
   shortcuts.innerHTML =
     '<button type="button" class="study-timer-shortcut" data-study-action="toggle">' +
-    '<span class="study-timer-shortcut-key">Space</span>' +
+    '<span class="study-timer-shortcut-key">' + localizeText("Phim cach", "Space") + "</span>" +
     '<span class="study-timer-shortcut-copy"><strong>' +
     localizeText("Bắt đầu/Tạm dừng", "Start/Pause") +
     "</strong><span>" +
@@ -1137,7 +1208,7 @@ function createStudyTimerPanel() {
   laps.className = "study-timer-laps";
   laps.dataset.studyLaps = "true";
 
-  panel.append(head, modes, display, config, actions, shortcuts, stats, laps);
+  panel.append(head, display, config, modes, actions, shortcuts, stats, laps);
   refreshStudyTimerUi();
   return panel;
 }
@@ -2466,7 +2537,8 @@ if (el.friendsCardToggle) {
 
 if (el.friendsSearchInput) {
   el.friendsSearchInput.addEventListener("input", (event) => {
-    friendSearchQuery = event.target.value || "";
+    const input = /** @type {HTMLInputElement} */ (event.currentTarget);
+    friendSearchQuery = input.value || "";
     renderFriends();
   });
 }
@@ -2475,7 +2547,8 @@ if (el.friendsSearchInput) {
   .filter(Boolean)
   .forEach((input) => {
     input.addEventListener("change", (event) => {
-      if (event.target.checked) applyTheme(event.target.value);
+      const currentInput = /** @type {HTMLInputElement} */ (event.currentTarget);
+      if (currentInput.checked) applyTheme(currentInput.value);
     });
   });
 
@@ -2534,19 +2607,22 @@ if (el.createGroupForm) {
 
 if (el.studyTimerPanelMount) {
   el.studyTimerPanelMount.addEventListener("click", (event) => {
-    const studyModeButton = event.target.closest("[data-study-mode]");
+    const target = asElement(event.target);
+    if (!target) return;
+
+    const studyModeButton = target.closest("[data-study-mode]");
     if (studyModeButton) {
       setStudyTimerMode(studyModeButton.dataset.studyMode || "stopwatch");
       return;
     }
 
-    const shortcutButton = event.target.closest("[data-study-shortcut]");
+    const shortcutButton = target.closest("[data-study-shortcut]");
     if (shortcutButton) {
       triggerStudyTimerAuxAction();
       return;
     }
 
-    const studyActionButton = event.target.closest("[data-study-action]");
+    const studyActionButton = target.closest("[data-study-action]");
     if (studyActionButton) {
       if (studyActionButton.dataset.studyAction === "toggle") {
         toggleStudyTimer();
@@ -2560,14 +2636,23 @@ if (el.studyTimerPanelMount) {
   });
 
   el.studyTimerPanelMount.addEventListener("input", (event) => {
-    const studyField = event.target.closest("[data-study-field]");
+    const target = asElement(event.target);
+    if (!target) return;
+
+    const studyField = target.closest("[data-study-field]");
     if (!studyField) return;
-    updateStudyTimerField(studyField.dataset.studyField || "", studyField.value);
+    updateStudyTimerField(
+      studyField.dataset.studyField || "",
+      /** @type {HTMLInputElement} */ (studyField).value,
+    );
   });
 }
 
 el.messagesArea.addEventListener("click", (event) => {
-  const actionButton = event.target.closest("[data-home-action]");
+  const target = asElement(event.target);
+  if (!target) return;
+
+  const actionButton = target.closest("[data-home-action]");
   if (actionButton) {
     const action = actionButton.dataset.homeAction;
     if (action === "add-friend") {
@@ -2586,7 +2671,7 @@ el.messagesArea.addEventListener("click", (event) => {
     return;
   }
 
-  const friendShortcut = event.target.closest("[data-home-friend]");
+  const friendShortcut = target.closest("[data-home-friend]");
   if (friendShortcut) {
     const email = normalizeEmail(friendShortcut.dataset.homeFriend || "");
     const friend = socialState.friends.find((item) => normalizeEmail(item.email) === email);
@@ -2594,7 +2679,7 @@ el.messagesArea.addEventListener("click", (event) => {
     return;
   }
 
-  const groupShortcut = event.target.closest("[data-home-group]");
+  const groupShortcut = target.closest("[data-home-group]");
   if (groupShortcut) {
     const groupId = String(groupShortcut.dataset.homeGroup || "");
     const group = groups.find((item) => String(item.id) === groupId);
@@ -2660,7 +2745,8 @@ el.attachBtn.addEventListener("click", () => {
 });
 
 el.attachmentInput.addEventListener("change", async (event) => {
-  const file = event.target.files && event.target.files[0];
+  const input = /** @type {HTMLInputElement} */ (event.currentTarget);
+  const file = input.files && input.files[0];
   if (!file) return;
   if (activeChannel.type === "direct") {
     await uploadDirectAttachment(file);
@@ -2726,7 +2812,7 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshWorkspace();
 });
 document.addEventListener("keydown", (event) => {
-  const target = event.target;
+  const target = asElement(event.target);
   const isTypingTarget =
     target &&
     (target.tagName === "INPUT" ||
@@ -2796,4 +2882,3 @@ window.addEventListener(
   true,
 );
 window.addEventListener("load", bootstrap);
-
