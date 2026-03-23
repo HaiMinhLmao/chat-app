@@ -48,35 +48,35 @@ body {
 
 body.theme-dark {
   color-scheme: dark;
-  --bg: #07111f;
+  --bg: #0c111a;
   --panel: #0f172a;
-  --line: rgba(148, 163, 184, 0.16);
-  --text: #e5eefc;
-  --muted: #93a4bf;
-  --accent: #60a5fa;
-  --accent-soft: rgba(96, 165, 250, 0.14);
-  --success: #34d399;
-  --success-soft: rgba(52, 211, 153, 0.16);
+  --line: rgba(148, 163, 184, 0.18);
+  --text: #e7edf7;
+  --muted: #a6b5cd;
+  --accent: #5ea3ff;
+  --accent-soft: rgba(94, 163, 255, 0.2);
+  --success: #38d39f;
+  --success-soft: rgba(56, 211, 159, 0.2);
   --danger: #fb7185;
-  --danger-soft: rgba(251, 113, 133, 0.14);
+  --danger-soft: rgba(251, 113, 133, 0.2);
   --warning: #fbbf24;
-  --warning-soft: rgba(251, 191, 36, 0.16);
-  --shadow: 0 28px 68px rgba(2, 6, 23, 0.48);
-  --panel-top: rgba(15, 23, 42, 0.98);
-  --panel-bottom: rgba(11, 18, 32, 0.98);
-  --surface-top: rgba(15, 23, 42, 0.94);
-  --surface-bottom: rgba(8, 15, 28, 0.94);
-  --canvas-top: rgba(11, 18, 32, 0.98);
-  --canvas-bottom: rgba(8, 15, 28, 0.98);
-  --rail-top: rgba(15, 23, 42, 0.96);
-  --rail-bottom: rgba(18, 29, 50, 0.92);
-  --input-bg: rgba(8, 15, 28, 0.96);
-  --floating-card-bg: rgba(15, 23, 42, 0.92);
-  --floating-soft-bg: rgba(96, 165, 250, 0.08);
+  --warning-soft: rgba(251, 191, 36, 0.2);
+  --shadow: 0 26px 70px rgba(3, 7, 18, 0.5);
+  --panel-top: rgba(20, 26, 39, 0.96);
+  --panel-bottom: rgba(13, 19, 32, 0.96);
+  --surface-top: rgba(15, 22, 34, 0.94);
+  --surface-bottom: rgba(11, 17, 28, 0.94);
+  --canvas-top: rgba(11, 17, 28, 0.96);
+  --canvas-bottom: rgba(9, 14, 24, 0.96);
+  --rail-top: rgba(18, 24, 36, 0.94);
+  --rail-bottom: rgba(14, 20, 32, 0.94);
+  --input-bg: rgba(17, 24, 39, 0.9);
+  --floating-card-bg: rgba(17, 24, 39, 0.92);
+  --floating-soft-bg: rgba(94, 163, 255, 0.08);
   background:
-    radial-gradient(circle at top left, rgba(96, 165, 250, 0.18), transparent 22%),
-    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.14), transparent 26%),
-    linear-gradient(180deg, #08111f, #0b1424 55%, #0f172a);
+    radial-gradient(circle at 16% 12%, rgba(94, 163, 255, 0.14), transparent 28%),
+    radial-gradient(circle at 84% 82%, rgba(56, 211, 159, 0.12), transparent 30%),
+    linear-gradient(180deg, #0c111a, #0f172a 55%, #0b1424);
 }
 
 button,
