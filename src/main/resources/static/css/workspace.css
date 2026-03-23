@@ -17,6 +17,17 @@
   --radius-lg: 22px;
   --radius-md: 16px;
   --shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  --panel-top: rgba(255, 255, 255, 0.98);
+  --panel-bottom: rgba(248, 250, 252, 0.98);
+  --surface-top: rgba(255, 255, 255, 0.96);
+  --surface-bottom: rgba(248, 250, 252, 0.96);
+  --canvas-top: #ffffff;
+  --canvas-bottom: #f8fbff;
+  --rail-top: rgba(255, 255, 255, 0.98);
+  --rail-bottom: rgba(243, 247, 255, 0.9);
+  --input-bg: #ffffff;
+  --floating-card-bg: rgba(255, 255, 255, 0.9);
+  --floating-soft-bg: rgba(37, 99, 235, 0.04);
 }
 
 * {
@@ -35,8 +46,43 @@ body {
     linear-gradient(180deg, #f8fbff, #eef4fb 55%, #f5f8fc);
 }
 
+body.theme-dark {
+  color-scheme: dark;
+  --bg: #07111f;
+  --panel: #0f172a;
+  --line: rgba(148, 163, 184, 0.16);
+  --text: #e5eefc;
+  --muted: #93a4bf;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.14);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.16);
+  --danger: #fb7185;
+  --danger-soft: rgba(251, 113, 133, 0.14);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.16);
+  --shadow: 0 28px 68px rgba(2, 6, 23, 0.48);
+  --panel-top: rgba(15, 23, 42, 0.98);
+  --panel-bottom: rgba(11, 18, 32, 0.98);
+  --surface-top: rgba(15, 23, 42, 0.94);
+  --surface-bottom: rgba(8, 15, 28, 0.94);
+  --canvas-top: rgba(11, 18, 32, 0.98);
+  --canvas-bottom: rgba(8, 15, 28, 0.98);
+  --rail-top: rgba(15, 23, 42, 0.96);
+  --rail-bottom: rgba(18, 29, 50, 0.92);
+  --input-bg: rgba(8, 15, 28, 0.96);
+  --floating-card-bg: rgba(15, 23, 42, 0.92);
+  --floating-soft-bg: rgba(96, 165, 250, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.18), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.14), transparent 26%),
+    linear-gradient(180deg, #08111f, #0b1424 55%, #0f172a);
+}
+
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
 }
 
@@ -57,7 +103,7 @@ input {
 .panel {
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98)), var(--panel);
+  background: linear-gradient(180deg, var(--panel-top), var(--panel-bottom)), var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -118,7 +164,7 @@ input {
   height: 56px;
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 247, 255, 0.9));
+  background: linear-gradient(180deg, var(--rail-top), var(--rail-bottom));
   color: inherit;
   display: grid;
   place-items: center;
@@ -230,7 +276,7 @@ input {
 .messages {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+  background: linear-gradient(180deg, var(--surface-top), var(--surface-bottom));
 }
 
 .profile {
@@ -374,7 +420,8 @@ input {
   transition: opacity 0.2s ease;
 }
 
-.settings-popover {
+.settings-popover,
+.create-group-popover {
   position: fixed;
   top: 24px;
   left: 112px;
@@ -433,11 +480,11 @@ input {
   overflow-y: auto;
 }
 
-body.settings-open {
+body.flyout-open {
   overflow: hidden;
 }
 
-body.settings-open .settings-scrim {
+body.flyout-open .settings-scrim {
   opacity: 1;
   pointer-events: auto;
 }
@@ -448,11 +495,17 @@ body.settings-open .settings-popover {
   transform: translateY(0) scale(1);
 }
 
+body.create-group-open .create-group-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
 .settings-account {
   padding: 14px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 16px;
-  background: rgba(37, 99, 235, 0.04);
+  background: var(--floating-soft-bg);
 }
 
 .settings-account strong {
@@ -472,7 +525,7 @@ body.settings-open .settings-popover {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--floating-card-bg);
   color: inherit;
   padding: 14px;
   display: flex;
@@ -510,14 +563,23 @@ body.settings-open .settings-popover {
   font-weight: 800;
 }
 
-.settings-actions {
-  display: flex;
-  gap: 10px;
+.settings-note {
   margin-top: 12px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
+  background: var(--floating-soft-bg);
 }
 
-.settings-actions .tiny-btn {
-  flex: 1;
+.settings-note strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.settings-reset-btn {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .settings-switch {
@@ -567,6 +629,94 @@ body.settings-open .settings-popover {
 .settings-switch input:focus-visible + .settings-switch-ui {
   outline: 3px solid rgba(37, 99, 235, 0.18);
   outline-offset: 2px;
+}
+
+.settings-profile-form,
+.create-group-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-profile-form {
+  margin-top: 14px;
+}
+
+.settings-inline-row,
+.settings-action-row {
+  display: flex;
+  gap: 10px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-field-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.settings-text-input,
+.settings-select-input,
+.settings-textarea-input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 13px 14px;
+}
+
+.settings-textarea-input {
+  min-height: 118px;
+  resize: vertical;
+}
+
+.settings-text-input:focus,
+.settings-select-input:focus,
+.settings-textarea-input:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.settings-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 18px;
+}
+
+.settings-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.settings-feedback {
+  min-height: 18px;
+}
+
+.settings-feedback.success {
+  color: var(--success);
+}
+
+.settings-feedback.error {
+  color: var(--danger);
+}
+
+.settings-action-row .btn {
+  flex: 1;
 }
 
 .logout-wide-btn {
@@ -632,7 +782,7 @@ body.settings-open .settings-popover {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 14px;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--text);
   padding: 14px 16px;
 }
@@ -863,7 +1013,7 @@ body.settings-open .settings-popover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  background: linear-gradient(180deg, var(--canvas-top), var(--canvas-bottom));
 }
 
 .banner {
@@ -1544,7 +1694,8 @@ body.compact-chat .empty-state h2 {
     border-radius: 24px;
   }
 
-  .settings-popover {
+  .settings-popover,
+  .create-group-popover {
     top: 10px !important;
     right: 10px;
     bottom: 10px;
@@ -1555,7 +1706,8 @@ body.compact-chat .empty-state h2 {
     transform: translateY(18px);
   }
 
-  body.settings-open .settings-popover {
+  body.settings-open .settings-popover,
+  body.create-group-open .create-group-popover {
     transform: translateY(0);
   }
 }
@@ -1620,7 +1772,8 @@ body.compact-chat .empty-state h2 {
     align-items: flex-start;
   }
 
-  .settings-actions {
+  .settings-inline-row,
+  .settings-action-row {
     flex-direction: column;
   }
 

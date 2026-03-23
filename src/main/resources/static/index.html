@@ -232,8 +232,34 @@
           <div class="mini muted">Signed in as</div>
           <strong id="settingsUserName">Workspace user</strong>
           <div class="mini muted" id="settingsUserEmail">user@example.com</div>
+          <form class="settings-profile-form" id="settingsProfileForm">
+            <label class="settings-field" for="settingsDisplayNameInput">
+              <span class="settings-field-label">Display name</span>
+            </label>
+            <div class="settings-inline-row">
+              <input
+                class="settings-text-input"
+                id="settingsDisplayNameInput"
+                type="text"
+                maxlength="60"
+                placeholder="How everyone sees your name"
+              />
+              <button class="tiny-btn" id="settingsDisplayNameSaveBtn" type="submit">Save</button>
+            </div>
+            <div class="mini settings-feedback" id="settingsProfileFeedback"></div>
+          </form>
         </div>
         <div class="settings-list">
+          <label class="settings-item settings-toggle-row">
+            <div>
+              <strong>Dark mode</strong>
+              <div class="mini muted">Switch the workspace between the light and dark look.</div>
+            </div>
+            <span class="settings-switch">
+              <input id="settingsThemeDark" type="checkbox" />
+              <span class="settings-switch-ui" aria-hidden="true"></span>
+            </span>
+          </label>
           <label class="settings-item settings-toggle-row">
             <div>
               <strong>Auto-open notifications</strong>
@@ -265,13 +291,88 @@
             </span>
           </label>
         </div>
-        <div class="settings-actions">
-          <button class="tiny-btn" id="settingsNotificationsBtn" type="button">Open notifications</button>
-          <button class="tiny-btn" id="settingsCreateGroupBtn" type="button">Create group</button>
+        <div class="settings-note">
+          <strong>Local preferences</strong>
+          <div class="mini muted">These options only affect this browser on this device.</div>
         </div>
+        <button class="tiny-btn settings-reset-btn" id="settingsResetBtn" type="button">
+          Reset interface preferences
+        </button>
         <button class="btn secondary logout-wide-btn" id="sidebarLogoutBtn" type="button">
           Sign out
         </button>
+      </div>
+    </aside>
+    <aside class="create-group-popover panel" id="createGroupPopover" aria-hidden="true">
+      <div class="settings-popover-header">
+        <div>
+          <div class="eyebrow">New Group</div>
+          <div class="headline settings-popover-title">Create a room</div>
+        </div>
+        <button
+          class="settings-close-btn"
+          id="createGroupCloseButton"
+          type="button"
+          aria-label="Close create group"
+        >
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="settings-popover-body">
+        <div class="settings-note">
+          <strong>Keep it simple and recognizable</strong>
+          <div class="mini muted">
+            Invite classmates by email. They will receive the join request in notifications.
+          </div>
+        </div>
+        <form class="create-group-form" id="createGroupForm">
+          <label class="settings-field" for="createGroupNameInput">
+            <span class="settings-field-label">Group name</span>
+            <input
+              class="settings-text-input"
+              id="createGroupNameInput"
+              type="text"
+              maxlength="80"
+              placeholder="e.g. DBI202 Study Group"
+              required
+            />
+          </label>
+          <label class="settings-field" for="createGroupCategoryInput">
+            <span class="settings-field-label">Category</span>
+            <select class="settings-select-input" id="createGroupCategoryInput">
+              <option value="">Select a course</option>
+              <option value="MAD101">MAD101 - Math</option>
+              <option value="PRO192">PRO192 - Computer Science</option>
+              <option value="DBI202">DBI202 - Database Systems</option>
+            </select>
+          </label>
+          <label class="settings-field" for="createGroupDescriptionInput">
+            <span class="settings-field-label">Description</span>
+            <textarea
+              class="settings-textarea-input"
+              id="createGroupDescriptionInput"
+              placeholder="What is this group for?"
+            ></textarea>
+          </label>
+          <label class="settings-field" for="createGroupMembersInput">
+            <span class="settings-field-label">Invite members</span>
+            <input
+              class="settings-text-input"
+              id="createGroupMembersInput"
+              type="text"
+              placeholder="a@gmail.com, b@gmail.com, c@gmail.com"
+            />
+            <span class="mini muted">
+              Separate emails with commas. Only existing MyClassRoom accounts can be invited.
+            </span>
+          </label>
+          <div class="settings-chip-list" id="createGroupMembersPreview"></div>
+          <div class="mini settings-feedback" id="createGroupFeedback"></div>
+          <div class="settings-action-row">
+            <button class="btn" id="createGroupSubmitBtn" type="submit">Create group</button>
+            <button class="btn secondary" id="createGroupCancelBtn" type="button">Cancel</button>
+          </div>
+        </form>
       </div>
     </aside>
     <div class="toast" id="toast"></div>

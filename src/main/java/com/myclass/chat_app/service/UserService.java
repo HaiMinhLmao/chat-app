@@ -57,6 +57,14 @@ public class UserService {
         }
     }
 
+    public UserResponse updateProfile(String email, String fullName) {
+        String trimmedFullName = UserIdentitySupport.trimToNull(fullName);
+        if (trimmedFullName == null) {
+            throw new IllegalArgumentException("Display name is required");
+        }
+        return toResponse(upsertByEmail(email, trimmedFullName));
+    }
+
     private UserResponse toResponse(User user) {
         return new UserResponse(
                 user.getId(),

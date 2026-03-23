@@ -24,12 +24,27 @@ const el = {
   settingsScrim: document.getElementById("settingsScrim"),
   settingsUserName: document.getElementById("settingsUserName"),
   settingsUserEmail: document.getElementById("settingsUserEmail"),
+  settingsProfileForm: document.getElementById("settingsProfileForm"),
+  settingsDisplayNameInput: document.getElementById("settingsDisplayNameInput"),
+  settingsDisplayNameSaveBtn: document.getElementById("settingsDisplayNameSaveBtn"),
+  settingsProfileFeedback: document.getElementById("settingsProfileFeedback"),
+  settingsThemeDark: document.getElementById("settingsThemeDark"),
   settingsAutoOpenNotifications: document.getElementById("settingsAutoOpenNotifications"),
   settingsFriendCardCollapsed: document.getElementById("settingsFriendCardCollapsed"),
   settingsFriendsCardCollapsed: document.getElementById("settingsFriendsCardCollapsed"),
-  settingsNotificationsBtn: document.getElementById("settingsNotificationsBtn"),
-  settingsCreateGroupBtn: document.getElementById("settingsCreateGroupBtn"),
+  settingsResetBtn: document.getElementById("settingsResetBtn"),
   sidebarLogoutBtn: document.getElementById("sidebarLogoutBtn"),
+  createGroupPopover: document.getElementById("createGroupPopover"),
+  createGroupCloseButton: document.getElementById("createGroupCloseButton"),
+  createGroupForm: document.getElementById("createGroupForm"),
+  createGroupNameInput: document.getElementById("createGroupNameInput"),
+  createGroupCategoryInput: document.getElementById("createGroupCategoryInput"),
+  createGroupDescriptionInput: document.getElementById("createGroupDescriptionInput"),
+  createGroupMembersInput: document.getElementById("createGroupMembersInput"),
+  createGroupMembersPreview: document.getElementById("createGroupMembersPreview"),
+  createGroupFeedback: document.getElementById("createGroupFeedback"),
+  createGroupSubmitBtn: document.getElementById("createGroupSubmitBtn"),
+  createGroupCancelBtn: document.getElementById("createGroupCancelBtn"),
   attachmentInput: document.getElementById("attachmentInput"),
   attachBtn: document.getElementById("attachBtn"),
   friendsList: document.getElementById("friendsList"),
@@ -84,6 +99,7 @@ const LEGACY_SESSION_KEY = "supabaseSession";
 const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
 const AUTO_OPEN_NOTIFICATIONS_KEY = "workspaceAutoOpenNotifications";
+const THEME_STORAGE_KEY = "workspaceTheme";
 const INBOX_BREAKPOINT = 1380;
 const SETTINGS_DRAWER_BREAKPOINT = 760;
 
@@ -127,10 +143,37 @@ function getCurrentUser() {
   };
 }
 
+function persistCurrentUser(user) {
+  currentUser = user;
+  sessionStorage.setItem("currentUser", JSON.stringify(user));
+}
+
+function persistSessionUserName(nextName) {
+  const session = getSession();
+  if (!session || !session.user) return;
+  const metadata = {
+    ...(session.user.user_metadata || {}),
+    full_name: nextName,
+    username: nextName,
+  };
+  sessionStorage.setItem(
+    AUTH_SESSION_KEY,
+    JSON.stringify({
+      ...session,
+      user: {
+        ...session.user,
+        user_metadata: metadata,
+      },
+    }),
+  );
+  sessionStorage.removeItem(LEGACY_SESSION_KEY);
+}
+
 function requireAuth() {
   const user = getCurrentUser();
   if (user && user.email) return user;
-  window.location.href = "/login.html?returnTo=/index.html";
+  const currentPath = window.location.pathname + window.location.search;
+  window.location.href = "/login.html?returnTo=" + encodeURIComponent(currentPath || "/index.html");
   return null;
 }
 
@@ -233,6 +276,27 @@ function initials(value) {
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
+function loadThemePreference() {
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+  } catch (_) {
+    return "light";
+  }
+}
+
+function applyTheme(nextTheme) {
+  const theme = nextTheme === "dark" ? "dark" : "light";
+  document.body.classList.toggle("theme-dark", theme === "dark");
+  if (el.settingsThemeDark) {
+    el.settingsThemeDark.checked = theme === "dark";
+  }
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch (_) {
+    // no-op
+  }
+}
+
 function formatAgo(timestamp) {
   if (!timestamp) return "Just now";
   const minutes = Math.max(1, Math.round((Date.now() - new Date(timestamp)) / 60000));
@@ -273,6 +337,14 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => el.toast.classList.remove("show"), 2400);
 }
 
+function setInlineFeedback(node, message, variant) {
+  if (!node) return;
+  node.textContent = message || "";
+  node.className = "mini settings-feedback";
+  if (!message) return;
+  node.classList.add(variant === "error" ? "error" : "success");
+}
+
 function setFriendFeedback(message, variant) {
   el.friendRequestFeedback.textContent = message || "";
   el.friendRequestFeedback.className = "mini friend-feedback";
@@ -280,6 +352,30 @@ function setFriendFeedback(message, variant) {
   el.friendRequestFeedback.classList.add(
     variant === "error" ? "error" : "success",
   );
+}
+
+function setSettingsProfileFeedback(message, variant) {
+  setInlineFeedback(el.settingsProfileFeedback, message, variant);
+}
+
+function setCreateGroupFeedback(message, variant) {
+  setInlineFeedback(el.createGroupFeedback, message, variant);
+}
+
+function syncCurrentUserUi() {
+  if (!currentUser) return;
+  const name = currentUser.username || defaultName(currentUser.email);
+  el.userAvatar.textContent = initials(name);
+  el.userName.textContent = name;
+  el.userEmail.textContent = currentUser.email;
+  el.selfRailLabel.textContent = initials(name);
+  if (el.settingsUserName) el.settingsUserName.textContent = name;
+  if (el.settingsUserEmail) el.settingsUserEmail.textContent = currentUser.email;
+  if (el.settingsDisplayNameInput) el.settingsDisplayNameInput.value = name;
+  if (activeChannel.type === "home") {
+    el.chatTitle.textContent = name;
+    refreshHomeOverviewIfNeeded();
+  }
 }
 
 function setFriendCardCollapsed(collapsed) {
@@ -353,23 +449,21 @@ function loadAutoOpenNotificationsPreference() {
   }
 }
 
-function isSettingsPopoverMobile() {
+function isFlyoutMobile() {
   return window.innerWidth <= SETTINGS_DRAWER_BREAKPOINT;
 }
 
-function positionSettingsPopover() {
-  if (!el.settingsPopover || isSettingsPopoverMobile()) {
-    if (el.settingsPopover) {
-      el.settingsPopover.style.top = "";
-      el.settingsPopover.style.left = "";
+function positionFlyout(panel, trigger) {
+  if (!panel || !trigger || isFlyoutMobile()) {
+    if (panel) {
+      panel.style.top = "";
+      panel.style.left = "";
     }
     return;
   }
-  const trigger = el.settingsToggleButton;
-  if (!trigger) return;
   const triggerRect = trigger.getBoundingClientRect();
-  const popoverWidth = el.settingsPopover.offsetWidth || 360;
-  const popoverHeight = el.settingsPopover.offsetHeight || 520;
+  const popoverWidth = panel.offsetWidth || 380;
+  const popoverHeight = panel.offsetHeight || 560;
   const gap = 16;
   const nextLeft = Math.min(
     window.innerWidth - popoverWidth - 16,
@@ -377,29 +471,50 @@ function positionSettingsPopover() {
   );
   const centeredTop = triggerRect.top + triggerRect.height / 2 - popoverHeight / 2;
   const nextTop = Math.max(16, Math.min(centeredTop, window.innerHeight - popoverHeight - 16));
-  el.settingsPopover.style.left = nextLeft + "px";
-  el.settingsPopover.style.top = nextTop + "px";
+  panel.style.left = nextLeft + "px";
+  panel.style.top = nextTop + "px";
+}
+
+function positionSettingsPopover() {
+  positionFlyout(el.settingsPopover, el.settingsToggleButton);
+}
+
+function positionCreateGroupPopover() {
+  positionFlyout(el.createGroupPopover, el.newGroupBtn);
+}
+
+function isSettingsPopoverOpen() {
+  return document.body.classList.contains("settings-open");
+}
+
+function isCreateGroupPopoverOpen() {
+  return document.body.classList.contains("create-group-open");
+}
+
+function syncFlyoutScrim() {
+  const isOpen = isSettingsPopoverOpen() || isCreateGroupPopoverOpen();
+  document.body.classList.toggle("flyout-open", isOpen);
+  if (el.settingsScrim) {
+    el.settingsScrim.hidden = !isOpen;
+  }
 }
 
 function setSettingsPopoverOpen(nextOpen) {
+  if (nextOpen && isCreateGroupPopoverOpen()) {
+    setCreateGroupPopoverOpen(false);
+  }
   document.body.classList.toggle("settings-open", nextOpen);
   if (el.settingsPopover) {
     el.settingsPopover.setAttribute("aria-hidden", String(!nextOpen));
-  }
-  if (el.settingsScrim) {
-    el.settingsScrim.hidden = !nextOpen;
   }
   if (el.settingsToggleButton) {
     el.settingsToggleButton.classList.toggle("active", nextOpen);
     el.settingsToggleButton.setAttribute("aria-pressed", String(nextOpen));
   }
+  syncFlyoutScrim();
   if (nextOpen) {
     requestAnimationFrame(positionSettingsPopover);
   }
-}
-
-function isSettingsPopoverOpen() {
-  return document.body.classList.contains("settings-open");
 }
 
 function closeSettingsPopover() {
@@ -410,10 +525,53 @@ function toggleSettingsPopover() {
   setSettingsPopoverOpen(!isSettingsPopoverOpen());
 }
 
+function setCreateGroupPopoverOpen(nextOpen) {
+  if (nextOpen && isSettingsPopoverOpen()) {
+    setSettingsPopoverOpen(false);
+  }
+  document.body.classList.toggle("create-group-open", nextOpen);
+  if (el.createGroupPopover) {
+    el.createGroupPopover.setAttribute("aria-hidden", String(!nextOpen));
+  }
+  if (el.newGroupBtn) {
+    el.newGroupBtn.classList.toggle("active", nextOpen);
+    el.newGroupBtn.setAttribute("aria-pressed", String(nextOpen));
+  }
+  syncFlyoutScrim();
+  if (nextOpen) {
+    requestAnimationFrame(() => {
+      positionCreateGroupPopover();
+      if (el.createGroupNameInput) el.createGroupNameInput.focus();
+    });
+  }
+}
+
+function closeCreateGroupPopover() {
+  setCreateGroupPopoverOpen(false);
+}
+
+function openCreateGroupPopover() {
+  setCreateGroupPopoverOpen(true);
+}
+
+function toggleCreateGroupPopover() {
+  setCreateGroupPopoverOpen(!isCreateGroupPopoverOpen());
+}
+
 function logout() {
   closeSettingsPopover();
+  closeCreateGroupPopover();
   clearSession();
   window.location.href = "/login.html";
+}
+
+function resetInterfacePreferences() {
+  applyTheme("light");
+  setAutoOpenNotificationsPreference(true);
+  setFriendCardCollapsed(false);
+  setFriendsCardCollapsed(false);
+  setSettingsProfileFeedback("", "success");
+  showToast("Interface preferences reset.");
 }
 
 async function parseResponsePayload(response) {
@@ -667,6 +825,116 @@ function renderHomeOverview() {
 
 function refreshHomeOverviewIfNeeded() {
   if (activeChannel.type === "home") renderHomeOverview();
+}
+
+function parseMemberEmails(value) {
+  return Array.from(
+    new Set(
+      String(value || "")
+        .split(",")
+        .map((item) => normalizeEmail(item))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function renderCreateGroupMembersPreview() {
+  if (!el.createGroupMembersPreview) return;
+  el.createGroupMembersPreview.innerHTML = "";
+  parseMemberEmails(el.createGroupMembersInput && el.createGroupMembersInput.value).forEach((email) => {
+    const chip = document.createElement("span");
+    chip.className = "settings-chip";
+    chip.textContent = email;
+    el.createGroupMembersPreview.appendChild(chip);
+  });
+}
+
+function clearCreateGroupForm() {
+  if (el.createGroupForm) el.createGroupForm.reset();
+  renderCreateGroupMembersPreview();
+  setCreateGroupFeedback("", "success");
+}
+
+async function saveDisplayName(event) {
+  event.preventDefault();
+  if (!currentUser || !el.settingsDisplayNameInput || !el.settingsDisplayNameSaveBtn) return;
+  const fullName = el.settingsDisplayNameInput.value.trim();
+  if (!fullName) {
+    setSettingsProfileFeedback("Enter a display name first.", "error");
+    return;
+  }
+  el.settingsDisplayNameSaveBtn.disabled = true;
+  el.settingsDisplayNameSaveBtn.textContent = "Saving...";
+  const result = await authorizedRequest("/api/users/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fullName }),
+  });
+  el.settingsDisplayNameSaveBtn.disabled = false;
+  el.settingsDisplayNameSaveBtn.textContent = "Save";
+  if (!result.ok) {
+    setSettingsProfileFeedback(result.data.error || "Could not update your name.", "error");
+    return;
+  }
+  const nextName = result.data.username || result.data.fullName || fullName;
+  persistCurrentUser({
+    ...currentUser,
+    username: nextName,
+    fullName: result.data.fullName || nextName,
+  });
+  persistSessionUserName(nextName);
+  syncCurrentUserUi();
+  setSettingsProfileFeedback("Display name updated.", "success");
+  showToast("Display name updated.");
+}
+
+async function submitCreateGroup(event) {
+  event.preventDefault();
+  if (!el.createGroupSubmitBtn) return;
+  const groupName = String(el.createGroupNameInput && el.createGroupNameInput.value).trim();
+  const description = String(
+    (el.createGroupDescriptionInput && el.createGroupDescriptionInput.value) || "",
+  ).trim();
+  const category = String((el.createGroupCategoryInput && el.createGroupCategoryInput.value) || "").trim();
+  const members = parseMemberEmails(el.createGroupMembersInput && el.createGroupMembersInput.value);
+  if (!groupName) {
+    setCreateGroupFeedback("Enter a group name before creating the room.", "error");
+    return;
+  }
+  const invalidEmail = members.find((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+  if (invalidEmail) {
+    setCreateGroupFeedback("Check the invited emails before creating the room.", "error");
+    return;
+  }
+  setCreateGroupFeedback("", "success");
+  el.createGroupSubmitBtn.disabled = true;
+  el.createGroupSubmitBtn.textContent = "Creating...";
+  const result = await authorizedRequest("/api/groups/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ groupName, description, category, members }),
+  });
+  el.createGroupSubmitBtn.disabled = false;
+  el.createGroupSubmitBtn.textContent = "Create group";
+  if (!result.ok) {
+    setCreateGroupFeedback(result.data.error || "Could not create the group.", "error");
+    return;
+  }
+  const createdId = String(result.data.id || "");
+  clearCreateGroupForm();
+  closeCreateGroupPopover();
+  await loadGroups();
+  const createdGroup =
+    groups.find((group) => String(group.id) === createdId) || {
+      id: result.data.id,
+      name: result.data.name || groupName,
+      category: result.data.category || category,
+      role: "ADMIN",
+    };
+  if (createdGroup.id) {
+    selectGroup(createdGroup);
+  }
+  showToast("Group created.");
 }
 
 // Message rendering
@@ -1331,16 +1599,23 @@ async function respondGroupInvitation(id, action) {
   await loadGroups();
 }
 
+function handlePanelQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const panel = params.get("panel");
+  if (panel === "create-group") {
+    openCreateGroupPopover();
+    params.delete("panel");
+    const nextSearch = params.toString();
+    const nextUrl = window.location.pathname + (nextSearch ? "?" + nextSearch : "");
+    window.history.replaceState({}, "", nextUrl);
+  }
+}
+
 async function bootstrap() {
   currentUser = requireAuth();
   if (!currentUser) return;
-  const name = currentUser.username || defaultName(currentUser.email);
-  el.userAvatar.textContent = initials(name);
-  el.userName.textContent = name;
-  el.userEmail.textContent = currentUser.email;
-  el.selfRailLabel.textContent = initials(name);
-  if (el.settingsUserName) el.settingsUserName.textContent = name;
-  if (el.settingsUserEmail) el.settingsUserEmail.textContent = currentUser.email;
+  applyTheme(loadThemePreference());
+  syncCurrentUserUi();
   setFriendCardCollapsed(loadFriendCardPreference());
   setFriendsCardCollapsed(loadFriendsCardPreference());
   setAutoOpenNotificationsPreference(loadAutoOpenNotificationsPreference());
@@ -1349,9 +1624,14 @@ async function bootstrap() {
     el.settingsToggleButton.setAttribute("aria-label", "Settings");
   }
   closeSettingsPopover();
+  closeCreateGroupPopover();
+  renderCreateGroupMembersPreview();
+  setSettingsProfileFeedback("", "success");
+  setCreateGroupFeedback("", "success");
   syncInboxToggleState();
   selectHome();
   await refreshWorkspace();
+  handlePanelQuery();
   connectWs();
   if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
   workspaceRefreshTimer = window.setInterval(refreshWorkspace, 5000);
@@ -1383,6 +1663,12 @@ if (el.settingsAutoOpenNotifications) {
   });
 }
 
+if (el.settingsThemeDark) {
+  el.settingsThemeDark.addEventListener("change", (event) => {
+    applyTheme(Boolean(event.target.checked) ? "dark" : "light");
+  });
+}
+
 if (el.settingsFriendCardCollapsed) {
   el.settingsFriendCardCollapsed.addEventListener("change", (event) => {
     setFriendCardCollapsed(Boolean(event.target.checked));
@@ -1393,6 +1679,27 @@ if (el.settingsFriendsCardCollapsed) {
   el.settingsFriendsCardCollapsed.addEventListener("change", (event) => {
     setFriendsCardCollapsed(Boolean(event.target.checked));
   });
+}
+
+if (el.settingsProfileForm) {
+  el.settingsProfileForm.addEventListener("submit", saveDisplayName);
+}
+
+if (el.settingsDisplayNameInput) {
+  el.settingsDisplayNameInput.addEventListener("input", () => {
+    setSettingsProfileFeedback("", "success");
+  });
+}
+
+if (el.createGroupMembersInput) {
+  el.createGroupMembersInput.addEventListener("input", () => {
+    renderCreateGroupMembersPreview();
+    setCreateGroupFeedback("", "success");
+  });
+}
+
+if (el.createGroupForm) {
+  el.createGroupForm.addEventListener("submit", submitCreateGroup);
 }
 
 el.messagesArea.addEventListener("click", (event) => {
@@ -1410,7 +1717,7 @@ el.messagesArea.addEventListener("click", (event) => {
       return;
     }
     if (action === "create-group") {
-      window.location.href = "/create-group.html";
+      openCreateGroupPopover();
     }
     return;
   }
@@ -1502,7 +1809,7 @@ el.attachmentInput.addEventListener("change", async (event) => {
 
 el.homeRailButton.addEventListener("click", selectHome);
 if (el.newGroupBtn) {
-  el.newGroupBtn.addEventListener("click", () => (window.location.href = "/create-group.html"));
+  el.newGroupBtn.addEventListener("click", toggleCreateGroupPopover);
 }
 if (el.settingsToggleButton) {
   el.settingsToggleButton.addEventListener("click", toggleSettingsPopover);
@@ -1510,29 +1817,23 @@ if (el.settingsToggleButton) {
 if (el.settingsCloseButton) {
   el.settingsCloseButton.addEventListener("click", closeSettingsPopover);
 }
+if (el.createGroupCloseButton) {
+  el.createGroupCloseButton.addEventListener("click", closeCreateGroupPopover);
+}
+if (el.createGroupCancelBtn) {
+  el.createGroupCancelBtn.addEventListener("click", closeCreateGroupPopover);
+}
 if (el.settingsScrim) {
-  el.settingsScrim.addEventListener("click", closeSettingsPopover);
-}
-if (el.createGroupSidebarBtn) {
-  el.createGroupSidebarBtn.addEventListener(
-    "click",
-    () => (window.location.href = "/create-group.html"),
-  );
-}
-if (el.settingsNotificationsBtn) {
-  el.settingsNotificationsBtn.addEventListener("click", () => {
+  el.settingsScrim.addEventListener("click", () => {
     closeSettingsPopover();
-    openInboxPanel();
+    closeCreateGroupPopover();
   });
 }
-if (el.settingsCreateGroupBtn) {
-  el.settingsCreateGroupBtn.addEventListener(
-    "click",
-    () => {
-      closeSettingsPopover();
-      window.location.href = "/create-group.html";
-    },
-  );
+if (el.createGroupSidebarBtn) {
+  el.createGroupSidebarBtn.addEventListener("click", openCreateGroupPopover);
+}
+if (el.settingsResetBtn) {
+  el.settingsResetBtn.addEventListener("click", resetInterfacePreferences);
 }
 if (el.headerInboxButton) {
   el.headerInboxButton.addEventListener("click", toggleInboxPanel);
@@ -1556,7 +1857,12 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshWorkspace();
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && isSettingsPopoverOpen()) {
+  if (event.key !== "Escape") return;
+  if (isCreateGroupPopoverOpen()) {
+    closeCreateGroupPopover();
+    return;
+  }
+  if (isSettingsPopoverOpen()) {
     closeSettingsPopover();
   }
 });
@@ -1567,6 +1873,9 @@ window.addEventListener("resize", () => {
   if (isSettingsPopoverOpen()) {
     positionSettingsPopover();
   }
+  if (isCreateGroupPopoverOpen()) {
+    positionCreateGroupPopover();
+  }
   syncInboxToggleState();
 });
 window.addEventListener(
@@ -1574,6 +1883,9 @@ window.addEventListener(
   () => {
     if (isSettingsPopoverOpen()) {
       positionSettingsPopover();
+    }
+    if (isCreateGroupPopoverOpen()) {
+      positionCreateGroupPopover();
     }
   },
   true,
