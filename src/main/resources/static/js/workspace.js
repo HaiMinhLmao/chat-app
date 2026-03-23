@@ -31,7 +31,6 @@ const el = {
   settingsThemeLight: document.getElementById("settingsThemeLight"),
   settingsThemeDark: document.getElementById("settingsThemeDark"),
   settingsThemeAuto: document.getElementById("settingsThemeAuto"),
-  settingsResetBtn: document.getElementById("settingsResetBtn"),
   sidebarLogoutBtn: document.getElementById("sidebarLogoutBtn"),
   createGroupPopover: document.getElementById("createGroupPopover"),
   createGroupCloseButton: document.getElementById("createGroupCloseButton"),
@@ -555,14 +554,6 @@ function logout() {
   closeCreateGroupPopover();
   clearSession();
   window.location.href = "/login.html";
-}
-
-function resetInterfacePreferences() {
-  applyTheme("light");
-  setFriendCardCollapsed(true);
-  setFriendsCardCollapsed(true);
-  setSettingsProfileFeedback("", "success");
-  showToast("Interface preferences reset.");
 }
 
 async function parseResponsePayload(response) {
@@ -1812,9 +1803,6 @@ if (el.settingsScrim) {
 }
 if (el.createGroupSidebarBtn) {
   el.createGroupSidebarBtn.addEventListener("click", openCreateGroupPopover);
-}
-if (el.settingsResetBtn) {
-  el.settingsResetBtn.addEventListener("click", resetInterfacePreferences);
 }
 if (el.headerInboxButton) {
   el.headerInboxButton.addEventListener("click", toggleInboxPanel);
