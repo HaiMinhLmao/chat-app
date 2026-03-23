@@ -249,17 +249,50 @@
             <div class="mini settings-feedback" id="settingsProfileFeedback"></div>
           </form>
         </div>
-        <div class="settings-list">
-          <label class="settings-item settings-toggle-row">
-            <div>
-              <strong>Dark mode</strong>
-              <div class="mini muted">Switch the workspace between the light and dark look.</div>
+        <div class="settings-list settings-appearance-list">
+          <section class="settings-appearance-card" aria-labelledby="settingsThemeHeading">
+            <div class="settings-appearance-header">
+              <div class="settings-appearance-icon" aria-hidden="true">☾</div>
+              <div>
+                <strong id="settingsThemeHeading">Chế độ tối</strong>
+                <div class="mini muted">
+                  Điều chỉnh giao diện sáng, tối hoặc để hệ thống tự động đồng bộ.
+                </div>
+              </div>
             </div>
-            <span class="settings-switch">
-              <input id="settingsThemeDark" type="checkbox" />
-              <span class="settings-switch-ui" aria-hidden="true"></span>
-            </span>
-          </label>
+            <div class="settings-theme-options" role="radiogroup" aria-labelledby="settingsThemeHeading">
+              <label class="settings-theme-option" for="settingsThemeLight">
+                <span class="settings-theme-option-copy">
+                  <strong>Tắt</strong>
+                  <span class="mini muted">Luôn dùng giao diện sáng.</span>
+                </span>
+                <span class="settings-radio">
+                  <input id="settingsThemeLight" name="settingsThemeMode" type="radio" value="light" />
+                  <span class="settings-radio-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+              <label class="settings-theme-option" for="settingsThemeDark">
+                <span class="settings-theme-option-copy">
+                  <strong>Bật</strong>
+                  <span class="mini muted">Luôn dùng giao diện tối.</span>
+                </span>
+                <span class="settings-radio">
+                  <input id="settingsThemeDark" name="settingsThemeMode" type="radio" value="dark" />
+                  <span class="settings-radio-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+              <label class="settings-theme-option" for="settingsThemeAuto">
+                <span class="settings-theme-option-copy">
+                  <strong>Tự động</strong>
+                  <span class="mini muted">Tự đổi theo chế độ sáng/tối của thiết bị.</span>
+                </span>
+                <span class="settings-radio">
+                  <input id="settingsThemeAuto" name="settingsThemeMode" type="radio" value="auto" />
+                  <span class="settings-radio-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+            </div>
+          </section>
         </div>
         <div class="settings-note">
           <strong>Local preferences</strong>
