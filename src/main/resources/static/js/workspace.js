@@ -445,6 +445,12 @@ function refreshSettingsAvatarPreview() {
   syncAvatarNode(el.settingsAvatarPreview, name, avatarUrl);
 }
 
+function removeLanguageSettingsField() {
+  if (!el.settingsLanguageSelect) return;
+  const field = el.settingsLanguageSelect.closest("label");
+  if (field) field.remove();
+}
+
 function syncCurrentUserUi() {
   if (!currentUser) return;
   const name = displayName(currentUser);
@@ -461,7 +467,7 @@ function syncCurrentUserUi() {
     el.settingsBirthDateInput.value = currentUser.birthDate || "";
     el.settingsBirthDateInput.max = new Date().toISOString().slice(0, 10);
   }
-  if (el.settingsLanguageSelect) {
+  if (el.settingsLanguageSelect && el.settingsLanguageSelect.isConnected) {
     el.settingsLanguageSelect.value = currentUser.preferredLanguage || "vi";
   }
   document.documentElement.lang = activeLanguage();
@@ -1642,7 +1648,7 @@ async function saveProfileSettings(event) {
   }
   const birthDate =
     el.settingsBirthDateInput && el.settingsBirthDateInput.value ? el.settingsBirthDateInput.value : null;
-  const preferredLanguage = el.settingsLanguageSelect ? el.settingsLanguageSelect.value : "vi";
+  const preferredLanguage = (currentUser && currentUser.preferredLanguage) || "vi";
   el.settingsDisplayNameSaveBtn.disabled = true;
   el.settingsDisplayNameSaveBtn.textContent = "Đang lưu...";
   const result = await authorizedRequest("/api/users/me", {
@@ -2414,6 +2420,7 @@ async function bootstrap() {
   await loadCurrentUserProfile();
   applyTheme(loadThemePreference());
   startStudyTimerTicker();
+  removeLanguageSettingsField();
   if (el.studyTimerPanelMount && !el.studyTimerPanelMount.firstChild) {
     el.studyTimerPanelMount.appendChild(createStudyTimerPanel());
     refreshStudyTimerUi();
