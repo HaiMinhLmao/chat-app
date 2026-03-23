@@ -283,7 +283,10 @@ public class SocialService {
                 user.getId(),
                 UserIdentitySupport.displayName(user),
                 user.getEmail(),
-                user.getFullName()
+                user.getFullName(),
+                user.getAvatarUrl(),
+                user.getBirthDate(),
+                user.getPreferredLanguage()
         );
     }
 
