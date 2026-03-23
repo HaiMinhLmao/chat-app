@@ -1035,12 +1035,24 @@ function buildAttachment(message) {
   const wrap = document.createElement("div");
   wrap.className = "message-attachment";
 
+  const type = String(message.attachmentContentType || "");
+  if (type.startsWith("image/")) {
+    wrap.classList.add("is-image");
+  } else if (type.startsWith("video/")) {
+    wrap.classList.add("is-video");
+  } else {
+    wrap.classList.add("is-file");
+  }
+
+  const header = document.createElement("div");
+  header.className = "message-attachment-header";
+
   const label = document.createElement("strong");
+  label.className = "message-attachment-title";
   label.textContent = message.attachmentName || "attachment";
-  wrap.appendChild(label);
+  header.appendChild(label);
 
   const href = attachmentDataUrl(message);
-  const type = String(message.attachmentContentType || "");
 
   if (type.startsWith("video/")) {
     const video = document.createElement("video");
@@ -1057,12 +1069,15 @@ function buildAttachment(message) {
   }
 
   const meta = document.createElement("small");
+  meta.className = "message-attachment-meta";
   meta.textContent =
     (message.attachmentContentType || "application/octet-stream") +
     (message.attachmentSize ? " - " + formatBytes(message.attachmentSize) : "");
-  wrap.appendChild(meta);
+  header.appendChild(meta);
+  wrap.appendChild(header);
 
   const download = document.createElement("a");
+  download.className = "message-attachment-link";
   download.href = href;
   download.download = message.attachmentName || "attachment";
   download.target = "_blank";

@@ -1414,37 +1414,59 @@ body.theme-dark .message-attachment {
 .message-attachment {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(248, 250, 252, 0.96);
+  background: rgba(255, 255, 255, 0.92);
+  max-width: min(100%, 380px);
 }
 
 .message-row.sent .message-attachment {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.message-attachment-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 4px 0;
+}
+
+.message-attachment-title {
+  font-size: 14px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.message-attachment-meta {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .message-attachment video,
 .message-attachment img {
-  width: min(100%, 340px);
-  border-radius: 12px;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: 14px;
   background: rgba(0, 0, 0, 0.55);
 }
 
-.message-attachment a {
+.message-attachment-link {
+  align-self: flex-start;
+  padding: 0 4px 2px;
   color: inherit;
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.message-attachment small {
-  color: var(--muted);
-}
-
-.message-row.sent .message-attachment small {
+.message-row.sent .message-attachment-meta {
   color: rgba(255, 255, 255, 0.82);
 }
 
