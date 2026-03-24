@@ -35,8 +35,7 @@ function mustGetForm(id) {
 }
 
 /**
- * @param {string} id
- * @returns {HTMLSelectElement}
+ *
  */
 function mustGetSelect(id) {
   return /** @type {HTMLSelectElement} */ (mustGetElement(id));
@@ -64,6 +63,14 @@ function getOptionalElement(id) {
  */
 function getOptionalButton(id) {
   return /** @type {HTMLButtonElement | null} */ (document.getElementById(id));
+}
+
+/**
+ * @param {string} id
+ * @returns {HTMLInputElement | null}
+ */
+function getOptionalInput(id) {
+  return /** @type {HTMLInputElement | null} */ (document.getElementById(id));
 }
 
 /**
@@ -147,8 +154,6 @@ const el = {
   filterAllButton: getOptionalButton("filterAllButton"),
   filterPersonalButton: getOptionalButton("filterPersonalButton"),
   filterGroupsButton: getOptionalButton("filterGroupsButton"),
-  clearSearchButton: getOptionalButton("clearSearchButton"),
-  previewFilterSummary: getOptionalElement("previewFilterSummary"),
   previewRosterBadge: getOptionalElement("previewRosterBadge"),
   chatKicker: mustGetElement("chatKicker"),
   chatTitle: mustGetElement("chatTitle"),
@@ -190,6 +195,14 @@ const el = {
   previewGroupMembersCount: getOptionalElement("previewGroupMembersCount"),
   previewGroupMembersList: getOptionalElement("previewGroupMembersList"),
   previewGroupMembersEmpty: getOptionalElement("previewGroupMembersEmpty"),
+  previewGroupOwnerTools: getOptionalElement("previewGroupOwnerTools"),
+  previewGroupRenameInput: getOptionalInput("previewGroupRenameInput"),
+  previewGroupRenameBtn: getOptionalButton("previewGroupRenameBtn"),
+  previewGroupManageFeedback: getOptionalElement("previewGroupManageFeedback"),
+  previewGroupLeaveTools: getOptionalElement("previewGroupLeaveTools"),
+  previewGroupLeaveBtn: getOptionalButton("previewGroupLeaveBtn"),
+  previewGroupLeaveFeedback: getOptionalElement("previewGroupLeaveFeedback"),
+  previewSharedPanel: getOptionalElement("previewSharedPanel"),
 };
 
 // Runtime state
@@ -219,7 +232,9 @@ const THEME_STORAGE_KEY = "workspaceTheme";
 const STUDY_TIMER_STORAGE_KEY = "workspaceStudyTimer";
 const SETTINGS_DRAWER_BREAKPOINT = 760;
 const MINUTE_MS = 60000;
+const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 let studyTimerTicker = null;
+const conversationHistoryCache = new Map();
 
 // Session and auth helpers
 function parseJson(value) {
@@ -526,6 +541,14 @@ function setCreateGroupFeedback(message, variant) {
   setInlineFeedback(el.createGroupFeedback, message, variant);
 }
 
+function setPreviewGroupManageFeedback(message, variant) {
+  setInlineFeedback(el.previewGroupManageFeedback, message, variant);
+}
+
+function setPreviewGroupLeaveFeedback(message, variant) {
+  setInlineFeedback(el.previewGroupLeaveFeedback, message, variant);
+}
+
 function syncAvatarNode(node, name, avatarUrl) {
   if (!node) return;
   const nextUrl = String(avatarUrl || "").trim();
@@ -651,6 +674,241 @@ function mergeGroupDetails(detail) {
   return detail;
 }
 
+function isGroupCreator(group) {
+  const creatorEmail = normalizeEmail(group && group.createdByEmail);
+  return Boolean(creatorEmail && currentUser && creatorEmail === normalizeEmail(currentUser.email));
+}
+
+function syncPreviewGroupOwnerTools(groupRecord) {
+  if (!el.previewGroupOwnerTools || !el.previewGroupRenameInput || !el.previewGroupRenameBtn) return;
+  const visible = Boolean(groupRecord) && activeChannel.type === "group" && isGroupCreator(groupRecord);
+  el.previewGroupOwnerTools.hidden = !visible;
+  if (!visible) {
+    el.previewGroupRenameBtn.disabled = false;
+    setPreviewGroupManageFeedback("", "success");
+    return;
+  }
+  if (document.activeElement !== el.previewGroupRenameInput) {
+    el.previewGroupRenameInput.value = groupRecord.name || "";
+  }
+}
+
+function syncPreviewGroupLeaveTools(groupRecord) {
+  if (!el.previewGroupLeaveTools || !el.previewGroupLeaveBtn) return;
+  const visible =
+    Boolean(groupRecord) &&
+    activeChannel.type === "group" &&
+    !isGroupCreator(groupRecord);
+  el.previewGroupLeaveTools.hidden = !visible;
+  if (!visible) {
+    el.previewGroupLeaveBtn.disabled = false;
+    setPreviewGroupLeaveFeedback("", "success");
+  }
+}
+
+function applyGroupDetails(detail) {
+  if (!detail || !detail.id) return null;
+  const groupId = String(detail.id);
+  groupDetailsCache.set(groupId, detail);
+  const groupRecord = mergeGroupDetails(detail) || detail;
+  if (activeChannel.type === "group" && String(activeChannel.id) === groupId) {
+    activeChannel.name = groupRecord.name || "Study Group";
+    el.chatTitle.textContent = groupRecord.name || "Study Group";
+    el.chatSubtitle.textContent = groupRecord.category || "";
+    syncAvatarNode(el.chatAvatar, groupRecord.name || "Study Group", "");
+  }
+  renderGroups();
+  syncPreviewProfilePanel();
+  renderFavoritesStrip();
+  return groupRecord;
+}
+
+function channelHistoryKey(type, id) {
+  return String(type || "") + ":" + String(id || "");
+}
+
+function setConversationHistory(type, id, messages) {
+  conversationHistoryCache.set(
+    channelHistoryKey(type, id),
+    Array.isArray(messages) ? messages.slice() : [],
+  );
+  if (isSameChannel(type, id)) {
+    renderPreviewSharedPanel();
+  }
+}
+
+function appendConversationHistory(type, id, message) {
+  if (!message) return;
+  const key = channelHistoryKey(type, id);
+  const history = conversationHistoryCache.get(key) || [];
+  history.push(message);
+  conversationHistoryCache.set(key, history.slice(-120));
+  if (isSameChannel(type, id)) {
+    renderPreviewSharedPanel();
+  }
+}
+
+function activeConversationHistory() {
+  if (activeChannel.type !== "direct" && activeChannel.type !== "group") {
+    return [];
+  }
+  return conversationHistoryCache.get(channelHistoryKey(activeChannel.type, activeChannel.id)) || [];
+}
+
+function normalizeSharedUrl(url) {
+  return String(url || "").trim().replace(/[),.;!?]+$/, "");
+}
+
+function extractMessageLinks(message) {
+  const text = String((message && message.content) || "");
+  return Array.from(text.matchAll(URL_PATTERN), (match) => normalizeSharedUrl(match[0])).filter(Boolean);
+}
+
+function summarizeSharedContent(messages) {
+  const images = [];
+  const files = [];
+  const links = [];
+  const seenImages = new Set();
+  const seenFiles = new Set();
+  const seenLinks = new Set();
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    const href = attachmentDataUrl(message);
+    const type = String((message && message.attachmentContentType) || "");
+    const attachmentName = String((message && message.attachmentName) || "").trim();
+    const timestamp = message && message.timestamp ? message.timestamp : "";
+    const sender = message && (message.senderName || message.senderEmail || "User");
+
+    if (href && attachmentName) {
+      const baseItem = {
+        href,
+        name: attachmentName,
+        sender,
+        timestamp,
+        meta:
+          (message.attachmentContentType || "application/octet-stream") +
+          (message.attachmentSize ? " - " + formatBytes(message.attachmentSize) : ""),
+      };
+      if (type.startsWith("image/")) {
+        if (!seenImages.has(href)) {
+          seenImages.add(href);
+          images.push(baseItem);
+        }
+      } else if (!seenFiles.has(href)) {
+        seenFiles.add(href);
+        files.push(baseItem);
+      }
+    }
+
+    extractMessageLinks(message).forEach((url) => {
+      if (seenLinks.has(url)) return;
+      seenLinks.add(url);
+      let host = url;
+      try {
+        host = new URL(url).hostname.replace(/^www\./, "");
+      } catch (_) {
+        // Keep the raw url if parsing fails.
+      }
+      links.push({
+        href: url,
+        label: host,
+        meta: url,
+        sender,
+        timestamp,
+      });
+    });
+  }
+
+  return { images, files, links };
+}
+
+function renderPreviewSharedSection(title, items, kind) {
+  const section = document.createElement("section");
+  section.className = "preview-shared-section";
+
+  const head = document.createElement("div");
+  head.className = "preview-group-panel-head preview-shared-section-head";
+  head.innerHTML =
+    "<span>" +
+    title +
+    '</span><strong>' +
+    String(items.length) +
+    "</strong>";
+  section.appendChild(head);
+
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "mini muted preview-shared-empty";
+    empty.textContent = "Nothing shared yet.";
+    section.appendChild(empty);
+    return section;
+  }
+
+  const list = document.createElement("div");
+  list.className =
+    kind === "images"
+      ? "preview-shared-image-grid"
+      : kind === "files"
+        ? "preview-shared-file-list"
+        : "preview-shared-link-list";
+
+  items.slice(0, kind === "images" ? 6 : 5).forEach((item) => {
+    const link = document.createElement("a");
+    link.href = item.href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+
+    if (kind === "images") {
+      link.className = "preview-shared-image-item";
+      const image = document.createElement("img");
+      image.loading = "lazy";
+      image.src = item.href;
+      image.alt = item.name || "Shared image";
+      const caption = document.createElement("span");
+      caption.textContent = item.name || "Image";
+      link.append(image, caption);
+    } else {
+      link.className = kind === "files" ? "preview-shared-file-item" : "preview-shared-link-item";
+      const primary = document.createElement("strong");
+      primary.textContent = kind === "files" ? item.name : item.label;
+      const meta = document.createElement("span");
+      meta.textContent = kind === "files" ? item.meta : item.meta;
+      link.append(primary, meta);
+    }
+
+    list.appendChild(link);
+  });
+
+  section.appendChild(list);
+  return section;
+}
+
+function renderPreviewSharedPanel() {
+  if (!el.previewSharedPanel) return;
+  const inConversation = activeChannel.type === "direct" || activeChannel.type === "group";
+  if (!inConversation) {
+    el.previewSharedPanel.hidden = true;
+    el.previewSharedPanel.innerHTML = "";
+    return;
+  }
+
+  const shared = summarizeSharedContent(activeConversationHistory());
+  el.previewSharedPanel.hidden = false;
+  el.previewSharedPanel.innerHTML = "";
+
+  const title = document.createElement("div");
+  title.className = "preview-group-panel-head";
+  title.innerHTML = "<span>Shared</span><strong>" + String(
+    shared.images.length + shared.files.length + shared.links.length,
+  ) + "</strong>";
+
+  el.previewSharedPanel.appendChild(title);
+  el.previewSharedPanel.appendChild(renderPreviewSharedSection("Images", shared.images, "images"));
+  el.previewSharedPanel.appendChild(renderPreviewSharedSection("Files", shared.files, "files"));
+  el.previewSharedPanel.appendChild(renderPreviewSharedSection("Links", shared.links, "links"));
+}
+
 function renderPreviewGroupMembers(group) {
   if (
     !el.previewGroupPanel ||
@@ -671,6 +929,9 @@ function renderPreviewGroupMembers(group) {
   }
 
   const members = Array.isArray(group.members) ? group.members : [];
+  const creatorView = isGroupCreator(group);
+  const currentEmail = normalizeEmail(currentUser && currentUser.email);
+  const creatorEmail = normalizeEmail(group.createdByEmail);
   el.previewGroupPanel.hidden = false;
   el.previewGroupMembersCount.textContent = String(members.length);
   el.previewGroupMembersList.innerHTML = "";
@@ -706,11 +967,32 @@ function renderPreviewGroupMembers(group) {
     role.className = "preview-group-member-role";
     role.textContent = String(member.role || "MEMBER").replace(/_/g, " ");
 
+    const tools = document.createElement("div");
+    tools.className = "preview-group-member-tools";
+    tools.appendChild(role);
+
+    const memberEmail = normalizeEmail(info.email || member.email || "");
+    const canKick =
+      creatorView &&
+      memberEmail &&
+      memberEmail !== currentEmail &&
+      memberEmail !== creatorEmail;
+    if (canKick) {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "preview-group-member-remove";
+      removeButton.textContent = "Kick";
+      removeButton.addEventListener("click", () => {
+        void removeGroupMember(group.id, info.email || member.email || "", info.name);
+      });
+      tools.appendChild(removeButton);
+    }
+
     copy.appendChild(name);
     copy.appendChild(email);
     row.appendChild(avatar);
     row.appendChild(copy);
-    row.appendChild(role);
+    row.appendChild(tools);
     el.previewGroupMembersList.appendChild(row);
   });
 }
@@ -739,10 +1021,7 @@ async function ensureGroupDetails(groupId) {
     return null;
   }
 
-  groupDetailsCache.set(id, result.data);
-  const merged = mergeGroupDetails(result.data);
-  syncPreviewProfilePanel();
-  return merged;
+  return applyGroupDetails(result.data);
 }
 
 function syncPreviewProfilePanel() {
@@ -809,8 +1088,8 @@ function syncPreviewProfilePanel() {
 
   showPreviewAction(
     el.previewAddFriendBtn,
-    activeChannel.type !== "group",
-    activeChannel.type === "home" ? "Add Friend" : "Pinned Contact",
+    activeChannel.type === "direct",
+    "Pinned Contact",
     activeChannel.type === "direct",
   );
   showPreviewAction(
@@ -819,7 +1098,143 @@ function syncPreviewProfilePanel() {
     "Refresh Members",
     false,
   );
+  syncPreviewGroupOwnerTools(groupRecord);
+  syncPreviewGroupLeaveTools(groupRecord);
   renderPreviewGroupMembers(groupRecord);
+  renderPreviewSharedPanel();
+}
+
+async function renameActiveGroup() {
+  if (!el.previewGroupRenameBtn || !el.previewGroupRenameInput) return;
+  const group = activeGroupRecord();
+  if (!group || activeChannel.type !== "group") {
+    setPreviewGroupManageFeedback("Open a group before renaming it.", "error");
+    return;
+  }
+  if (!isGroupCreator(group)) {
+    setPreviewGroupManageFeedback("Only the group creator can rename this group.", "error");
+    return;
+  }
+
+  const nextName = String(el.previewGroupRenameInput.value || "").trim();
+  if (!nextName) {
+    setPreviewGroupManageFeedback("Group name is required.", "error");
+    return;
+  }
+
+  const previousLabel = el.previewGroupRenameBtn.textContent;
+  el.previewGroupRenameBtn.disabled = true;
+  el.previewGroupRenameBtn.textContent = "Saving...";
+  setPreviewGroupManageFeedback("", "success");
+
+  const result = await authorizedRequest(
+    "/api/groups/" + encodeURIComponent(group.id) + "/name",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupName: nextName }),
+    },
+  );
+
+  el.previewGroupRenameBtn.disabled = false;
+  el.previewGroupRenameBtn.textContent = previousLabel;
+
+  if (!result.ok || !result.data) {
+    setPreviewGroupManageFeedback(
+      (result.data && result.data.error) || "Could not rename the group.",
+      "error",
+    );
+    return;
+  }
+
+  applyGroupDetails(result.data);
+  setPreviewGroupManageFeedback("Group name updated.", "success");
+  showToast("Group name updated.");
+}
+
+async function removeGroupMember(groupId, memberEmail, memberName) {
+  const normalizedEmail = normalizeEmail(memberEmail);
+  if (!groupId || !normalizedEmail) return;
+  const group = groups.find((item) => String(item.id) === String(groupId));
+  if (!group || !isGroupCreator(group)) {
+    showToast("Only the group creator can remove members.");
+    return;
+  }
+
+  const name = memberName || defaultName(normalizedEmail);
+  const confirmed = window.confirm(
+    'Kick "' + name + '" out of this group?',
+  );
+  if (!confirmed) return;
+
+  const result = await authorizedRequest(
+    "/api/groups/" +
+      encodeURIComponent(groupId) +
+      "/members/" +
+      encodeURIComponent(normalizedEmail),
+    { method: "DELETE" },
+  );
+
+  if (!result.ok || !result.data) {
+    const message =
+      (result.data && result.data.error) || "Could not remove this member.";
+    setPreviewGroupManageFeedback(message, "error");
+    showToast(message);
+    return;
+  }
+
+  applyGroupDetails(result.data);
+  setPreviewGroupManageFeedback(name + " was removed from the group.", "success");
+  showToast(name + " was removed from the group.");
+}
+
+async function leaveActiveGroup() {
+  if (!el.previewGroupLeaveBtn) return;
+  const group = activeGroupRecord();
+  if (!group || activeChannel.type !== "group") {
+    setPreviewGroupLeaveFeedback("Open a group before leaving it.", "error");
+    return;
+  }
+  if (isGroupCreator(group)) {
+    setPreviewGroupLeaveFeedback("The group creator cannot leave this group.", "error");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    'Leave "' + (group.name || "this group") + '"?',
+  );
+  if (!confirmed) return;
+
+  const previousLabel = el.previewGroupLeaveBtn.textContent;
+  el.previewGroupLeaveBtn.disabled = true;
+  el.previewGroupLeaveBtn.textContent = "Leaving...";
+  setPreviewGroupLeaveFeedback("", "success");
+
+  const result = await authorizedRequest(
+    "/api/groups/" + encodeURIComponent(group.id) + "/leave",
+    { method: "POST" },
+  );
+
+  el.previewGroupLeaveBtn.disabled = false;
+  el.previewGroupLeaveBtn.textContent = previousLabel;
+
+  if (!result.ok) {
+    const message =
+      (result.data && result.data.error) || "Could not leave this group.";
+    setPreviewGroupLeaveFeedback(message, "error");
+    showToast(message);
+    return;
+  }
+
+  const groupId = String(group.id);
+  groups = groups.filter((item) => String(item.id) !== groupId);
+  groupDetailsCache.delete(groupId);
+  conversationHistoryCache.delete(channelHistoryKey("group", groupId));
+  setPreview("group", groupId, "");
+  selectHome();
+  renderGroups();
+  setPreviewGroupLeaveFeedback("", "success");
+  showToast("You left the group.");
 }
 
 function normalizeStudyMinutes(value, fallback, maximum) {
@@ -2530,21 +2945,9 @@ function syncRosterFilterUi() {
     button.setAttribute("aria-pressed", String(active));
   });
 
-  if (el.clearSearchButton) {
-    el.clearSearchButton.hidden = !friendSearchQuery.trim();
-  }
 
   const personalCount = visibleFriends().length;
   const groupCount = visibleGroups().length;
-  if (el.previewFilterSummary) {
-    const parts = [];
-    if (rosterFilter !== "group") parts.push(String(personalCount) + " personal");
-    if (rosterFilter !== "personal") parts.push(String(groupCount) + " groups");
-    const label = parts.length ? parts.join(" • ") : "No results";
-    el.previewFilterSummary.textContent = friendSearchQuery.trim()
-      ? 'Search "' + friendSearchQuery.trim() + '" • ' + label
-      : label;
-  }
 
   if (el.previewRosterBadge) {
     const totalVisible = personalCount + groupCount;
@@ -2806,6 +3209,7 @@ async function loadDirectHistory(otherEmail) {
   );
   if (activeChannel.type !== "direct" || normalizeEmail(activeChannel.email) !== directId) return;
   if (!result.ok) {
+    setConversationHistory("direct", directId, []);
     clearMessages(
       "Chat unavailable",
       result.data.error || "Messaging unlocks after a friend request is accepted.",
@@ -2819,6 +3223,7 @@ async function loadDirectHistory(otherEmail) {
   }
   showBanner("", "info");
   const messages = Array.isArray(result.data) ? result.data : [];
+  setConversationHistory("direct", directId, messages);
   if (!messages.length) {
     clearMessages("No messages yet", "Start the conversation here.", "");
     return;
@@ -2845,6 +3250,7 @@ async function loadGroupHistory(groupId) {
   const result = await authorizedRequest("/api/messages/groups/" + groupId);
   if (activeChannel.type !== "group" || String(activeChannel.id) !== currentGroupId) return;
   if (!result.ok) {
+    setConversationHistory("group", currentGroupId, []);
     clearMessages(
       "Group unavailable",
       result.data.error || "You cannot open this group right now.",
@@ -2855,6 +3261,7 @@ async function loadGroupHistory(groupId) {
   }
   showBanner("", "info");
   const messages = Array.isArray(result.data) ? result.data : [];
+  setConversationHistory("group", currentGroupId, messages);
   if (!messages.length) {
     clearMessages("No messages yet", "Send the first message to this study group.", "Group");
     return;
@@ -2908,6 +3315,7 @@ function subscribeToGroup(groupId) {
     if (!String(message.content || "").trim() && !message.attachmentBase64 && !message.attachmentUrl) return;
     const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
     const sender = message.senderName || message.senderEmail || "User";
+    appendConversationHistory("group", groupId, message);
     setPreview("group", groupId, messagePreview(message, sent, sender));
     addMessage(message, sent, sender, message.timestamp);
   });
@@ -2917,12 +3325,14 @@ function subscribeToDirect(otherEmail) {
   if (!stompClient || !stompClient.connected) return;
   disconnectSubscription();
   const key = conversationKey(currentUser.email, otherEmail);
+  const directId = normalizeEmail(otherEmail);
   activeSubscription = stompClient.subscribe("/topic/direct/" + key, (payload) => {
     const message = JSON.parse(payload.body || "{}");
     if (!String(message.content || "").trim() && !message.attachmentBase64 && !message.attachmentUrl) return;
     const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
     const sender = message.senderName || message.senderEmail || "User";
-    setPreview("direct", normalizeEmail(otherEmail), messagePreview(message, sent, sender));
+    appendConversationHistory("direct", directId, message);
+    setPreview("direct", directId, messagePreview(message, sent, sender));
     addMessage(message, sent, sender, message.timestamp);
   });
 }
@@ -2985,6 +3395,7 @@ async function sendGroupMessageFallback(content) {
   const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
   setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
   if (!stompClient || !stompClient.connected) {
+    appendConversationHistory("group", activeGroupId, result.data);
     if (isSameChannel("group", activeGroupId)) {
       addMessage(result.data, true, sender, result.data.timestamp);
     }
@@ -3014,6 +3425,7 @@ async function sendDirectMessageFallback(content) {
   const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
   setPreview("direct", channelId, messagePreview(result.data, true, sender));
   if (!stompClient || !stompClient.connected) {
+    appendConversationHistory("direct", channelId, result.data);
     if (isSameChannel("direct", channelId)) {
       addMessage(result.data, true, sender, result.data.timestamp);
     }
@@ -3056,6 +3468,7 @@ async function uploadDirectAttachment(file) {
   setPreview("direct", channelId, messagePreview(result.data, true, sender));
 
   if (!stompClient || !stompClient.connected) {
+    appendConversationHistory("direct", channelId, result.data);
     if (isSameChannel("direct", channelId)) {
       addMessage(result.data, true, sender, result.data.timestamp);
     }
@@ -3095,6 +3508,7 @@ async function uploadGroupAttachment(file) {
   setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
 
   if (!stompClient || !stompClient.connected) {
+    appendConversationHistory("group", activeGroupId, result.data);
     if (isSameChannel("group", activeGroupId)) {
       addMessage(result.data, true, sender, result.data.timestamp);
     }
@@ -3188,15 +3602,6 @@ el.friendsSearchInput.addEventListener("input", (event) => {
   renderGroups();
 });
 
-const previewChatHead = document.querySelector(".preview-chat-head");
-if (previewChatHead) {
-  previewChatHead.addEventListener("click", (event) => {
-    const target = asElement(event.target);
-    if (target && target.closest("button")) return;
-    setPreviewDetailsOpen(true);
-  });
-}
-
 if (el.previewCloseProfile) {
   el.previewCloseProfile.addEventListener("click", closePreviewDetails);
 }
@@ -3222,6 +3627,29 @@ if (el.previewGroupInfoBtn) {
     if (activeChannel.type === "group") {
       void ensureGroupDetails(activeChannel.id);
     }
+  });
+}
+
+if (el.previewGroupRenameBtn) {
+  el.previewGroupRenameBtn.addEventListener("click", () => {
+    void renameActiveGroup();
+  });
+}
+
+if (el.previewGroupRenameInput) {
+  el.previewGroupRenameInput.addEventListener("input", () => {
+    setPreviewGroupManageFeedback("", "success");
+  });
+  el.previewGroupRenameInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    void renameActiveGroup();
+  });
+}
+
+if (el.previewGroupLeaveBtn) {
+  el.previewGroupLeaveBtn.addEventListener("click", () => {
+    void leaveActiveGroup();
   });
 }
 
@@ -3272,15 +3700,6 @@ if (el.filterPersonalButton) {
 
 if (el.filterGroupsButton) {
   el.filterGroupsButton.addEventListener("click", () => setRosterFilter("group"));
-}
-
-if (el.clearSearchButton) {
-  el.clearSearchButton.addEventListener("click", () => {
-    friendSearchQuery = "";
-    el.friendsSearchInput.value = "";
-    setRosterFilter(rosterFilter);
-    el.friendsSearchInput.focus();
-  });
 }
 
 [el.settingsThemeLight, el.settingsThemeDark, el.settingsThemeAuto]

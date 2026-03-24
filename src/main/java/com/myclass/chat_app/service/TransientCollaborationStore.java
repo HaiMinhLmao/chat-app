@@ -169,15 +169,106 @@ public class TransientCollaborationStore {
         return toResponse(group);
     }
 
-    public GroupResponse getGroup(Long id) {
+    public GroupResponse getGroup(Long id, String requesterEmail) {
         if (id == null) {
             throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
+        }
+        String requester = UserIdentitySupport.normalizeEmail(requesterEmail);
+        if (requester == null) {
+            throw new SecurityException(UNAUTHORIZED_MESSAGE);
         }
         StoredGroup group = groupsById.get(id);
         if (group == null) {
             throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
         }
+        if (!group.members().containsKey(requester)) {
+            throw new SecurityException("You are not a member of this group.");
+        }
         return toResponse(group);
+    }
+
+    public synchronized GroupResponse renameGroup(Long id, String requesterEmail, String nextName) {
+        if (id == null) {
+            throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
+        }
+        String requester = UserIdentitySupport.normalizeEmail(requesterEmail);
+        if (requester == null) {
+            throw new SecurityException(UNAUTHORIZED_MESSAGE);
+        }
+        String normalizedName = UserIdentitySupport.trimToNull(nextName);
+        if (normalizedName == null) {
+            throw new IllegalArgumentException("groupName is required");
+        }
+
+        StoredGroup group = groupsById.get(id);
+        if (group == null) {
+            throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
+        }
+        requireGroupCreator(group, requester);
+
+        StoredGroup updated = new StoredGroup(
+                group.id(),
+                normalizedName,
+                group.description(),
+                group.category(),
+                group.createdByEmail(),
+                group.createdAt(),
+                group.members()
+        );
+        groupsById.put(id, updated);
+        return toResponse(updated);
+    }
+
+    public synchronized GroupResponse removeMember(Long id, String requesterEmail, String memberEmail) {
+        if (id == null) {
+            throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
+        }
+        String requester = UserIdentitySupport.normalizeEmail(requesterEmail);
+        if (requester == null) {
+            throw new SecurityException(UNAUTHORIZED_MESSAGE);
+        }
+        String member = UserIdentitySupport.normalizeEmail(memberEmail);
+        if (member == null) {
+            throw new IllegalArgumentException("Member email is required");
+        }
+
+        StoredGroup group = groupsById.get(id);
+        if (group == null) {
+            throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
+        }
+        requireGroupCreator(group, requester);
+        if (member.equals(group.createdByEmail())) {
+            throw new IllegalArgumentException("The group creator cannot be removed.");
+        }
+        if (!group.members().containsKey(member)) {
+            throw new IllegalArgumentException("Member not found.");
+        }
+
+        group.members().remove(member);
+        return toResponse(group);
+    }
+
+    public synchronized void leaveGroup(Long id, String requesterEmail) {
+        if (id == null) {
+            throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
+        }
+        String requester = UserIdentitySupport.normalizeEmail(requesterEmail);
+        if (requester == null) {
+            throw new SecurityException(UNAUTHORIZED_MESSAGE);
+        }
+
+        StoredGroup group = groupsById.get(id);
+        if (group == null) {
+            throw new IllegalArgumentException(GROUP_NOT_FOUND_MESSAGE);
+        }
+        if (requester.equals(group.createdByEmail())) {
+            throw new IllegalArgumentException("The group creator cannot leave this group.");
+        }
+        if (!group.members().containsKey(requester)) {
+            throw new SecurityException("You are not a member of this group.");
+        }
+
+        group.members().remove(requester);
     }
 
     public List<GroupSummaryResponse> listMyGroups(String email) {
@@ -205,6 +296,12 @@ public class TransientCollaborationStore {
         }
         StoredGroup group = groupsById.get(groupId);
         return group != null && group.members().containsKey(normalized);
+    }
+
+    private static void requireGroupCreator(StoredGroup group, String requesterEmail) {
+        if (!group.createdByEmail().equals(requesterEmail)) {
+            throw new SecurityException("Only the group creator can manage this group.");
+        }
     }
 
     private String resolvePreferredLanguage(String preferredLanguage) {

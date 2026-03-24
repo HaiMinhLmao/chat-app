@@ -92,11 +92,11 @@
               <h2>Inbox</h2>
               <span class="preview-new-badge" id="previewRosterBadge">0</span>
             </div>
-            <button class="preview-create-btn" id="newGroupBtn" type="button">Create Group</button>
+            <button class="preview-ghost-btn" id="homeRailButton" type="button">Overview</button>
           </div>
 
           <div class="preview-social-row">
-            <button class="preview-ghost-btn" id="homeRailButton" type="button">Overview</button>
+            <button class="preview-create-btn" id="newGroupBtn" type="button">Create Group</button>
             <button class="preview-add-btn" id="friendCardToggle" type="button">Add Friend</button>
           </div>
 
@@ -117,7 +117,6 @@
           </div>
 
           <div class="preview-filter-row">
-            <div class="preview-filter-summary" id="previewFilterSummary">Showing all chats</div>
             <label class="preview-search preview-search-inline">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="11" cy="11" r="5.5"></circle>
@@ -125,12 +124,6 @@
               </svg>
               <input id="friendsSearchInput" type="search" placeholder="Search" />
             </label>
-            <button class="preview-circle-btn preview-clear-btn" id="clearSearchButton" type="button" aria-label="Clear search" title="Clear search">
-              <svg viewBox="0 0 24 24">
-                <path d="M7 7l10 10"></path>
-                <path d="M17 7L7 17"></path>
-              </svg>
-            </button>
           </div>
 
           <section class="preview-roster-card" id="friendsCard">
@@ -156,7 +149,7 @@
         </section>
 
         <section class="preview-chat-panel">
-          <header class="preview-chat-head" data-open-profile>
+          <header class="preview-chat-head">
             <div class="preview-chat-user">
               <div class="preview-conversation-avatar preview-avatar-two large avatar" id="chatAvatar">MC</div>
               <div>
@@ -195,8 +188,8 @@
             <input class="composer-input" id="messageInput" type="text" placeholder="Write a message..." />
             <button class="preview-send-btn btn" id="sendBtn" type="submit" aria-label="Send">
               <svg viewBox="0 0 24 24">
-                <path d="M5 12l14-7-4 14-3.5-5z"></path>
-                <path d="M11.5 14L19 5"></path>
+                <path d="M4 12L20 4L13 20L10 14L4 12Z"></path>
+                <path d="M10 14L20 4"></path>
               </svg>
             </button>
           </form>
@@ -229,6 +222,22 @@
               <button type="button" id="previewGroupInfoBtn">View Group Info</button>
             </div>
 
+            <section class="preview-group-owner-tools" id="previewGroupOwnerTools" hidden>
+              <label class="preview-group-manage-field" for="previewGroupRenameInput">
+                <span>Group name</span>
+                <input id="previewGroupRenameInput" type="text" maxlength="200" placeholder="Rename group" />
+              </label>
+              <div class="preview-group-manage-actions">
+                <button type="button" id="previewGroupRenameBtn">Save name</button>
+              </div>
+              <div class="mini settings-feedback" id="previewGroupManageFeedback"></div>
+            </section>
+
+            <section class="preview-group-leave-tools" id="previewGroupLeaveTools" hidden>
+              <button type="button" id="previewGroupLeaveBtn">Leave group</button>
+              <div class="mini settings-feedback" id="previewGroupLeaveFeedback"></div>
+            </section>
+
             <section class="preview-group-panel" id="previewGroupPanel" hidden>
               <div class="preview-group-panel-head">
                 <span>Members</span>
@@ -237,6 +246,8 @@
               <div class="preview-group-member-list" id="previewGroupMembersList"></div>
               <div class="mini muted" id="previewGroupMembersEmpty">Open a group to see its members.</div>
             </section>
+
+            <section class="preview-shared-panel" id="previewSharedPanel" hidden></section>
           </div>
         </aside>
 

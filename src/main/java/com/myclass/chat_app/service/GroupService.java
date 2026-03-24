@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -149,26 +150,106 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
-    public GroupResponse getGroup(Long id) {
+    public GroupResponse getGroup(Long id, String requesterEmail) {
+        String requester = requireRequesterEmail(requesterEmail);
         if (id == null) throw new IllegalArgumentException("Group not found");
         try {
-            ChatGroup group = groupRepository.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException("Group not found"));
-            List<GroupMember> members = memberRepository.findByGroupId(id);
-            return new GroupResponse(
-                    group.getId(),
-                    group.getName(),
-                    group.getDescription(),
-                    group.getCategory(),
-                    group.getCreatedBy().getEmail(),
-                    group.getCreatedAt(),
-                    members.stream().map(GroupService::toMemberResponse).toList()
-            );
-        } catch (IllegalArgumentException e) {
-            return transientStore.getGroup(id);
+            ChatGroup group = groupRepository.findById(id).orElse(null);
+            if (group != null) {
+                if (memberRepository.findByGroupIdAndUserEmailIgnoreCase(id, requester).isEmpty()) {
+                    throw new SecurityException("You are not a member of this group.");
+                }
+                return toGroupResponse(group, memberRepository.findByGroupId(id));
+            }
+        } catch (SecurityException e) {
+            throw e;
         } catch (RuntimeException e) {
-            return transientStore.getGroup(id);
+            try {
+                return transientStore.getGroup(id, requester);
+            } catch (IllegalArgumentException | SecurityException fallbackFailure) {
+                throw e;
+            }
         }
+        return transientStore.getGroup(id, requester);
+    }
+
+    public GroupResponse renameGroup(Long groupId, String requesterEmail, String nextName) {
+        String requester = requireRequesterEmail(requesterEmail);
+        String normalizedName = UserIdentitySupport.trimToNull(nextName);
+        if (normalizedName == null) {
+            throw new IllegalArgumentException("groupName is required");
+        }
+        if (groupId == null) {
+            throw new IllegalArgumentException("Group not found");
+        }
+
+        try {
+            ChatGroup group = groupRepository.findById(groupId).orElse(null);
+            if (group != null) {
+                return transactionTemplate.execute(status -> renameGroupInDatabase(groupId, requester, normalizedName));
+            }
+        } catch (IllegalArgumentException | SecurityException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            try {
+                return transientStore.renameGroup(groupId, requester, normalizedName);
+            } catch (IllegalArgumentException | SecurityException fallbackFailure) {
+                throw e;
+            }
+        }
+        return transientStore.renameGroup(groupId, requester, normalizedName);
+    }
+
+    public GroupResponse removeMember(Long groupId, String requesterEmail, String memberEmail) {
+        String requester = requireRequesterEmail(requesterEmail);
+        String targetEmail = UserIdentitySupport.normalizeEmail(memberEmail);
+        if (targetEmail == null) {
+            throw new IllegalArgumentException("Member email is required");
+        }
+        if (groupId == null) {
+            throw new IllegalArgumentException("Group not found");
+        }
+
+        try {
+            ChatGroup group = groupRepository.findById(groupId).orElse(null);
+            if (group != null) {
+                return transactionTemplate.execute(status -> removeMemberInDatabase(groupId, requester, targetEmail));
+            }
+        } catch (IllegalArgumentException | SecurityException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            try {
+                return transientStore.removeMember(groupId, requester, targetEmail);
+            } catch (IllegalArgumentException | SecurityException fallbackFailure) {
+                throw e;
+            }
+        }
+        return transientStore.removeMember(groupId, requester, targetEmail);
+    }
+
+    public void leaveGroup(Long groupId, String requesterEmail) {
+        String requester = requireRequesterEmail(requesterEmail);
+        if (groupId == null) {
+            throw new IllegalArgumentException("Group not found");
+        }
+
+        try {
+            ChatGroup group = groupRepository.findById(groupId).orElse(null);
+            if (group != null) {
+                transactionTemplate.executeWithoutResult(status -> leaveGroupInDatabase(groupId, requester));
+                return;
+            }
+        } catch (IllegalArgumentException | SecurityException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            try {
+                transientStore.leaveGroup(groupId, requester);
+                return;
+            } catch (IllegalArgumentException | SecurityException fallbackFailure) {
+                throw e;
+            }
+        }
+        transientStore.leaveGroup(groupId, requester);
     }
 
     @Transactional(readOnly = true)
@@ -207,6 +288,62 @@ public class GroupService {
             // Fall back to transient storage below.
         }
         return transientStore.isMember(groupId, normalized);
+    }
+
+    private GroupResponse renameGroupInDatabase(Long groupId, String requester, String nextName) {
+        ChatGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+        requireGroupCreator(group, requester);
+        group.setName(nextName);
+        ChatGroup savedGroup = groupRepository.save(group);
+        return toGroupResponse(savedGroup, memberRepository.findByGroupId(groupId));
+    }
+
+    private GroupResponse removeMemberInDatabase(Long groupId, String requester, String targetEmail) {
+        ChatGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+        requireGroupCreator(group, requester);
+
+        String creatorEmail = UserIdentitySupport.normalizeEmail(group.getCreatedBy().getEmail());
+        if (targetEmail.equals(creatorEmail)) {
+            throw new IllegalArgumentException("The group creator cannot be removed.");
+        }
+
+        GroupMember member = memberRepository.findByGroupIdAndUserEmailIgnoreCase(groupId, targetEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Member not found."));
+        memberRepository.delete(member);
+        memberRepository.flush();
+        return toGroupResponse(group, memberRepository.findByGroupId(groupId));
+    }
+
+    private void leaveGroupInDatabase(Long groupId, String requester) {
+        ChatGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+
+        String creatorEmail = UserIdentitySupport.normalizeEmail(group.getCreatedBy().getEmail());
+        if (requester.equals(creatorEmail)) {
+            throw new IllegalArgumentException("The group creator cannot leave this group.");
+        }
+
+        GroupMember membership = memberRepository.findByGroupIdAndUserEmailIgnoreCase(groupId, requester)
+                .orElseThrow(() -> new SecurityException("You are not a member of this group."));
+        memberRepository.delete(membership);
+        memberRepository.flush();
+    }
+
+    private static String requireRequesterEmail(String email) {
+        String normalized = UserIdentitySupport.normalizeEmail(email);
+        if (normalized == null) {
+            throw new SecurityException("Unauthorized");
+        }
+        return normalized;
+    }
+
+    private static void requireGroupCreator(ChatGroup group, String requesterEmail) {
+        String creatorEmail = UserIdentitySupport.normalizeEmail(group.getCreatedBy().getEmail());
+        if (!requesterEmail.equals(creatorEmail)) {
+            throw new SecurityException("Only the group creator can manage this group.");
+        }
     }
 
     private static boolean isValidEmail(String email) {
@@ -251,6 +388,23 @@ public class GroupService {
             merged.putIfAbsent(group.id(), group);
         }
         return new ArrayList<>(merged.values());
+    }
+
+    private static GroupResponse toGroupResponse(ChatGroup group, List<GroupMember> members) {
+        return new GroupResponse(
+                group.getId(),
+                group.getName(),
+                group.getDescription(),
+                group.getCategory(),
+                group.getCreatedBy().getEmail(),
+                group.getCreatedAt(),
+                members.stream()
+                        .sorted(Comparator
+                                .comparing((GroupMember member) -> member.getRole() != GroupRole.ADMIN)
+                                .thenComparing(member -> member.getUser().getEmail(), String.CASE_INSENSITIVE_ORDER))
+                        .map(GroupService::toMemberResponse)
+                        .toList()
+        );
     }
 
     private static GroupResponse.GroupMemberResponse toMemberResponse(GroupMember member) {
