@@ -2676,8 +2676,8 @@ async function bootstrap() {
     refreshStudyTimerUi();
   }
   syncCurrentUserUi();
-  setFriendCardCollapsed(loadFriendCardPreference());
-  setFriendsCardCollapsed(loadFriendsCardPreference());
+  setFriendCardCollapsed(true);
+  setFriendsCardCollapsed(true);
   el.settingsToggleButton.title = "Settings";
   el.settingsToggleButton.setAttribute("aria-label", "Settings");
   el.studyTimerToggleButton.title = "Study timer";
