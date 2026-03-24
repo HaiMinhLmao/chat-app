@@ -1651,7 +1651,7 @@ function createHomeAction(label, copy, action) {
   return button;
 }
 
-function createHomeShortcut(name, meta, datasetKey, datasetValue) {
+function createHomeShortcut(name, meta, datasetKey, datasetValue, avatarUrl) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "home-shortcut";
@@ -1659,7 +1659,7 @@ function createHomeShortcut(name, meta, datasetKey, datasetValue) {
 
   const avatar = document.createElement("div");
   avatar.className = "channel-avatar";
-  avatar.textContent = initials(name);
+  syncAvatarNode(avatar, name, avatarUrl || "");
 
   const copy = document.createElement("div");
   copy.className = "home-shortcut-copy";
@@ -1711,6 +1711,9 @@ function renderHomeOverview() {
   const wrap = document.createElement("div");
   wrap.className = "home-overview";
 
+  const frame = document.createElement("section");
+  frame.className = "home-frame";
+
   const hero = document.createElement("section");
   hero.className = "home-hero";
   const kicker = document.createElement("div");
@@ -1740,6 +1743,7 @@ function renderHomeOverview() {
       getPreview("direct", email, friend.email || "Ready to chat"),
       "homeFriend",
       email,
+      friend.avatarUrl || "",
     );
   });
 
@@ -1749,6 +1753,7 @@ function renderHomeOverview() {
       getPreview("group", group.id, group.category || "Open room"),
       "homeGroup",
       group.id,
+      "",
     ),
   );
 
@@ -1767,7 +1772,8 @@ function renderHomeOverview() {
     ),
   );
 
-  wrap.append(hero, sections);
+  frame.append(hero, sections);
+  wrap.append(frame);
   el.messagesArea.appendChild(wrap);
   el.messagesArea.scrollTop = 0;
 }
@@ -2209,6 +2215,10 @@ function renderFriends() {
       ),
     );
   });
+  if (activeChannel.type === "home" && visibleFriends.length) {
+    selectDirect(visibleFriends[0]);
+    return;
+  }
   highlightSelection();
   renderFavoritesStrip();
   refreshHomeOverviewIfNeeded();

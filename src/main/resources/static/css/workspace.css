@@ -96,6 +96,37 @@ select {
   display: grid;
   grid-template-columns: 118px 366px minmax(0, 1fr);
   gap: 18px;
+  position: relative;
+}
+
+.app-shell::before {
+  content: "Search";
+  position: absolute;
+  top: 20px;
+  left: 154px;
+  right: 18px;
+  height: 84px;
+  padding: 0 34px 0 84px;
+  border-radius: 0 0 0 0;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  font-size: 28px;
+  font-weight: 500;
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.06);
+  z-index: 1;
+}
+
+.app-shell::after {
+  content: "Hello";
+  position: absolute;
+  top: 48px;
+  right: 116px;
+  color: #64748b;
+  font-size: 16px;
+  z-index: 2;
 }
 
 .panel {
@@ -115,6 +146,7 @@ select {
 .sidebar,
 .main {
   overflow: hidden;
+  margin-top: 84px;
 }
 
 .rail {
@@ -457,7 +489,56 @@ select {
 }
 
 .friends-search {
+  display: block;
+}
+
+.sidebar-topbar,
+.sidebar-account,
+.favorites-panel,
+#friendCard,
+.sidebar-divider {
   display: none;
+}
+
+.sidebar {
+  padding: 34px 0 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar::before {
+  content: "Chat";
+  display: block;
+  padding: 0 34px 26px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: #172554;
+}
+
+#friendsCard {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#friendsCard .card-heading {
+  display: none;
+}
+
+#friendsCard .collapsible-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  max-height: none;
+  margin-top: 0;
+  opacity: 1;
 }
 
 .favorites-panel {
@@ -1299,7 +1380,8 @@ body.inbox-open .inbox {
 }
 
 .friends-search {
-  margin-bottom: 12px;
+  margin-bottom: 0;
+  padding: 0 22px 14px 0;
 }
 
 #friendsList {
@@ -1310,7 +1392,8 @@ body.inbox-open .inbox {
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-gutter: stable;
-  padding-right: 4px;
+  padding-right: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .eyebrow {
@@ -1350,6 +1433,12 @@ body.inbox-open .inbox {
   background: var(--input-bg);
   color: var(--text);
   padding: 14px 16px;
+}
+
+.friends-search-input {
+  border-radius: 14px 14px 0 0;
+  border-color: rgba(148, 163, 184, 0.14);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .friend-form input:focus,
@@ -1458,12 +1547,14 @@ body.inbox-open .inbox {
 
 .channel-item {
   width: 100%;
-  padding: 12px 14px;
+  padding: 16px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
   text-align: left;
   cursor: pointer;
+  border-radius: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
   transition:
     border-color 0.18s ease,
     background 0.18s ease,
@@ -1472,9 +1563,9 @@ body.inbox-open .inbox {
 
 .channel-item:hover,
 .channel-item.active {
-  border-color: rgba(37, 99, 235, 0.14);
-  background: rgba(37, 99, 235, 0.06);
-  transform: translateX(2px);
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  transform: none;
 }
 
 .channel-avatar {
