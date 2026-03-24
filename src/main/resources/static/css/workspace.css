@@ -580,6 +580,8 @@ body.study-timer-open .study-timer-popover {
 .study-timer-popover:fullscreen .study-timer-shortcuts,
 .study-timer-popover:fullscreen .study-timer-stats,
 .study-timer-popover:fullscreen .study-timer-laps,
+.study-timer-popover:fullscreen .study-timer-display-meta,
+.study-timer-popover:fullscreen .study-timer-progress,
 .study-timer-popover:fullscreen .study-timer-helper,
 .study-timer-popover:fullscreen .study-timer-badge,
 .study-timer-popover:-webkit-full-screen .study-timer-popover-header,
@@ -588,6 +590,8 @@ body.study-timer-open .study-timer-popover {
 .study-timer-popover:-webkit-full-screen .study-timer-shortcuts,
 .study-timer-popover:-webkit-full-screen .study-timer-stats,
 .study-timer-popover:-webkit-full-screen .study-timer-laps,
+.study-timer-popover:-webkit-full-screen .study-timer-display-meta,
+.study-timer-popover:-webkit-full-screen .study-timer-progress,
 .study-timer-popover:-webkit-full-screen .study-timer-helper,
 .study-timer-popover:-webkit-full-screen .study-timer-badge {
   display: none !important;
@@ -621,10 +625,40 @@ body.study-timer-open .study-timer-popover {
 
 .study-timer-popover:fullscreen .study-timer-time,
 .study-timer-popover:-webkit-full-screen .study-timer-time {
+  align-items: center;
+  gap: min(3vw, 28px);
+}
+
+.study-timer-popover:fullscreen .study-timer-time-part,
+.study-timer-popover:-webkit-full-screen .study-timer-time-part {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.study-timer-popover:fullscreen .study-timer-time-value,
+.study-timer-popover:-webkit-full-screen .study-timer-time-value,
+.study-timer-popover:fullscreen .study-timer-time-separator,
+.study-timer-popover:-webkit-full-screen .study-timer-time-separator {
   color: #e5e7eb;
-  font-size: min(32vw, 420px);
   line-height: 0.9;
-  letter-spacing: -0.12em;
+}
+
+.study-timer-popover:fullscreen .study-timer-time-value,
+.study-timer-popover:-webkit-full-screen .study-timer-time-value {
+  font-size: min(25vw, 340px);
+  letter-spacing: -0.06em;
+}
+
+.study-timer-popover:fullscreen .study-timer-time-caption,
+.study-timer-popover:-webkit-full-screen .study-timer-time-caption {
+  display: none;
+}
+
+.study-timer-popover:fullscreen .study-timer-time-separator,
+.study-timer-popover:-webkit-full-screen .study-timer-time-separator {
+  font-size: min(15vw, 180px);
+  padding-bottom: 0;
 }
 
 .settings-account {
@@ -1410,6 +1444,37 @@ body.theme-dark .study-timer-badge[data-variant="break"] {
   color: #34d399;
 }
 
+body.theme-dark .study-timer-display {
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.2), transparent 38%),
+    linear-gradient(135deg, #0f172a 0%, #111827 100%);
+  border-color: rgba(96, 165, 250, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body.theme-dark .study-timer-display-label,
+body.theme-dark .study-timer-time-caption {
+  color: #94a3b8;
+}
+
+body.theme-dark .study-timer-display-phase {
+  background: rgba(148, 163, 184, 0.14);
+  color: #e2e8f0;
+}
+
+body.theme-dark .study-timer-time-part {
+  background: rgba(2, 6, 23, 0.52);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+body.theme-dark .study-timer-progress {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+body.theme-dark .study-timer-time-separator {
+  color: rgba(226, 232, 240, 0.42);
+}
+
 body.theme-dark .study-timer-shortcut:hover:not(:disabled) {
   background: transparent;
   color: #f8fafc;
@@ -1512,23 +1577,114 @@ body.theme-dark .study-timer-shortcut-key {
 .study-timer-shortcut,
 .study-timer-laps {
   border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 18px;
+  border-radius: 24px;
   background: rgba(255, 255, 255, 0.88);
 }
 
 .study-timer-display {
-  padding: 20px;
+  padding: 18px 20px 20px;
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 34%),
+    linear-gradient(135deg, rgba(248, 250, 252, 0.98) 0%, rgba(239, 246, 255, 0.98) 100%);
+  border-color: rgba(96, 165, 250, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.study-timer-display-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.study-timer-display-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.study-timer-display-phase {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .study-timer-time {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(8px, 2vw, 18px);
+}
+
+.study-timer-time-part {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 14px 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.study-timer-time-value {
+  display: block;
   font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(38px, 6vw, 64px);
-  line-height: 0.94;
-  letter-spacing: -0.08em;
+  font-size: clamp(40px, 7vw, 76px);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.study-timer-time-caption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.study-timer-time-separator {
+  align-self: center;
+  color: rgba(15, 23, 42, 0.34);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(24px, 4vw, 42px);
+  font-weight: 700;
+  line-height: 1;
+  padding-bottom: 30px;
+}
+
+.study-timer-progress {
+  margin-top: 18px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.study-timer-progress-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
+  transition: width 0.18s ease;
 }
 
 .study-timer-helper {
-  margin: 10px 0 0;
+  margin: 14px 0 0;
   color: var(--muted);
   line-height: 1.6;
 }
@@ -2020,6 +2176,23 @@ body.compact-chat .empty-state h2 {
   .study-timer-shortcuts {
     gap: 6px 0;
   }
+
+  .study-timer-display-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .study-timer-time {
+    gap: 8px;
+  }
+
+  .study-timer-time-value {
+    font-size: clamp(34px, 10vw, 54px);
+  }
+
+  .study-timer-time-separator {
+    padding-bottom: 24px;
+  }
 }
 
 @media (max-width: 760px) {
@@ -2256,6 +2429,23 @@ body.compact-chat .empty-state h2 {
     padding: 18px;
   }
 
+  .study-timer-display-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .study-timer-time {
+    gap: 8px;
+  }
+
+  .study-timer-time-value {
+    font-size: clamp(34px, 10vw, 54px);
+  }
+
+  .study-timer-time-separator {
+    padding-bottom: 24px;
+  }
+
   .study-timer-shortcut {
     padding: 0 12px;
   }
@@ -2365,6 +2555,26 @@ body.compact-chat .empty-state h2 {
 
   .settings-popover-title {
     font-size: 21px;
+  }
+
+  .study-timer-time-part {
+    padding: 12px 6px 10px;
+    border-radius: 16px;
+  }
+
+  .study-timer-time-value {
+    font-size: clamp(28px, 11vw, 40px);
+  }
+
+  .study-timer-time-caption {
+    margin-top: 6px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .study-timer-time-separator {
+    font-size: 22px;
+    padding-bottom: 20px;
   }
 
   .toast {

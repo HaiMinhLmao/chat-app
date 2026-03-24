@@ -628,6 +628,26 @@ function formatStudyTimerClock(ms) {
   return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
 }
 
+function getStudyTimerClockParts(ms) {
+  const safe = Math.max(0, ms);
+  const totalSeconds = Math.floor(safe / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return {
+    hours: String(hours).padStart(2, "0"),
+    minutes: String(minutes).padStart(2, "0"),
+    seconds: String(seconds).padStart(2, "0"),
+  };
+}
+
+function getStudyTimerDisplayProgress(snapshot) {
+  if (snapshot.mode === "countdown" || snapshot.mode === "pomodoro") {
+    return Math.max(0, Math.min(1, snapshot.progress || 0));
+  }
+  return ((snapshot.elapsedMs || 0) % MINUTE_MS) / MINUTE_MS;
+}
+
 function deriveStudyTimerSnapshot(now) {
   const currentTime = now || Date.now();
   const runningDelta =
@@ -743,7 +763,43 @@ function refreshStudyTimerUi(now) {
   });
 
   const display = panel.querySelector("[data-study-display]");
-  if (display) display.textContent = formatStudyTimerClock(getStudyTimerDisplayMs(snapshot));
+  if (display) {
+    const displayMs = getStudyTimerDisplayMs(snapshot);
+    const parts = getStudyTimerClockParts(displayMs);
+    display.setAttribute("aria-label", formatStudyTimerClock(displayMs));
+
+    const hours = panel.querySelector("[data-study-hours]");
+    const minutes = panel.querySelector("[data-study-minutes]");
+    const seconds = panel.querySelector("[data-study-seconds]");
+    if (hours) hours.textContent = parts.hours;
+    if (minutes) minutes.textContent = parts.minutes;
+    if (seconds) seconds.textContent = parts.seconds;
+
+    const displayLabel = panel.querySelector("[data-study-display-label]");
+    if (displayLabel) {
+      displayLabel.textContent =
+        snapshot.mode === "stopwatch"
+          ? localizeText("Buổi học hiện tại", "Current study session")
+          : snapshot.mode === "countdown"
+            ? localizeText("Mục tiêu đếm ngược", "Countdown target")
+            : localizeText("Nhịp Pomodoro", "Pomodoro cycle");
+    }
+
+    const displayPhase = panel.querySelector("[data-study-display-phase]");
+    if (displayPhase) {
+      displayPhase.textContent =
+        snapshot.mode === "stopwatch"
+          ? localizeText("Đang đếm", "Live")
+          : snapshot.mode === "countdown"
+            ? localizeText("Còn lại", "Remaining")
+            : snapshot.phase === "break"
+              ? localizeText("Pha nghỉ", "Break phase")
+              : localizeText("Pha tập trung", "Focus phase");
+    }
+
+    const progressBar = panel.querySelector("[data-study-progress-bar]");
+    if (progressBar) progressBar.style.width = Math.round(getStudyTimerDisplayProgress(snapshot) * 100) + "%";
+  }
 
   const helper = panel.querySelector("[data-study-helper]");
   if (helper) {
@@ -1141,15 +1197,40 @@ function createStudyTimerPanel() {
   const display = document.createElement("div");
   display.className = "study-timer-display";
 
+  const displayMeta = document.createElement("div");
+  displayMeta.className = "study-timer-display-meta";
+
+  const displayLabel = document.createElement("span");
+  displayLabel.className = "study-timer-display-label";
+  displayLabel.dataset.studyDisplayLabel = "true";
+
+  const displayPhase = document.createElement("span");
+  displayPhase.className = "study-timer-display-phase";
+  displayPhase.dataset.studyDisplayPhase = "true";
+
+  displayMeta.append(displayLabel, displayPhase);
+
   const time = document.createElement("div");
   time.className = "study-timer-time";
   time.dataset.studyDisplay = "true";
+  time.innerHTML =
+    '<div class="study-timer-time-part"><strong class="study-timer-time-value" data-study-hours="true">00</strong><span class="study-timer-time-caption">' +
+    localizeText("Giờ", "Hours") +
+    '</span></div><span class="study-timer-time-separator" aria-hidden="true">:</span><div class="study-timer-time-part"><strong class="study-timer-time-value" data-study-minutes="true">00</strong><span class="study-timer-time-caption">' +
+    localizeText("Phút", "Minutes") +
+    '</span></div><span class="study-timer-time-separator" aria-hidden="true">:</span><div class="study-timer-time-part"><strong class="study-timer-time-value" data-study-seconds="true">00</strong><span class="study-timer-time-caption">' +
+    localizeText("Giây", "Seconds") +
+    "</span></div>";
+
+  const progress = document.createElement("div");
+  progress.className = "study-timer-progress";
+  progress.innerHTML = '<span class="study-timer-progress-bar" data-study-progress-bar="true"></span>';
 
   const helper = document.createElement("p");
   helper.className = "study-timer-helper";
   helper.dataset.studyHelper = "true";
 
-  display.append(time, helper);
+  display.append(displayMeta, time, progress, helper);
 
   const config = document.createElement("div");
   config.className = "study-timer-config";
