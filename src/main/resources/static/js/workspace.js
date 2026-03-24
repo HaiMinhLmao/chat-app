@@ -84,6 +84,9 @@ const el = {
   newGroupBtn: mustGetButton("newGroupBtn"),
   studyTimerToggleButton: mustGetButton("studyTimerToggleButton"),
   settingsToggleButton: mustGetButton("settingsToggleButton"),
+  dashboardNavButton: getOptionalButton("dashboardNavButton"),
+  friendsNavButton: getOptionalButton("friendsNavButton"),
+  groupNavButton: getOptionalButton("groupNavButton"),
   userAvatar: mustGetElement("userAvatar"),
   userName: mustGetElement("userName"),
   userEmail: mustGetElement("userEmail"),
@@ -132,12 +135,20 @@ const el = {
   friendsList: mustGetElement("friendsList"),
   friendsCount: mustGetElement("friendsCount"),
   friendsEmpty: mustGetElement("friendsEmpty"),
+  friendsSection: getOptionalElement("friendsSection"),
   favoriteAvatars: getOptionalElement("favoriteAvatars"),
   favoritesEmpty: getOptionalElement("favoritesEmpty"),
   favoritesCount: getOptionalElement("favoritesCount"),
   groupsList: getOptionalElement("groupsList"),
   groupsEmpty: getOptionalElement("groupsEmpty"),
+  groupsSection: getOptionalElement("groupsSection"),
   createGroupSidebarBtn: getOptionalButton("createGroupSidebarBtn"),
+  filterAllButton: getOptionalButton("filterAllButton"),
+  filterPersonalButton: getOptionalButton("filterPersonalButton"),
+  filterGroupsButton: getOptionalButton("filterGroupsButton"),
+  clearSearchButton: getOptionalButton("clearSearchButton"),
+  previewFilterSummary: getOptionalElement("previewFilterSummary"),
+  previewRosterBadge: getOptionalElement("previewRosterBadge"),
   chatKicker: mustGetElement("chatKicker"),
   chatTitle: mustGetElement("chatTitle"),
   chatSubtitle: mustGetElement("chatSubtitle"),
@@ -161,6 +172,18 @@ const el = {
   groupInvitationsCount: mustGetElement("groupInvitationsCount"),
   groupInvitationsEmpty: mustGetElement("groupInvitationsEmpty"),
   toast: mustGetElement("toast"),
+  previewApp: getOptionalElement("previewApp"),
+  previewSidebarAvatar: getOptionalElement("previewSidebarAvatar"),
+  previewDetails: getOptionalElement("previewDetails"),
+  previewCloseProfile: getOptionalButton("previewCloseProfile"),
+  previewProfileAvatar: getOptionalElement("previewProfileAvatar"),
+  previewProfileName: getOptionalElement("previewProfileName"),
+  previewProfileEmail: getOptionalElement("previewProfileEmail"),
+  previewProfilePhone: getOptionalElement("previewProfilePhone"),
+  previewProfileStatus: getOptionalElement("previewProfileStatus"),
+  previewMutualCount: getOptionalElement("previewMutualCount"),
+  previewAddFriendBtn: getOptionalButton("previewAddFriendBtn"),
+  previewGroupInfoBtn: getOptionalButton("previewGroupInfoBtn"),
 };
 
 // Runtime state
@@ -179,6 +202,7 @@ let reconnectTimer = null;
 let workspaceRefreshTimer = null;
 let notificationsPrimed = false;
 let friendSearchQuery = "";
+let rosterFilter = "all";
 const previews = new Map();
 const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
@@ -529,6 +553,7 @@ function syncCurrentUserUi() {
   if (!currentUser) return;
   const name = displayName(currentUser);
   syncAvatarNode(el.userAvatar, name, currentUser.avatarUrl);
+  syncAvatarNode(el.previewSidebarAvatar, name, currentUser.avatarUrl);
   el.userName.textContent = name;
   el.userEmail.textContent = currentUser.email;
   syncAvatarNode(el.selfRailLabel, name, currentUser.avatarUrl);
@@ -548,7 +573,107 @@ function syncCurrentUserUi() {
     syncAvatarNode(el.chatAvatar, name, currentUser.avatarUrl);
     refreshHomeOverviewIfNeeded();
   }
+  syncPreviewProfilePanel();
   renderFavoritesStrip();
+}
+
+function setPreviewDetailsOpen(nextOpen) {
+  if (!el.previewApp || !el.previewDetails) return;
+  el.previewApp.classList.toggle("details-open", nextOpen);
+  if (nextOpen) {
+    el.previewDetails.scrollTop = 0;
+  }
+}
+
+function closePreviewDetails() {
+  setPreviewDetailsOpen(false);
+}
+
+function showPreviewAction(button, visible, label, disabled) {
+  if (!button) return;
+  button.hidden = !visible;
+  button.disabled = Boolean(disabled);
+  if (visible && label) {
+    button.textContent = label;
+  }
+}
+
+function activeGroupRecord() {
+  return groups.find((group) => String(group.id) === String(activeChannel.id || ""));
+}
+
+function activeFriendRecord() {
+  return socialState.friends.find(
+    (friend) => normalizeEmail(friend.email) === String(activeChannel.id || ""),
+  );
+}
+
+function syncPreviewProfilePanel() {
+  if (
+    !el.previewProfileAvatar ||
+    !el.previewProfileName ||
+    !el.previewProfileEmail ||
+    !el.previewProfilePhone ||
+    !el.previewProfileStatus ||
+    !el.previewMutualCount
+  ) {
+    return;
+  }
+
+  let name = displayName(currentUser);
+  let avatarUrl = currentUser && currentUser.avatarUrl;
+  let contact = currentUser && currentUser.email ? currentUser.email : "workspace@myclassroom.app";
+  let detail = currentUser && currentUser.birthDate ? "Birthday: " + currentUser.birthDate : "Workspace owner";
+  let status = "Your workspace";
+  let meta = String(socialState.friends.length) + " active friends";
+  let emailHref = currentUser && currentUser.email ? "mailto:" + currentUser.email : "#";
+
+  if (activeChannel.type === "direct") {
+    const friend = activeFriendRecord();
+    if (friend) {
+      name = displayName(friend);
+      avatarUrl = friend.avatarUrl || "";
+      contact = friend.email || "friend@myclassroom.app";
+      detail = "Direct message";
+      status = "Accepted friend";
+      meta = groups.length ? String(groups.length) + " active groups in workspace" : "Ready to chat";
+      emailHref = friend.email ? "mailto:" + friend.email : "#";
+    }
+  } else if (activeChannel.type === "group") {
+    const group = activeGroupRecord();
+    if (group) {
+      name = group.name || "Study Group";
+      avatarUrl = "";
+      contact = group.category || "Group room";
+      detail = group.description || "Shared workspace for classmates and team members.";
+      status = "Group conversation";
+      meta = String(groups.length) + " groups available";
+      emailHref = "#";
+    }
+  }
+
+  syncAvatarNode(el.previewProfileAvatar, name, avatarUrl || "");
+  el.previewProfileName.textContent = name;
+  el.previewProfileEmail.textContent = contact;
+  if ("href" in el.previewProfileEmail) {
+    el.previewProfileEmail.href = emailHref;
+  }
+  el.previewProfilePhone.textContent = detail;
+  el.previewProfileStatus.textContent = status;
+  el.previewMutualCount.textContent = meta;
+
+  showPreviewAction(
+    el.previewAddFriendBtn,
+    activeChannel.type !== "group",
+    activeChannel.type === "home" ? "Add Friend" : "Pinned Contact",
+    activeChannel.type === "direct",
+  );
+  showPreviewAction(
+    el.previewGroupInfoBtn,
+    activeChannel.type === "group",
+    "View Group Info",
+    false,
+  );
 }
 
 function normalizeStudyMinutes(value, fallback, maximum) {
@@ -1308,6 +1433,7 @@ function createStudyTimerPanel() {
 function setFriendCardCollapsed(collapsed) {
   if (!el.friendCard || !el.friendCardToggle) return;
   el.friendCard.classList.toggle("is-collapsed", collapsed);
+  el.friendCardToggle.classList.toggle("active", !collapsed);
   el.friendCardToggle.setAttribute("aria-expanded", String(!collapsed));
   el.friendCardToggle.setAttribute(
     "aria-label",
@@ -2099,6 +2225,7 @@ function addMessage(message, sent, sender, timestamp) {
 // Channel selection and sidebar rendering
 function selectHome() {
   activeChannel = { type: "home" };
+  closePreviewDetails();
   syncSurfaceMode();
   el.chatKicker.textContent = "Overview";
   el.chatTitle.textContent = displayName(currentUser);
@@ -2107,6 +2234,7 @@ function selectHome() {
   showBanner("", "info");
   disconnectSubscription();
   highlightSelection();
+  syncPreviewProfilePanel();
   renderFavoritesStrip();
   renderHomeOverview();
   syncComposer();
@@ -2119,6 +2247,7 @@ function selectDirect(friend) {
     email: friend.email,
     name: displayName(friend),
   };
+  closePreviewDetails();
   syncSurfaceMode();
   el.chatKicker.textContent = "";
   el.chatTitle.textContent = displayName(friend);
@@ -2126,6 +2255,7 @@ function selectDirect(friend) {
   syncAvatarNode(el.chatAvatar, displayName(friend), friend.avatarUrl || "");
   showBanner("", "info");
   highlightSelection();
+  syncPreviewProfilePanel();
   renderFavoritesStrip();
   syncComposer();
   loadDirectHistory(friend.email);
@@ -2134,6 +2264,7 @@ function selectDirect(friend) {
 
 function selectGroup(group) {
   activeChannel = { type: "group", id: group.id, name: group.name || "Study Group" };
+  closePreviewDetails();
   syncSurfaceMode();
   el.chatKicker.textContent = "Group";
   el.chatTitle.textContent = group.name || "Study Group";
@@ -2141,6 +2272,7 @@ function selectGroup(group) {
   syncAvatarNode(el.chatAvatar, group.name || "Study Group", "");
   showBanner("", "info");
   highlightSelection();
+  syncPreviewProfilePanel();
   renderFavoritesStrip();
   syncComposer();
   loadGroupHistory(group.id);
@@ -2157,7 +2289,7 @@ function highlightSelection() {
   });
   el.homeRailButton.classList.toggle(
     "active",
-    activeChannel.type === "home" || activeChannel.type === "direct",
+    activeChannel.type === "home",
   );
   document.querySelectorAll(".rail-group").forEach((item) => {
     item.classList.toggle(
@@ -2188,21 +2320,87 @@ function renderChannel(type, id, name, preview, role, onClick) {
   return button;
 }
 
+function friendMatchesQuery(friend, query) {
+  if (!query) return true;
+  const name = displayName(friend).toLowerCase();
+  const email = String(friend.email || "").toLowerCase();
+  return name.includes(query) || email.includes(query);
+}
+
+function groupMatchesQuery(group, query) {
+  if (!query) return true;
+  const name = String(group.name || "").toLowerCase();
+  const category = String(group.category || "").toLowerCase();
+  const description = String(group.description || "").toLowerCase();
+  return name.includes(query) || category.includes(query) || description.includes(query);
+}
+
+function visibleFriends() {
+  if (rosterFilter === "group") return [];
+  const query = friendSearchQuery.trim().toLowerCase();
+  return socialState.friends.filter((friend) => friendMatchesQuery(friend, query));
+}
+
+function visibleGroups() {
+  if (rosterFilter === "personal") return [];
+  const query = friendSearchQuery.trim().toLowerCase();
+  return groups.filter((group) => groupMatchesQuery(group, query));
+}
+
+function syncRosterFilterUi() {
+  const tabs = [
+    [el.filterAllButton, "all"],
+    [el.filterPersonalButton, "personal"],
+    [el.filterGroupsButton, "group"],
+  ];
+  tabs.forEach(([button, filter]) => {
+    if (!button) return;
+    const active = rosterFilter === filter;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+
+  if (el.clearSearchButton) {
+    el.clearSearchButton.hidden = !friendSearchQuery.trim();
+  }
+
+  const personalCount = visibleFriends().length;
+  const groupCount = visibleGroups().length;
+  if (el.previewFilterSummary) {
+    const parts = [];
+    if (rosterFilter !== "group") parts.push(String(personalCount) + " personal");
+    if (rosterFilter !== "personal") parts.push(String(groupCount) + " groups");
+    const label = parts.length ? parts.join(" • ") : "No results";
+    el.previewFilterSummary.textContent = friendSearchQuery.trim()
+      ? 'Search "' + friendSearchQuery.trim() + '" • ' + label
+      : label;
+  }
+
+  if (el.previewRosterBadge) {
+    const totalVisible = personalCount + groupCount;
+    el.previewRosterBadge.textContent = totalVisible ? String(totalVisible) + " ready" : "Ready";
+  }
+}
+
+function setRosterFilter(nextFilter) {
+  rosterFilter = nextFilter;
+  syncRosterFilterUi();
+  renderFriends();
+  renderGroups();
+}
+
 function renderFriends() {
   el.friendsList.innerHTML = "";
-  el.friendsCount.textContent = String(socialState.friends.length);
-  const query = friendSearchQuery.trim().toLowerCase();
-  const visibleFriends = socialState.friends.filter((friend) => {
-    if (!query) return true;
-    const name = displayName(friend).toLowerCase();
-    const email = String(friend.email || "").toLowerCase();
-    return name.includes(query) || email.includes(query);
-  });
+  const matches = visibleFriends();
+  if (el.friendsSection) {
+    el.friendsSection.hidden = rosterFilter === "group";
+  }
+  el.friendsCount.textContent = String(matches.length);
   el.friendsEmpty.textContent = socialState.friends.length
     ? "No friends match your search."
     : "No accepted friends yet.";
-  el.friendsEmpty.style.display = visibleFriends.length ? "none" : "block";
-  visibleFriends.forEach((friend) => {
+  el.friendsEmpty.style.display = matches.length ? "none" : "block";
+  matches.forEach((friend) => {
     const email = normalizeEmail(friend.email);
     el.friendsList.appendChild(
       renderChannel(
@@ -2215,10 +2413,7 @@ function renderFriends() {
       ),
     );
   });
-  if (activeChannel.type === "home" && visibleFriends.length) {
-    selectDirect(visibleFriends[0]);
-    return;
-  }
+  syncRosterFilterUi();
   highlightSelection();
   renderFavoritesStrip();
   refreshHomeOverviewIfNeeded();
@@ -2230,7 +2425,11 @@ function renderGroups() {
   }
   if (el.groupsList) {
     el.groupsList.innerHTML = "";
-    groups.forEach((group) => {
+    const matches = visibleGroups();
+    if (el.groupsSection) {
+      el.groupsSection.hidden = rosterFilter === "personal";
+    }
+    matches.forEach((group) => {
       el.groupsList.appendChild(
         renderChannel(
           "group",
@@ -2242,6 +2441,13 @@ function renderGroups() {
         ),
       );
     });
+    if (el.groupsEmpty) {
+      el.groupsEmpty.style.display = matches.length ? "none" : "block";
+      el.groupsEmpty.textContent = groups.length
+        ? "No groups match your search."
+        : "No active groups yet.";
+    }
+    el.overviewGroups.textContent = String(matches.length);
   }
   if (el.groupRailList) {
     groups.forEach((group) => {
@@ -2262,10 +2468,7 @@ function renderGroups() {
       el.groupRailList.appendChild(button);
     });
   }
-  if (el.groupsEmpty) {
-    el.groupsEmpty.style.display = groups.length ? "none" : "block";
-  }
-  el.overviewGroups.textContent = String(groups.length);
+  syncRosterFilterUi();
   highlightSelection();
   renderFavoritesStrip();
   refreshHomeOverviewIfNeeded();
@@ -2687,7 +2890,8 @@ async function bootstrap() {
   }
   syncCurrentUserUi();
   setFriendCardCollapsed(true);
-  setFriendsCardCollapsed(true);
+  setFriendsCardCollapsed(false);
+  setRosterFilter("all");
   el.settingsToggleButton.title = "Settings";
   el.settingsToggleButton.setAttribute("aria-label", "Settings");
   el.studyTimerToggleButton.title = "Study timer";
@@ -2720,7 +2924,88 @@ el.friendsSearchInput.addEventListener("input", (event) => {
   const input = /** @type {HTMLInputElement} */ (event.currentTarget);
   friendSearchQuery = input.value || "";
   renderFriends();
+  renderGroups();
 });
+
+const previewChatHead = document.querySelector(".preview-chat-head");
+if (previewChatHead) {
+  previewChatHead.addEventListener("click", (event) => {
+    const target = asElement(event.target);
+    if (target && target.closest("button")) return;
+    setPreviewDetailsOpen(true);
+  });
+}
+
+if (el.previewCloseProfile) {
+  el.previewCloseProfile.addEventListener("click", closePreviewDetails);
+}
+
+if (el.previewAddFriendBtn) {
+  el.previewAddFriendBtn.addEventListener("click", () => {
+    closePreviewDetails();
+    setRosterFilter("personal");
+    setFriendCardCollapsed(false);
+    el.friendEmailInput.focus();
+  });
+}
+
+if (el.dashboardNavButton) {
+  el.dashboardNavButton.addEventListener("click", () => {
+    closePreviewDetails();
+    setRosterFilter("all");
+    selectHome();
+  });
+}
+
+if (el.friendsNavButton) {
+  el.friendsNavButton.addEventListener("click", () => {
+    closePreviewDetails();
+    setRosterFilter("personal");
+    setFriendsCardCollapsed(false);
+    const matches = visibleFriends();
+    if (matches.length) {
+      selectDirect(matches[0]);
+    }
+    el.friendsSearchInput.focus();
+  });
+}
+
+if (el.groupNavButton) {
+  el.groupNavButton.addEventListener("click", () => {
+    closePreviewDetails();
+    setRosterFilter("group");
+    setFriendsCardCollapsed(false);
+    const matches = visibleGroups();
+    if (matches.length) {
+      selectGroup(matches[0]);
+      return;
+    }
+    if (el.groupsList) {
+      el.groupsList.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+}
+
+if (el.filterAllButton) {
+  el.filterAllButton.addEventListener("click", () => setRosterFilter("all"));
+}
+
+if (el.filterPersonalButton) {
+  el.filterPersonalButton.addEventListener("click", () => setRosterFilter("personal"));
+}
+
+if (el.filterGroupsButton) {
+  el.filterGroupsButton.addEventListener("click", () => setRosterFilter("group"));
+}
+
+if (el.clearSearchButton) {
+  el.clearSearchButton.addEventListener("click", () => {
+    friendSearchQuery = "";
+    el.friendsSearchInput.value = "";
+    setRosterFilter(rosterFilter);
+    el.friendsSearchInput.focus();
+  });
+}
 
 [el.settingsThemeLight, el.settingsThemeDark, el.settingsThemeAuto]
   .filter(Boolean)
@@ -2919,7 +3204,10 @@ el.attachmentInput.addEventListener("change", async (event) => {
   }
 });
 
-el.homeRailButton.addEventListener("click", selectHome);
+el.homeRailButton.addEventListener("click", () => {
+  setRosterFilter("all");
+  selectHome();
+});
 el.newGroupBtn.addEventListener("click", toggleCreateGroupPopover);
 el.studyTimerToggleButton.addEventListener("click", toggleStudyTimerPopover);
 el.settingsToggleButton.addEventListener("click", toggleSettingsPopover);

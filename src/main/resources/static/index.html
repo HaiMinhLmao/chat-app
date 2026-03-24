@@ -3,335 +3,403 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MyClassRoom Workspace</title>
+    <title>MyClassRoom Inbox</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
-    <link rel="stylesheet" href="/css/workspace.css" />
+    <link rel="stylesheet" href="css/workspace.css" />
   </head>
-  <body>
-    <div class="app-shell">
-      <aside class="rail panel">
-        <div class="rail-stack rail-stack-top">
-          <button class="rail-btn brand" type="button" title="MyClassRoom">
-            <span class="rail-brand-mark">MC</span>
-            <span class="rail-btn-copy">
-              <strong class="rail-btn-title">MyClassRoom</strong>
-              <span class="rail-btn-subtitle">Study workspace</span>
-            </span>
-          </button>
-          <button class="rail-btn active" id="homeRailButton" type="button" title="Workspace">
-            <span id="selfRailLabel">ME</span>
-            <span class="rail-btn-copy">
-              <strong class="rail-btn-title">Chats</strong>
-              <span class="rail-btn-subtitle">Workspace & direct messages</span>
-            </span>
-          </button>
-          <button
-            class="rail-btn rail-action-btn"
-            id="studyTimerToggleButton"
-            type="button"
-            title="Study timer"
-            aria-label="Study timer"
-          >
-            <span class="rail-btn-glyph" aria-hidden="true">
-              <span class="rail-icon">
+  <body class="preview-page">
+    <main class="preview-shell">
+      <section class="preview-app" id="previewApp">
+        <aside class="preview-sidebar">
+          <div class="preview-brand">
+            <span class="preview-brand-mark">MC</span>
+          </div>
+
+          <nav class="preview-nav" aria-label="Primary">
+            <button class="preview-nav-item" id="dashboardNavButton" type="button">
+              <span class="preview-nav-icon">
                 <svg viewBox="0 0 24 24">
-                  <circle cx="12" cy="13" r="6.5"></circle>
-                  <path d="M12 9.7v3.7l2.3 1.5"></path>
-                  <path d="M9 3.5h6"></path>
-                  <path d="M16.8 5.6l1.7-1.6"></path>
+                  <path d="M4 12.5L12 5l8 7.5"></path>
+                  <path d="M6.5 10.8V19h11V10.8"></path>
                 </svg>
               </span>
-            </span>
-            <span class="rail-btn-copy">
-              <strong class="rail-btn-title">Focus</strong>
-              <span class="rail-btn-subtitle">Study timer & pomodoro</span>
-            </span>
-          </button>
-          <div class="rail-group-list" id="groupRailList"></div>
-        </div>
-        <div class="rail-divider" aria-hidden="true"></div>
-        <div class="rail-stack rail-stack-bottom">
-          <button
-            class="rail-btn rail-action-btn"
-            id="notificationToggleButton"
-            type="button"
-            title="Thông báo"
-            aria-label="Thông báo"
-          >
-            <span class="rail-btn-glyph" aria-hidden="true">
-              <span class="rail-icon">
+              <span>Dashboard</span>
+            </button>
+            <button class="preview-nav-item" type="button">
+              <span class="preview-nav-icon">
                 <svg viewBox="0 0 24 24">
-                  <path d="M9.5 18.5a2.5 2.5 0 0 0 5 0"></path>
-                  <path
-                    d="M18 16.5H6l1.4-1.6a2 2 0 0 0 .5-1.3V11a4.1 4.1 0 1 1 8.2 0v2.6a2 2 0 0 0 .5 1.3z"
-                  ></path>
+                  <path d="M4 20h16"></path>
+                  <path d="M6 20V8l6-4 6 4v12"></path>
+                  <path d="M9 11h1"></path>
+                  <path d="M9 14h1"></path>
+                  <path d="M14 11h1"></path>
+                  <path d="M14 14h1"></path>
                 </svg>
               </span>
-            </span>
-            <span class="rail-btn-copy">
-              <strong class="rail-btn-title">Notifications</strong>
-              <span class="rail-btn-subtitle">Friend requests & invites</span>
-            </span>
-            <span class="badge" id="notificationBadge" hidden>0</span>
-          </button>
-          <button
-            class="rail-btn rail-action-btn"
-            id="newGroupBtn"
-            type="button"
-            title="Tạo nhóm"
-            aria-label="Tạo nhóm"
-          >
-            <span class="rail-btn-glyph" aria-hidden="true">
-              <span class="rail-icon">
+              <span>Apartments</span>
+            </button>
+            <button class="preview-nav-item" type="button">
+              <span class="preview-nav-icon">
                 <svg viewBox="0 0 24 24">
-                  <path d="M12 5v14"></path>
-                  <path d="M5 12h14"></path>
+                  <rect x="4" y="5" width="16" height="15" rx="2"></rect>
+                  <path d="M8 3v4"></path>
+                  <path d="M16 3v4"></path>
+                  <path d="M4 10h16"></path>
                 </svg>
               </span>
-            </span>
-            <span class="rail-btn-copy">
-              <strong class="rail-btn-title">Create group</strong>
-              <span class="rail-btn-subtitle">Open a new study room</span>
-            </span>
-          </button>
-          <button
-            class="rail-btn rail-action-btn"
-            id="settingsToggleButton"
-            type="button"
-            title="Settings"
-            aria-label="Settings"
-          >
-            <span class="rail-btn-glyph" aria-hidden="true">
-              <span class="rail-icon">
+              <span>Bookings</span>
+            </button>
+            <button class="preview-nav-item" type="button">
+              <span class="preview-nav-icon">
+                <svg viewBox="0 0 24 24">
+                  <path d="M6 12h12"></path>
+                  <path d="M6 7h12"></path>
+                  <path d="M6 17h7"></path>
+                </svg>
+              </span>
+              <span>Tasks</span>
+            </button>
+            <button class="preview-nav-item" id="studyTimerToggleButton" type="button" title="Study timer">
+              <span class="preview-nav-icon">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="7"></circle>
+                  <path d="M12 8v4l2.8 2"></path>
+                </svg>
+              </span>
+              <span>Time</span>
+            </button>
+            <button class="preview-nav-item" id="friendsNavButton" type="button">
+              <span class="preview-nav-icon">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="9" cy="9" r="3"></circle>
+                  <path d="M4 18a5 5 0 0 1 10 0"></path>
+                  <circle cx="17" cy="10" r="2.2"></circle>
+                  <path d="M14.8 18a4 4 0 0 1 5.2-3.8"></path>
+                </svg>
+              </span>
+              <span>Friends</span>
+            </button>
+            <button class="preview-nav-item" id="groupNavButton" type="button">
+              <span class="preview-nav-icon">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 7h16"></path>
+                  <path d="M4 12h12"></path>
+                  <path d="M4 17h9"></path>
+                </svg>
+              </span>
+              <span>Group Chat</span>
+            </button>
+            <button class="preview-nav-item" id="notificationToggleButton" type="button" title="Notifications">
+              <span class="preview-active-pill" aria-hidden="true"></span>
+              <span class="preview-nav-icon">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 7.5A2.5 2.5 0 0 1 7.5 5h9A2.5 2.5 0 0 1 19 7.5v6A2.5 2.5 0 0 1 16.5 16H11l-4 3v-3H7.5A2.5 2.5 0 0 1 5 13.5z"></path>
+                </svg>
+              </span>
+              <span>Notifications</span>
+              <span class="badge" id="notificationBadge" hidden>0</span>
+            </button>
+            <button class="preview-nav-item" id="aiBotNavButton" type="button" onclick="window.location.href='ai-bot/index.html'">
+              <span class="preview-nav-icon">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 4l7 4v8l-7 4-7-4V8z"></path>
+                  <path d="M9.5 10.5c.7-1.1 1.7-1.6 3-1.6 1.8 0 3 1.1 3 2.6 0 1-.4 1.6-1.5 2.3l-.8.5"></path>
+                  <circle cx="12" cy="16.8" r=".8" fill="currentColor" stroke="none"></circle>
+                </svg>
+              </span>
+              <span>AI Bot</span>
+            </button>
+            <button class="preview-nav-item" id="settingsToggleButton" type="button" title="Settings">
+              <span class="preview-nav-icon">
                 <svg viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="3.1"></circle>
                   <path d="M19.2 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.1 1.1a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9v.2a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.7-.9 1 1 0 0 0-1 .2l-.2.1a1 1 0 0 1-1.4 0l-1.1-1.1a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6h-.2a1 1 0 0 1-1-1v-1.6a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.7 1 1 0 0 0-.2-1l-.1-.2a1 1 0 0 1 0-1.4l1.1-1.1a1 1 0 0 1 1.4 0l.2.1a1 1 0 0 0 1 .2 1 1 0 0 0 .7-.9v-.2a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.1 1.1a1 1 0 0 1 0 1.4l-.1.2a1 1 0 0 0-.2 1 1 1 0 0 0 .9.7h.2a1 1 0 0 1 1 1v1.6a1 1 0 0 1-1 1H20a1 1 0 0 0-.8.6z"></path>
                 </svg>
               </span>
-            </span>
-            <span class="rail-btn-copy">
-              <strong class="rail-btn-title">Settings</strong>
-              <span class="rail-btn-subtitle">Theme, profile & preferences</span>
-            </span>
-          </button>
-        </div>
-      </aside>
+              <span>Settings</span>
+            </button>
+          </nav>
 
-      <aside class="sidebar panel">
-        <div class="sidebar-topbar">
-          <div>
-            <div class="sidebar-kicker">Workspace</div>
-            <div class="sidebar-title">Private Messaging</div>
-          </div>
-          <button
-            class="sidebar-icon-btn"
-            id="createGroupSidebarBtn"
-            type="button"
-            aria-label="Create group"
-            title="Create group"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 5v14"></path>
-              <path d="M5 12h14"></path>
-            </svg>
-          </button>
-        </div>
+          <div class="preview-sidebar-avatar" id="previewSidebarAvatar">QM</div>
+        </aside>
 
-        <div class="profile sidebar-account">
-          <div class="avatar" id="userAvatar">ME</div>
-          <div>
-            <div class="headline" id="userName">Your Workspace</div>
-            <div class="muted mini" id="userEmail">user@example.com</div>
-            <div class="mini presence-online">Online</div>
+        <section class="preview-list-panel">
+          <div class="preview-search-row">
+            <label class="preview-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="5.5"></circle>
+                <path d="M16 16l4 4"></path>
+              </svg>
+              <input id="friendsSearchInput" type="search" placeholder="Search" />
+            </label>
+            <button class="preview-circle-btn" type="button" aria-label="Find friends">
+              <svg viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="5.5"></circle>
+                <path d="M16 16l4 4"></path>
+              </svg>
+            </button>
           </div>
-        </div>
 
-        <section class="favorites-panel">
-          <div class="section-head sidebar-section-head">
-            <strong>Favorites</strong>
-            <span class="count-pill" id="favoritesCount">0</span>
-          </div>
-          <div class="favorites-strip" id="favoriteAvatars">
-            <div class="mini muted favorites-empty" id="favoritesEmpty">Your pinned chats will appear here.</div>
-          </div>
-        </section>
-
-        <section class="card section-card collapsible-card" id="friendCard">
-          <div class="card-heading">
-            <div class="eyebrow">Add Friend</div>
-            <button
-              class="card-collapse-btn"
-              id="friendCardToggle"
-              type="button"
-              aria-expanded="true"
-              aria-controls="friendCardBody"
-              aria-label="Collapse add friend"
-            ></button>
-          </div>
-          <div class="collapsible-body" id="friendCardBody">
-            <div class="headline headline-offset">Send request by email</div>
-            <p class="muted mini support-copy">
-              Requests appear in Thông báo inside the app, not Gmail.
-            </p>
-            <form class="friend-form" id="friendRequestForm">
-              <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
-              <button class="btn" id="friendSubmitBtn" type="submit">Add</button>
-            </form>
-            <div class="mini friend-feedback" id="friendRequestFeedback"></div>
-          </div>
-        </section>
-
-        <section class="list-card section-card collapsible-card" id="friendsCard">
-          <div class="card-heading">
-            <div class="section-head-title">
-              <strong>Friends</strong>
-              <span class="count-pill" id="friendsCount">0</span>
+          <div class="preview-list-head">
+            <div>
+              <h2>Inbox</h2>
+              <span class="preview-new-badge" id="previewRosterBadge">Ready</span>
             </div>
-            <button
-              class="card-collapse-btn"
-              id="friendsCardToggle"
-              type="button"
-              aria-expanded="true"
-              aria-controls="friendsCardBody"
-              aria-label="Collapse friends list"
-            ></button>
+            <button class="preview-create-btn" id="newGroupBtn" type="button">Create Group</button>
           </div>
-          <div class="collapsible-body" id="friendsCardBody">
-            <div class="friends-search">
-              <input
-                class="friends-search-input"
-                id="friendsSearchInput"
-                type="search"
-                placeholder="Search friends..."
-              />
+
+          <div class="preview-social-row">
+            <button class="preview-add-btn" id="friendCardToggle" type="button">Add Friend</button>
+            <button class="preview-ghost-btn" id="homeRailButton" type="button">Overview</button>
+          </div>
+
+          <section class="preview-inline-card collapsible-card is-collapsed" id="friendCard">
+            <div class="collapsible-body" id="friendCardBody">
+              <form class="friend-form" id="friendRequestForm">
+                <input id="friendEmailInput" type="email" placeholder="friend@example.com" />
+                <button class="btn" id="friendSubmitBtn" type="submit">Send</button>
+              </form>
+              <div class="mini friend-feedback" id="friendRequestFeedback"></div>
             </div>
-            <div class="channel-list" id="friendsList"></div>
-            <div class="mini muted" id="friendsEmpty">No accepted friends yet.</div>
+          </section>
+
+          <div class="preview-tabs">
+            <button class="active" id="filterAllButton" type="button">All</button>
+            <button id="filterPersonalButton" type="button">Personal</button>
+            <button id="filterGroupsButton" type="button">Groups</button>
           </div>
+
+          <div class="preview-filter-row">
+            <div class="preview-filter-summary" id="previewFilterSummary">Showing all chats</div>
+            <button class="preview-circle-btn preview-clear-btn" id="clearSearchButton" type="button" aria-label="Clear search" title="Clear search">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 7l10 10"></path>
+                <path d="M17 7L7 17"></path>
+              </svg>
+            </button>
+          </div>
+
+          <section class="preview-roster-card" id="friendsCard">
+            <button id="friendsCardToggle" type="button" hidden></button>
+            <div id="friendsSection">
+              <div class="preview-section-label">
+                <span>Personal chats</span>
+                <strong id="friendsCount">0</strong>
+              </div>
+              <div class="preview-conversation-list channel-list" id="friendsList"></div>
+              <div class="mini muted" id="friendsEmpty">No accepted friends yet.</div>
+            </div>
+
+            <div id="groupsSection">
+              <div class="preview-section-label groups">
+                <span>Group chats</span>
+                <strong id="overviewGroups">0</strong>
+              </div>
+              <div class="preview-conversation-list channel-list" id="groupsList"></div>
+              <div class="mini muted" id="groupsEmpty">No active groups yet.</div>
+            </div>
+          </section>
         </section>
 
-        <div class="sidebar-divider" aria-hidden="true"></div>
-      </aside>
-
-      <main class="main panel">
-        <div class="main-top">
-          <div class="chat-hero">
-            <div class="avatar chat-hero-avatar" id="chatAvatar">MC</div>
-            <div class="chat-hero-copy">
-              <div class="eyebrow" id="chatKicker">Overview</div>
-              <h1 class="main-title" id="chatTitle">MyClassRoom</h1>
-              <div class="main-copy" id="chatSubtitle">
-                Friends, invites, and groups in one place.
+        <section class="preview-chat-panel">
+          <header class="preview-chat-head" data-open-profile>
+            <div class="preview-chat-user">
+              <div class="preview-conversation-avatar preview-avatar-two large avatar" id="chatAvatar">MC</div>
+              <div>
+                <strong id="chatTitle">MyClassRoom</strong>
+                <div id="chatSubtitle">Friends, invites, and groups in one place.</div>
+                <span class="preview-hidden-kicker eyebrow" id="chatKicker">Overview</span>
               </div>
             </div>
-          </div>
-          <div class="main-actions">
-            <div class="main-toolbar">
-              <button class="toolbar-btn" type="button" aria-label="Search conversation" title="Search conversation">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="11" cy="11" r="5.5"></circle>
-                  <path d="M16 16l4 4"></path>
+            <div class="preview-chat-actions">
+              <button class="preview-circle-btn" type="button" aria-label="Call">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 4h3l2 5-2.5 1.8a16 16 0 0 0 5.2 5.2L14 13l5 2v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 7.2 2 2 0 0 1 5 4z"></path>
                 </svg>
               </button>
-              <button class="toolbar-btn" type="button" aria-label="Files" title="Files">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M8 7.5V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.5"></path>
-                  <rect x="4" y="7.5" width="16" height="11.5" rx="2"></rect>
+              <button class="preview-circle-btn" type="button" aria-label="Video call">
+                <svg viewBox="0 0 24 24">
+                  <rect x="3.5" y="6.5" width="11" height="11" rx="2"></rect>
+                  <path d="M14.5 10l5-3v10l-5-3"></path>
                 </svg>
               </button>
-              <button class="toolbar-btn" type="button" aria-label="Grid view" title="Grid view">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="4" y="4" width="6" height="6" rx="1.5"></rect>
-                  <rect x="14" y="4" width="6" height="6" rx="1.5"></rect>
-                  <rect x="4" y="14" width="6" height="6" rx="1.5"></rect>
-                  <rect x="14" y="14" width="6" height="6" rx="1.5"></rect>
+              <button class="preview-circle-btn" id="headerInboxButton" type="button" aria-label="More">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="6.5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
+                  <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
+                  <circle cx="17.5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
                 </svg>
               </button>
-              <button
-                class="toolbar-btn"
-                id="headerInboxButton"
-                type="button"
-                aria-label="Notifications"
-                title="Notifications"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M9.5 18.5a2.5 2.5 0 0 0 5 0"></path>
-                  <path d="M18 16.5H6l1.4-1.6a2 2 0 0 0 .5-1.3V11a4.1 4.1 0 1 1 8.2 0v2.6a2 2 0 0 0 .5 1.3z"></path>
-                </svg>
-              </button>
+              <div class="status-pill" id="connectionState">Reconnecting</div>
             </div>
-            <div class="status-pill" id="connectionState">Reconnecting</div>
-          </div>
-        </div>
+          </header>
 
-        <section class="stats">
-          <article class="stat">
-            <div class="eyebrow">Accepted Friends</div>
-            <div class="stat-value" id="overviewFriends">0</div>
-          </article>
-          <article class="stat">
-            <div class="eyebrow">Pending Notifications</div>
-            <div class="stat-value" id="overviewNotifications">0</div>
-          </article>
-          <article class="stat">
-            <div class="eyebrow">Active Groups</div>
-            <div class="stat-value" id="overviewGroups">0</div>
-          </article>
-        </section>
-
-        <section class="messages">
           <div class="banner info" id="surfaceBanner"></div>
-          <div class="messages-body" id="messagesArea"></div>
-          <form class="composer" id="messageForm">
+          <div class="preview-chat-stream messages-body" id="messagesArea"></div>
+
+          <form class="preview-composer composer" id="messageForm">
             <input id="attachmentInput" type="file" hidden />
-            <button class="btn secondary attach-btn" id="attachBtn" type="button">Video/File</button>
-            <input
-              class="composer-input"
-              id="messageInput"
-              type="text"
-              placeholder="Choose a friend or accepted group before sending a message..."
-            />
-            <button class="btn" id="sendBtn" type="submit">Send</button>
+            <button class="preview-plain-icon btn secondary attach-btn" id="attachBtn" type="button" aria-label="Attach">
+              <svg viewBox="0 0 24 24">
+                <path d="M21.4 11.6l-8.5 8.5a5 5 0 1 1-7.1-7.1l9.2-9.2a3.5 3.5 0 0 1 5 5L9.9 18.9a2 2 0 1 1-2.8-2.8l8-8"></path>
+              </svg>
+            </button>
+            <input class="composer-input" id="messageInput" type="text" placeholder="Write a message..." />
+            <button class="preview-plain-icon" type="button" aria-label="Emoji">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8"></circle>
+                <path d="M9 10h.01"></path>
+                <path d="M15 10h.01"></path>
+                <path d="M8.5 14.5a5 5 0 0 0 7 0"></path>
+              </svg>
+            </button>
+            <button class="preview-plain-icon" type="button" aria-label="More">
+              <svg viewBox="0 0 24 24">
+                <circle cx="6.5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
+                <circle cx="17.5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
+              </svg>
+            </button>
+            <button class="preview-send-btn btn" id="sendBtn" type="submit" aria-label="Send">
+              <svg viewBox="0 0 24 24">
+                <path d="M5 12l14-7-4 14-3.5-5z"></path>
+                <path d="M11.5 14L19 5"></path>
+              </svg>
+            </button>
           </form>
         </section>
-      </main>
 
-      <aside class="inbox panel" id="utilityPanel" aria-hidden="true">
-        <div class="section-head">
-          <div>
-            <div class="headline">Thông báo</div>
-            <div class="mini muted">Friend requests and group invites appear here inside the app.</div>
+        <aside class="preview-details-panel" id="previewDetails">
+          <div class="preview-details-head">
+            <h3>Profile</h3>
+            <button class="preview-circle-btn" id="previewCloseProfile" type="button" aria-label="Close profile">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 7l10 10"></path>
+                <path d="M17 7L7 17"></path>
+              </svg>
+            </button>
           </div>
-          <button class="btn secondary" id="closeInboxButton" type="button">Hide</button>
+
+          <div class="preview-profile-card">
+            <div class="preview-profile-avatar preview-avatar-two" id="previewProfileAvatar">EB</div>
+            <h4 id="previewProfileName">Emily Butler</h4>
+            <a href="#" id="previewProfileEmail">emily_butler224@gmail.com</a>
+            <p id="previewProfilePhone">+1-541-754-3010</p>
+
+            <div class="preview-profile-stats">
+              <span class="online" id="previewProfileStatus">Online now</span>
+              <span id="previewMutualCount">12 mutual friends</span>
+            </div>
+
+            <div class="preview-profile-actions">
+              <button type="button" id="previewAddFriendBtn">Add Friend</button>
+              <button type="button" id="previewGroupInfoBtn">View Group Info</button>
+            </div>
+
+            <div class="preview-rating">
+              <span>4.6 Rating</span>
+              <div class="preview-stars">★ ★ ★ ★ ☆</div>
+            </div>
+          </div>
+
+          <section class="preview-info-block">
+            <div class="preview-info-head">
+              <strong>Last bookings</strong>
+              <a href="#" role="button">See all</a>
+            </div>
+            <div class="preview-info-card">
+              <span>Manhattan cozy</span>
+              <small>Manhattan, New York</small>
+            </div>
+            <div class="preview-info-card">
+              <span>Minimalist clean and white</span>
+              <small>Hell's Kitchen, Barcelona</small>
+            </div>
+          </section>
+
+          <section class="preview-info-block">
+            <div class="preview-info-head">
+              <strong>Shared groups</strong>
+              <a href="#" role="button">See all</a>
+            </div>
+            <div class="preview-chip-row">
+              <span>Design Sprint</span>
+              <span>Time Focus</span>
+              <span>AI Bot</span>
+            </div>
+          </section>
+
+          <section class="preview-info-block">
+            <div class="preview-info-head">
+              <strong>Recent files</strong>
+              <a href="#" role="button">See all</a>
+            </div>
+            <div class="preview-info-card">
+              <span>Losra logo.ai</span>
+              <small>Shared 2 hours ago</small>
+            </div>
+          </section>
+
+          <section class="preview-info-block">
+            <div class="preview-info-head">
+              <strong>Upcoming tasks</strong>
+              <a href="#" role="button">See all</a>
+            </div>
+            <div class="preview-info-card">
+              <span>Finalize UI review</span>
+              <small>Tomorrow, 09:00 AM</small>
+            </div>
+          </section>
+        </aside>
+
+        <div class="preview-hidden-bridge" aria-hidden="true">
+          <div id="selfRailLabel">ME</div>
+          <div id="groupRailList"></div>
+          <div id="userAvatar"></div>
+          <div id="userName"></div>
+          <div id="userEmail"></div>
+          <div id="favoritesCount">0</div>
+          <div id="favoriteAvatars"></div>
+          <div id="favoritesEmpty"></div>
+          <div id="overviewFriends">0</div>
+          <div id="overviewNotifications">0</div>
         </div>
+      </section>
+    </main>
 
-        <section class="inbox-card section-card">
-          <div class="section-head">
-            <strong>Friend Requests</strong>
-            <span class="count-pill" id="incomingFriendsCount">0</span>
-          </div>
-          <div class="notification-list" id="incomingFriendRequests"></div>
-          <div class="mini muted" id="incomingFriendsEmpty">No friend requests right now.</div>
-        </section>
+    <aside class="inbox panel" id="utilityPanel" aria-hidden="true">
+      <div class="section-head">
+        <div>
+          <div class="headline">Thông báo</div>
+          <div class="mini muted">Friend requests and group invites appear here inside the app.</div>
+        </div>
+        <button class="btn secondary" id="closeInboxButton" type="button">Hide</button>
+      </div>
 
-        <section class="inbox-card section-card">
-          <div class="section-head">
-            <strong>Group Invitations</strong>
-            <span class="count-pill" id="groupInvitationsCount">0</span>
-          </div>
-          <div class="notification-list" id="groupInvitations"></div>
-          <div class="mini muted" id="groupInvitationsEmpty">No group invites right now.</div>
-        </section>
+      <section class="inbox-card section-card">
+        <div class="section-head">
+          <strong>Friend Requests</strong>
+          <span class="count-pill" id="incomingFriendsCount">0</span>
+        </div>
+        <div class="notification-list" id="incomingFriendRequests"></div>
+        <div class="mini muted" id="incomingFriendsEmpty">No friend requests right now.</div>
+      </section>
 
-      </aside>
-    </div>
+      <section class="inbox-card section-card">
+        <div class="section-head">
+          <strong>Group Invitations</strong>
+          <span class="count-pill" id="groupInvitationsCount">0</span>
+        </div>
+        <div class="notification-list" id="groupInvitations"></div>
+        <div class="mini muted" id="groupInvitationsEmpty">No group invites right now.</div>
+      </section>
+    </aside>
+
     <div class="settings-scrim" id="settingsScrim" hidden></div>
     <aside class="settings-popover panel" id="settingsPopover" aria-hidden="true">
       <div class="settings-popover-header">
@@ -356,23 +424,11 @@
           <form class="settings-profile-form" id="settingsProfileForm">
             <label class="settings-field" for="settingsDisplayNameInput">
               <span class="settings-field-label">Họ và tên</span>
-              <input
-                class="settings-text-input"
-                id="settingsDisplayNameInput"
-                type="text"
-                maxlength="60"
-                placeholder="Tên hiển thị của bạn"
-              />
+              <input class="settings-text-input" id="settingsDisplayNameInput" type="text" maxlength="60" placeholder="Tên hiển thị của bạn" />
             </label>
             <label class="settings-field" for="settingsAvatarUrlInput">
               <span class="settings-field-label">Avatar</span>
-              <input
-                class="settings-text-input"
-                id="settingsAvatarUrlInput"
-                type="url"
-                maxlength="1000"
-                placeholder="https://example.com/avatar.jpg"
-              />
+              <input class="settings-text-input" id="settingsAvatarUrlInput" type="url" maxlength="1000" placeholder="https://example.com/avatar.jpg" />
             </label>
             <div class="mini muted settings-avatar-hint">Dán link ảnh đại diện để hiển thị trong workspace.</div>
             <div class="settings-inline-row">
@@ -400,9 +456,7 @@
               <div class="settings-appearance-icon" aria-hidden="true">☾</div>
               <div>
                 <strong id="settingsThemeHeading">Chế độ tối</strong>
-                <div class="mini muted">
-                  Điều chỉnh giao diện sáng, tối hoặc để hệ thống tự động đồng bộ.
-                </div>
+                <div class="mini muted">Điều chỉnh giao diện sáng, tối hoặc để hệ thống tự động đồng bộ.</div>
               </div>
             </div>
             <div class="settings-theme-options" role="radiogroup" aria-labelledby="settingsThemeHeading">
@@ -439,11 +493,10 @@
             </div>
           </section>
         </div>
-        <button class="btn secondary logout-wide-btn" id="sidebarLogoutBtn" type="button">
-          Sign out
-        </button>
+        <button class="btn secondary logout-wide-btn" id="sidebarLogoutBtn" type="button">Sign out</button>
       </div>
     </aside>
+
     <aside class="study-timer-popover panel" id="studyTimerPopover" aria-hidden="true">
       <div class="settings-popover-header study-timer-popover-header">
         <div>
@@ -458,39 +511,26 @@
         <div class="study-timer-shell" id="studyTimerPanelMount"></div>
       </div>
     </aside>
+
     <aside class="create-group-popover panel" id="createGroupPopover" aria-hidden="true">
       <div class="settings-popover-header">
         <div>
           <div class="eyebrow">New Group</div>
           <div class="headline settings-popover-title">Create a room</div>
         </div>
-        <button
-          class="settings-close-btn"
-          id="createGroupCloseButton"
-          type="button"
-          aria-label="Close create group"
-        >
+        <button class="settings-close-btn" id="createGroupCloseButton" type="button" aria-label="Close create group">
           <span aria-hidden="true">&times;</span>
         </button>
       </div>
       <div class="settings-popover-body">
         <div class="settings-note">
           <strong>Keep it simple and recognizable</strong>
-          <div class="mini muted">
-            Invite classmates by email. They will receive the join request in Thông báo inside the app.
-          </div>
+          <div class="mini muted">Invite classmates by email. They will receive the join request in Thông báo inside the app.</div>
         </div>
         <form class="create-group-form" id="createGroupForm">
           <label class="settings-field" for="createGroupNameInput">
             <span class="settings-field-label">Group name</span>
-            <input
-              class="settings-text-input"
-              id="createGroupNameInput"
-              type="text"
-              maxlength="80"
-              placeholder="e.g. DBI202 Study Group"
-              required
-            />
+            <input class="settings-text-input" id="createGroupNameInput" type="text" maxlength="80" placeholder="e.g. DBI202 Study Group" required />
           </label>
           <label class="settings-field" for="createGroupCategoryInput">
             <span class="settings-field-label">Category</span>
@@ -503,23 +543,12 @@
           </label>
           <label class="settings-field" for="createGroupDescriptionInput">
             <span class="settings-field-label">Description</span>
-            <textarea
-              class="settings-textarea-input"
-              id="createGroupDescriptionInput"
-              placeholder="What is this group for?"
-            ></textarea>
+            <textarea class="settings-textarea-input" id="createGroupDescriptionInput" placeholder="What is this group for?"></textarea>
           </label>
           <label class="settings-field" for="createGroupMembersInput">
             <span class="settings-field-label">Invite members</span>
-            <input
-              class="settings-text-input"
-              id="createGroupMembersInput"
-              type="text"
-              placeholder="a@gmail.com, b@gmail.com, c@gmail.com"
-            />
-            <span class="mini muted">
-              Separate emails with commas. Invites appear in Thông báo inside the app.
-            </span>
+            <input class="settings-text-input" id="createGroupMembersInput" type="text" placeholder="a@gmail.com, b@gmail.com, c@gmail.com" />
+            <span class="mini muted">Separate emails with commas. Invites appear in Thông báo inside the app.</span>
           </label>
           <div class="settings-chip-list" id="createGroupMembersPreview"></div>
           <div class="mini settings-feedback" id="createGroupFeedback"></div>
@@ -530,7 +559,9 @@
         </form>
       </div>
     </aside>
+
     <div class="toast" id="toast"></div>
-    <script src="/js/workspace.js"></script>
+
+    <script src="js/workspace.js"></script>
   </body>
 </html>
