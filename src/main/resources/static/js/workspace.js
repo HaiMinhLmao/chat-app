@@ -182,7 +182,6 @@ const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
 const THEME_STORAGE_KEY = "workspaceTheme";
 const STUDY_TIMER_STORAGE_KEY = "workspaceStudyTimer";
-const INBOX_BREAKPOINT = 1380;
 const SETTINGS_DRAWER_BREAKPOINT = 760;
 const MINUTE_MS = 60000;
 let studyTimerTicker = null;
@@ -1282,7 +1281,20 @@ function createStudyTimerPanel() {
   laps.className = "study-timer-laps";
   laps.dataset.studyLaps = "true";
 
-  panel.append(head, display, config, modes, actions, shortcuts, stats, laps);
+  const layout = document.createElement("div");
+  layout.className = "study-timer-layout";
+
+  const stage = document.createElement("div");
+  stage.className = "study-timer-stage";
+  stage.append(display, actions, shortcuts);
+
+  const side = document.createElement("div");
+  side.className = "study-timer-side";
+  side.append(config, stats, laps);
+
+  layout.append(stage, side);
+
+  panel.append(head, modes, layout);
   refreshStudyTimerUi();
   return panel;
 }
@@ -1351,6 +1363,10 @@ function positionCreateGroupPopover() {
   positionFlyout(el.createGroupPopover, el.newGroupBtn);
 }
 
+function positionInboxPanel() {
+  positionFlyout(el.utilityPanel, el.notificationToggleButton);
+}
+
 function isSettingsPopoverOpen() {
   return document.body.classList.contains("settings-open");
 }
@@ -1363,13 +1379,24 @@ function isStudyTimerPopoverOpen() {
   return document.body.classList.contains("study-timer-open");
 }
 
+function isInboxPanelOpen() {
+  return document.body.classList.contains("inbox-open");
+}
+
 function syncFlyoutScrim() {
-  const isOpen = isSettingsPopoverOpen() || isCreateGroupPopoverOpen() || isStudyTimerPopoverOpen();
+  const isOpen =
+    isSettingsPopoverOpen() ||
+    isCreateGroupPopoverOpen() ||
+    isStudyTimerPopoverOpen() ||
+    isInboxPanelOpen();
   document.body.classList.toggle("flyout-open", isOpen);
   el.settingsScrim.hidden = !isOpen;
 }
 
 function setSettingsPopoverOpen(nextOpen) {
+  if (nextOpen && isInboxPanelOpen()) {
+    setInboxPanelOpen(false);
+  }
   if (nextOpen && isCreateGroupPopoverOpen()) {
     setCreateGroupPopoverOpen(false);
   }
@@ -1395,6 +1422,9 @@ function toggleSettingsPopover() {
 }
 
 function setCreateGroupPopoverOpen(nextOpen) {
+  if (nextOpen && isInboxPanelOpen()) {
+    setInboxPanelOpen(false);
+  }
   if (nextOpen && isSettingsPopoverOpen()) {
     setSettingsPopoverOpen(false);
   }
@@ -1423,6 +1453,9 @@ function openCreateGroupPopover() {
 }
 
 function setStudyTimerPopoverOpen(nextOpen) {
+  if (nextOpen && isInboxPanelOpen()) {
+    setInboxPanelOpen(false);
+  }
   if (nextOpen && isSettingsPopoverOpen()) {
     setSettingsPopoverOpen(false);
   }
@@ -1501,17 +1534,6 @@ async function loadCurrentUserProfile() {
   persistSessionUserName(nextName);
 }
 
-// Surface state and composer behavior
-function isWideLayout() {
-  return window.innerWidth > INBOX_BREAKPOINT;
-}
-
-function isInboxPanelOpen() {
-  return isWideLayout()
-    ? !document.body.classList.contains("notifications-collapsed")
-    : document.body.classList.contains("inbox-open");
-}
-
 function syncInboxToggleState() {
   const open = isInboxPanelOpen();
   el.notificationToggleButton.classList.toggle("active", open);
@@ -1523,13 +1545,25 @@ function syncInboxToggleState() {
 }
 
 function setInboxPanelOpen(nextOpen) {
-  if (isWideLayout()) {
-    document.body.classList.toggle("notifications-collapsed", !nextOpen);
-    document.body.classList.remove("inbox-open");
-  } else {
-    document.body.classList.toggle("inbox-open", nextOpen);
+  if (nextOpen && isSettingsPopoverOpen()) {
+    setSettingsPopoverOpen(false);
   }
+  if (nextOpen && isCreateGroupPopoverOpen()) {
+    setCreateGroupPopoverOpen(false);
+  }
+  if (nextOpen && isStudyTimerPopoverOpen()) {
+    setStudyTimerPopoverOpen(false);
+  }
+  document.body.classList.toggle("inbox-open", nextOpen);
+  el.utilityPanel.setAttribute("aria-hidden", String(!nextOpen));
   syncInboxToggleState();
+  syncFlyoutScrim();
+  if (nextOpen) {
+    requestAnimationFrame(() => {
+      positionInboxPanel();
+      el.closeInboxButton.focus();
+    });
+  }
 }
 
 function openInboxPanel() {
@@ -2128,7 +2162,14 @@ function renderGroups() {
       button.type = "button";
       button.className = "rail-btn rail-group";
       button.dataset.id = String(group.id);
-      button.textContent = initials(group.name || "Group");
+      button.innerHTML =
+        '<span class="rail-group-mark">' +
+        initials(group.name || "Group") +
+        '</span><span class="rail-btn-copy"><strong class="rail-btn-title">' +
+        (group.name || "Study Group") +
+        '</strong><span class="rail-btn-subtitle">' +
+        (group.category || group.role || "Study room") +
+        "</span></span>";
       button.title = group.name || "Study Group";
       button.addEventListener("click", () => selectGroup(group));
       el.groupRailList.appendChild(button);
@@ -2799,6 +2840,7 @@ el.studyTimerCloseButton.addEventListener("click", closeStudyTimerPopover);
 el.createGroupCloseButton.addEventListener("click", closeCreateGroupPopover);
 el.createGroupCancelBtn.addEventListener("click", closeCreateGroupPopover);
 el.settingsScrim.addEventListener("click", () => {
+  closeInboxPanel();
   closeSettingsPopover();
   closeStudyTimerPopover();
   closeCreateGroupPopover();
@@ -2859,6 +2901,10 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (event.key !== "Escape") return;
+  if (isInboxPanelOpen()) {
+    closeInboxPanel();
+    return;
+  }
   if (isStudyTimerPopoverOpen()) {
     closeStudyTimerPopover();
     return;
@@ -2872,10 +2918,10 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("resize", () => {
-  if (isWideLayout()) {
-    document.body.classList.remove("inbox-open");
-  }
   syncInboxToggleState();
+  if (isInboxPanelOpen()) {
+    positionInboxPanel();
+  }
   if (isSettingsPopoverOpen()) {
     positionSettingsPopover();
   }
@@ -2887,6 +2933,9 @@ window.addEventListener("resize", () => {
 window.addEventListener(
   "scroll",
   () => {
+    if (isInboxPanelOpen()) {
+      positionInboxPanel();
+    }
     if (isSettingsPopoverOpen()) {
       positionSettingsPopover();
     }

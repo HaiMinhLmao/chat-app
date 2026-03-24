@@ -1,5 +1,10 @@
 ## chat-app
 
+### Requirements
+
+- Java 21 (LTS)
+- Docker Desktop (if running with Docker)
+
 ### Run with Docker (recommended)
 
 1) Install Docker Desktop
@@ -21,6 +26,7 @@ Open `http://localhost:8080/login.html`.
 
 ```powershell
 cd d:\chat-app
+java -version
 $env:SUPABASE_ANON_KEY="sb_publishable_..."
 $env:SUPABASE_DB_JDBC_URL="jdbc:postgresql://aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require"
 $env:SUPABASE_DB_USERNAME="postgres.your-project-ref"
