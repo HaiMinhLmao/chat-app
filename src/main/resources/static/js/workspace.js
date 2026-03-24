@@ -132,12 +132,16 @@ const el = {
   friendsList: mustGetElement("friendsList"),
   friendsCount: mustGetElement("friendsCount"),
   friendsEmpty: mustGetElement("friendsEmpty"),
+  favoriteAvatars: getOptionalElement("favoriteAvatars"),
+  favoritesEmpty: getOptionalElement("favoritesEmpty"),
+  favoritesCount: getOptionalElement("favoritesCount"),
   groupsList: getOptionalElement("groupsList"),
   groupsEmpty: getOptionalElement("groupsEmpty"),
   createGroupSidebarBtn: getOptionalButton("createGroupSidebarBtn"),
   chatKicker: mustGetElement("chatKicker"),
   chatTitle: mustGetElement("chatTitle"),
   chatSubtitle: mustGetElement("chatSubtitle"),
+  chatAvatar: getOptionalElement("chatAvatar"),
   connectionState: mustGetElement("connectionState"),
   headerInboxButton: getOptionalButton("headerInboxButton"),
   overviewFriends: mustGetElement("overviewFriends"),
@@ -541,8 +545,10 @@ function syncCurrentUserUi() {
   document.documentElement.lang = activeLanguage();
   if (activeChannel.type === "home") {
     el.chatTitle.textContent = name;
+    syncAvatarNode(el.chatAvatar, name, currentUser.avatarUrl);
     refreshHomeOverviewIfNeeded();
   }
+  renderFavoritesStrip();
 }
 
 function normalizeStudyMinutes(value, fallback, maximum) {
@@ -1770,6 +1776,68 @@ function refreshHomeOverviewIfNeeded() {
   if (activeChannel.type === "home") renderHomeOverview();
 }
 
+function createFavoriteChip(label, avatarUrl, onClick, active) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "favorite-chip" + (active ? " active" : "");
+  button.title = label;
+  const avatar = document.createElement("span");
+  avatar.className = "favorite-chip-avatar";
+  syncAvatarNode(avatar, label, avatarUrl);
+  button.appendChild(avatar);
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function renderFavoritesStrip() {
+  if (!el.favoriteAvatars || !el.favoritesEmpty || !el.favoritesCount) return;
+  el.favoriteAvatars.innerHTML = "";
+
+  const chips = [];
+  if (currentUser) {
+    chips.push(
+      createFavoriteChip(
+        displayName(currentUser),
+        currentUser.avatarUrl,
+        () => selectHome(),
+        activeChannel.type === "home",
+      ),
+    );
+  }
+
+  socialState.friends.slice(0, 5).forEach((friend) => {
+    const email = normalizeEmail(friend.email);
+    chips.push(
+      createFavoriteChip(
+        displayName(friend),
+        friend.avatarUrl || "",
+        () => selectDirect(friend),
+        activeChannel.type === "direct" && activeChannel.id === email,
+      ),
+    );
+  });
+
+  groups.slice(0, 2).forEach((group) => {
+    chips.push(
+      createFavoriteChip(
+        group.name || "Study Group",
+        "",
+        () => selectGroup(group),
+        activeChannel.type === "group" && String(activeChannel.id) === String(group.id),
+      ),
+    );
+  });
+
+  el.favoritesCount.textContent = String(chips.length);
+  if (!chips.length) {
+    el.favoritesEmpty.style.display = "block";
+    el.favoriteAvatars.appendChild(el.favoritesEmpty);
+    return;
+  }
+  el.favoritesEmpty.style.display = "none";
+  chips.forEach((chip) => el.favoriteAvatars.appendChild(chip));
+}
+
 function parseMemberEmails(value) {
   return Array.from(
     new Set(
@@ -2029,9 +2097,11 @@ function selectHome() {
   el.chatKicker.textContent = "Overview";
   el.chatTitle.textContent = displayName(currentUser);
   el.chatSubtitle.textContent = "Friends, invites, and groups in one place.";
+  syncAvatarNode(el.chatAvatar, displayName(currentUser), currentUser && currentUser.avatarUrl);
   showBanner("", "info");
   disconnectSubscription();
   highlightSelection();
+  renderFavoritesStrip();
   renderHomeOverview();
   syncComposer();
 }
@@ -2047,8 +2117,10 @@ function selectDirect(friend) {
   el.chatKicker.textContent = "";
   el.chatTitle.textContent = displayName(friend);
   el.chatSubtitle.textContent = friend.email || "";
+  syncAvatarNode(el.chatAvatar, displayName(friend), friend.avatarUrl || "");
   showBanner("", "info");
   highlightSelection();
+  renderFavoritesStrip();
   syncComposer();
   loadDirectHistory(friend.email);
   subscribeToDirect(friend.email);
@@ -2060,8 +2132,10 @@ function selectGroup(group) {
   el.chatKicker.textContent = "Group";
   el.chatTitle.textContent = group.name || "Study Group";
   el.chatSubtitle.textContent = group.category || "";
+  syncAvatarNode(el.chatAvatar, group.name || "Study Group", "");
   showBanner("", "info");
   highlightSelection();
+  renderFavoritesStrip();
   syncComposer();
   loadGroupHistory(group.id);
   subscribeToGroup(group.id);
@@ -2097,10 +2171,12 @@ function renderChannel(type, id, name, preview, role, onClick) {
   button.innerHTML =
     '<div class="channel-avatar">' +
     initials(name) +
-    '</div><div class="channel-main"><div class="channel-name">' +
+    '</div><div class="channel-main"><div class="channel-row"><div class="channel-name">' +
     name +
-    '</div><div class="channel-preview"></div></div>' +
-    (role ? '<div class="mini muted">' + role + "</div>" : "");
+    "</div>" +
+    (role ? '<span class="channel-tag">' + role + "</span>" : "") +
+    '</div><div class="channel-preview"></div></div>';
+  button.title = name;
   button.querySelector(".channel-preview").textContent = preview;
   button.addEventListener("click", onClick);
   return button;
@@ -2134,6 +2210,7 @@ function renderFriends() {
     );
   });
   highlightSelection();
+  renderFavoritesStrip();
   refreshHomeOverviewIfNeeded();
 }
 
@@ -2180,6 +2257,7 @@ function renderGroups() {
   }
   el.overviewGroups.textContent = String(groups.length);
   highlightSelection();
+  renderFavoritesStrip();
   refreshHomeOverviewIfNeeded();
 }
 

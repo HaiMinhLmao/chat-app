@@ -125,7 +125,26 @@
       </aside>
 
       <aside class="sidebar panel">
-        <div class="profile">
+        <div class="sidebar-topbar">
+          <div>
+            <div class="sidebar-kicker">Workspace</div>
+            <div class="sidebar-title">Private Messaging</div>
+          </div>
+          <button
+            class="sidebar-icon-btn"
+            id="createGroupSidebarBtn"
+            type="button"
+            aria-label="Create group"
+            title="Create group"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14"></path>
+              <path d="M5 12h14"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="profile sidebar-account">
           <div class="avatar" id="userAvatar">ME</div>
           <div>
             <div class="headline" id="userName">Your Workspace</div>
@@ -133,6 +152,16 @@
             <div class="mini presence-online">Online</div>
           </div>
         </div>
+
+        <section class="favorites-panel">
+          <div class="section-head sidebar-section-head">
+            <strong>Favorites</strong>
+            <span class="count-pill" id="favoritesCount">0</span>
+          </div>
+          <div class="favorites-strip" id="favoriteAvatars">
+            <div class="mini muted favorites-empty" id="favoritesEmpty">Your pinned chats will appear here.</div>
+          </div>
+        </section>
 
         <section class="card section-card collapsible-card" id="friendCard">
           <div class="card-heading">
@@ -193,14 +222,51 @@
 
       <main class="main panel">
         <div class="main-top">
-          <div>
-            <div class="eyebrow" id="chatKicker">Overview</div>
-            <h1 class="main-title" id="chatTitle">MyClassRoom</h1>
-            <div class="main-copy" id="chatSubtitle">
-              Friends, invites, and groups in one place.
+          <div class="chat-hero">
+            <div class="avatar chat-hero-avatar" id="chatAvatar">MC</div>
+            <div class="chat-hero-copy">
+              <div class="eyebrow" id="chatKicker">Overview</div>
+              <h1 class="main-title" id="chatTitle">MyClassRoom</h1>
+              <div class="main-copy" id="chatSubtitle">
+                Friends, invites, and groups in one place.
+              </div>
             </div>
           </div>
           <div class="main-actions">
+            <div class="main-toolbar">
+              <button class="toolbar-btn" type="button" aria-label="Search conversation" title="Search conversation">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="11" cy="11" r="5.5"></circle>
+                  <path d="M16 16l4 4"></path>
+                </svg>
+              </button>
+              <button class="toolbar-btn" type="button" aria-label="Files" title="Files">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 7.5V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.5"></path>
+                  <rect x="4" y="7.5" width="16" height="11.5" rx="2"></rect>
+                </svg>
+              </button>
+              <button class="toolbar-btn" type="button" aria-label="Grid view" title="Grid view">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="4" y="4" width="6" height="6" rx="1.5"></rect>
+                  <rect x="14" y="4" width="6" height="6" rx="1.5"></rect>
+                  <rect x="4" y="14" width="6" height="6" rx="1.5"></rect>
+                  <rect x="14" y="14" width="6" height="6" rx="1.5"></rect>
+                </svg>
+              </button>
+              <button
+                class="toolbar-btn"
+                id="headerInboxButton"
+                type="button"
+                aria-label="Notifications"
+                title="Notifications"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9.5 18.5a2.5 2.5 0 0 0 5 0"></path>
+                  <path d="M18 16.5H6l1.4-1.6a2 2 0 0 0 .5-1.3V11a4.1 4.1 0 1 1 8.2 0v2.6a2 2 0 0 0 .5 1.3z"></path>
+                </svg>
+              </button>
+            </div>
             <div class="status-pill" id="connectionState">Reconnecting</div>
           </div>
         </div>
