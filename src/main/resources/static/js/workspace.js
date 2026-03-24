@@ -176,6 +176,7 @@ const el = {
   previewApp: getOptionalElement("previewApp"),
   previewSidebarAvatar: getOptionalElement("previewSidebarAvatar"),
   previewDetails: getOptionalElement("previewDetails"),
+  previewDetailsTitle: getOptionalElement("previewDetailsTitle"),
   previewCloseProfile: getOptionalButton("previewCloseProfile"),
   previewProfileAvatar: getOptionalElement("previewProfileAvatar"),
   previewProfileName: getOptionalElement("previewProfileName"),
@@ -185,6 +186,10 @@ const el = {
   previewMutualCount: getOptionalElement("previewMutualCount"),
   previewAddFriendBtn: getOptionalButton("previewAddFriendBtn"),
   previewGroupInfoBtn: getOptionalButton("previewGroupInfoBtn"),
+  previewGroupPanel: getOptionalElement("previewGroupPanel"),
+  previewGroupMembersCount: getOptionalElement("previewGroupMembersCount"),
+  previewGroupMembersList: getOptionalElement("previewGroupMembersList"),
+  previewGroupMembersEmpty: getOptionalElement("previewGroupMembersEmpty"),
 };
 
 // Runtime state
@@ -204,6 +209,7 @@ let workspaceRefreshTimer = null;
 let notificationsPrimed = false;
 let friendSearchQuery = "";
 let rosterFilter = "all";
+const groupDetailsCache = new Map();
 const previews = new Map();
 const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
@@ -585,8 +591,15 @@ function setPreviewDetailsOpen(nextOpen) {
     el.profileToggleButton.classList.toggle("active", nextOpen);
     el.profileToggleButton.setAttribute("aria-pressed", String(nextOpen));
   }
+  if (el.headerInboxButton) {
+    el.headerInboxButton.classList.toggle("active", nextOpen);
+    el.headerInboxButton.setAttribute("aria-pressed", String(nextOpen));
+  }
   if (nextOpen) {
     el.previewDetails.scrollTop = 0;
+    if (activeChannel.type === "group") {
+      void ensureGroupDetails(activeChannel.id);
+    }
   }
 }
 
@@ -613,8 +626,138 @@ function activeFriendRecord() {
   );
 }
 
+function workspaceIdentityByEmail(email) {
+  const normalized = normalizeEmail(email);
+  if (currentUser && normalizeEmail(currentUser.email) === normalized) {
+    return {
+      name: displayName(currentUser),
+      email: currentUser.email || email,
+      avatarUrl: currentUser.avatarUrl || "",
+    };
+  }
+  const friend = socialState.friends.find((item) => normalizeEmail(item.email) === normalized);
+  if (friend) {
+    return {
+      name: displayName(friend),
+      email: friend.email || email,
+      avatarUrl: friend.avatarUrl || "",
+    };
+  }
+  return {
+    name: defaultName(email),
+    email,
+    avatarUrl: "",
+  };
+}
+
+function mergeGroupDetails(detail) {
+  if (!detail || !detail.id) return null;
+  const group = groups.find((item) => String(item.id) === String(detail.id));
+  if (group) {
+    Object.assign(group, detail);
+    group.membersLoading = false;
+    return group;
+  }
+  return detail;
+}
+
+function renderPreviewGroupMembers(group) {
+  if (
+    !el.previewGroupPanel ||
+    !el.previewGroupMembersCount ||
+    !el.previewGroupMembersList ||
+    !el.previewGroupMembersEmpty
+  ) {
+    return;
+  }
+
+  if (!group || activeChannel.type !== "group") {
+    el.previewGroupPanel.hidden = true;
+    el.previewGroupMembersList.innerHTML = "";
+    el.previewGroupMembersEmpty.hidden = false;
+    el.previewGroupMembersEmpty.textContent = "Open a group to see its members.";
+    el.previewGroupMembersCount.textContent = "0";
+    return;
+  }
+
+  const members = Array.isArray(group.members) ? group.members : [];
+  el.previewGroupPanel.hidden = false;
+  el.previewGroupMembersCount.textContent = String(members.length);
+  el.previewGroupMembersList.innerHTML = "";
+
+  if (!members.length) {
+    el.previewGroupMembersEmpty.hidden = false;
+    el.previewGroupMembersEmpty.textContent = group.membersLoading
+      ? "Loading members..."
+      : "No member details yet.";
+    return;
+  }
+
+  el.previewGroupMembersEmpty.hidden = true;
+  members.forEach((member) => {
+    const info = workspaceIdentityByEmail(member.email || "");
+    const row = document.createElement("div");
+    row.className = "preview-group-member";
+
+    const avatar = document.createElement("div");
+    avatar.className = "preview-group-member-avatar";
+    syncAvatarNode(avatar, info.name, info.avatarUrl || "");
+
+    const copy = document.createElement("div");
+    copy.className = "preview-group-member-copy";
+
+    const name = document.createElement("strong");
+    name.textContent = info.name;
+
+    const email = document.createElement("span");
+    email.textContent = info.email || member.email || "";
+
+    const role = document.createElement("span");
+    role.className = "preview-group-member-role";
+    role.textContent = String(member.role || "MEMBER").replace(/_/g, " ");
+
+    copy.appendChild(name);
+    copy.appendChild(email);
+    row.appendChild(avatar);
+    row.appendChild(copy);
+    row.appendChild(role);
+    el.previewGroupMembersList.appendChild(row);
+  });
+}
+
+async function ensureGroupDetails(groupId) {
+  const id = String(groupId || "");
+  if (!id) return null;
+
+  const cached = groupDetailsCache.get(id);
+  if (cached && Array.isArray(cached.members)) {
+    return mergeGroupDetails(cached);
+  }
+
+  const group = groups.find((item) => String(item.id) === id);
+  if (group) {
+    group.membersLoading = true;
+    renderPreviewGroupMembers(group);
+  }
+
+  const result = await authorizedRequest("/api/groups/" + encodeURIComponent(id));
+  if (group) {
+    group.membersLoading = false;
+  }
+  if (!result.ok || !result.data) {
+    syncPreviewProfilePanel();
+    return null;
+  }
+
+  groupDetailsCache.set(id, result.data);
+  const merged = mergeGroupDetails(result.data);
+  syncPreviewProfilePanel();
+  return merged;
+}
+
 function syncPreviewProfilePanel() {
   if (
+    !el.previewDetailsTitle ||
     !el.previewProfileAvatar ||
     !el.previewProfileName ||
     !el.previewProfileEmail ||
@@ -632,6 +775,8 @@ function syncPreviewProfilePanel() {
   let status = "Your workspace";
   let meta = String(socialState.friends.length) + " active friends";
   let emailHref = currentUser && currentUser.email ? "mailto:" + currentUser.email : "#";
+  let detailsTitle = "Profile";
+  let groupRecord = null;
 
   if (activeChannel.type === "direct") {
     const friend = activeFriendRecord();
@@ -647,16 +792,21 @@ function syncPreviewProfilePanel() {
   } else if (activeChannel.type === "group") {
     const group = activeGroupRecord();
     if (group) {
+      groupRecord = group;
       name = group.name || "Study Group";
       avatarUrl = "";
       contact = group.category || "Study group";
       detail = group.description || "Shared space for classmates to chat, review, and coordinate.";
       status = "Group conversation";
-      meta = String(groups.length) + " groups available";
+      meta = Array.isArray(group.members)
+        ? String(group.members.length) + " members"
+        : "Open details to load members";
       emailHref = "#";
+      detailsTitle = "Group info";
     }
   }
 
+  el.previewDetailsTitle.textContent = detailsTitle;
   syncAvatarNode(el.previewProfileAvatar, name, avatarUrl || "");
   el.previewProfileName.textContent = name;
   el.previewProfileEmail.textContent = contact;
@@ -676,9 +826,10 @@ function syncPreviewProfilePanel() {
   showPreviewAction(
     el.previewGroupInfoBtn,
     activeChannel.type === "group",
-    "View Group Info",
+    "Refresh Members",
     false,
   );
+  renderPreviewGroupMembers(groupRecord);
 }
 
 function normalizeStudyMinutes(value, fallback, maximum) {
@@ -1675,10 +1826,6 @@ function syncInboxToggleState() {
   const open = isInboxPanelOpen();
   el.notificationToggleButton.classList.toggle("active", open);
   el.notificationToggleButton.setAttribute("aria-pressed", String(open));
-  if (el.headerInboxButton) {
-    el.headerInboxButton.classList.toggle("active", open);
-    el.headerInboxButton.setAttribute("aria-pressed", String(open));
-  }
 }
 
 function setInboxPanelOpen(nextOpen) {
@@ -1756,7 +1903,14 @@ function setConnectionState(text, online) {
   syncComposer();
 }
 
+function setMessagesSurfaceMode(mode) {
+  el.messagesArea.classList.toggle("home-mode", mode === "home");
+  el.messagesArea.classList.toggle("empty-mode", mode === "empty");
+  el.messagesArea.classList.toggle("conversation-mode", mode === "conversation");
+}
+
 function clearMessages(title, copy, kicker) {
+  setMessagesSurfaceMode("empty");
   el.messagesArea.innerHTML =
     '<div class="empty-state">' +
     (kicker ? '<div class="eyebrow">' + kicker + "</div>" : "") +
@@ -1851,6 +2005,7 @@ function createHomePanel(title, meta, buttons, emptyCopy) {
 }
 
 function renderHomeOverview() {
+  setMessagesSurfaceMode("home");
   el.messagesArea.innerHTML = "";
 
   const wrap = document.createElement("div");
@@ -2228,7 +2383,13 @@ function messagePreview(message, sent, sender) {
 }
 
 function addMessage(message, sent, sender, timestamp) {
-  if (el.messagesArea.querySelector(".empty-state")) el.messagesArea.innerHTML = "";
+  if (
+    el.messagesArea.querySelector(".empty-state") ||
+    el.messagesArea.classList.contains("home-mode")
+  ) {
+    el.messagesArea.innerHTML = "";
+  }
+  setMessagesSurfaceMode("conversation");
   const row = document.createElement("div");
   row.className = "message-row" + (sent ? " sent" : "");
   row.innerHTML =
@@ -2308,6 +2469,7 @@ function selectGroup(group) {
   syncPreviewProfilePanel();
   renderFavoritesStrip();
   syncComposer();
+  void ensureGroupDetails(group.id);
   loadGroupHistory(group.id);
   subscribeToGroup(group.id);
 }
@@ -2653,7 +2815,11 @@ async function refreshWorkspace() {
 
 async function loadGroups() {
   const result = await authorizedRequest("/api/groups/mine");
-  groups = result.ok && Array.isArray(result.data) ? result.data : [];
+  const nextGroups = result.ok && Array.isArray(result.data) ? result.data : [];
+  groups = nextGroups.map((group) => {
+    const cached = groupDetailsCache.get(String(group.id || ""));
+    return cached ? { ...group, ...cached } : group;
+  });
   renderGroups();
 }
 
@@ -2682,6 +2848,7 @@ async function loadDirectHistory(otherEmail) {
     clearMessages("No messages yet", "Start the conversation here.", "");
     return;
   }
+  setMessagesSurfaceMode("conversation");
   el.messagesArea.innerHTML = "";
   messages.forEach((message) => {
     const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
@@ -2717,6 +2884,7 @@ async function loadGroupHistory(groupId) {
     clearMessages("No messages yet", "Send the first message to this study group.", "Group");
     return;
   }
+  setMessagesSurfaceMode("conversation");
   el.messagesArea.innerHTML = "";
   messages.forEach((message) => {
     const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
@@ -2989,6 +3157,14 @@ if (el.previewAddFriendBtn) {
     setRosterFilter("personal");
     setFriendCardCollapsed(false);
     el.friendEmailInput.focus();
+  });
+}
+
+if (el.previewGroupInfoBtn) {
+  el.previewGroupInfoBtn.addEventListener("click", () => {
+    if (activeChannel.type === "group") {
+      void ensureGroupDetails(activeChannel.id);
+    }
   });
 }
 
@@ -3268,7 +3444,10 @@ if (el.createGroupSidebarBtn) {
   el.createGroupSidebarBtn.addEventListener("click", openCreateGroupPopover);
 }
 if (el.headerInboxButton) {
-  el.headerInboxButton.addEventListener("click", toggleInboxPanel);
+  el.headerInboxButton.addEventListener("click", () => {
+    const isOpen = Boolean(el.previewApp && el.previewApp.classList.contains("details-open"));
+    setPreviewDetailsOpen(!isOpen);
+  });
 }
 el.notificationToggleButton.addEventListener("click", toggleInboxPanel);
 el.closeInboxButton.addEventListener("click", closeInboxPanel);
