@@ -62,6 +62,16 @@ public class Message {
 
     private Long attachmentSize;
 
+    @Column(nullable = false)
+    private boolean recalled = false;
+
+    private Instant recalledAt;
+
+    @Column(nullable = false)
+    private boolean pinned = false;
+
+    private Instant pinnedAt;
+
     @Column(nullable = false, updatable = false)
     private Instant timestamp;
 

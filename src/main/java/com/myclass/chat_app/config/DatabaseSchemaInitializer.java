@@ -84,6 +84,10 @@ public class DatabaseSchemaInitializer {
                                 attachment_base64 text,
                                 attachment_storage_path varchar(1024),
                                 attachment_size bigint,
+                                recalled boolean not null default false,
+                                recalled_at timestamptz,
+                                pinned boolean not null default false,
+                                pinned_at timestamptz,
                                 timestamp timestamptz not null default now(),
                                 room varchar(512),
                                 type varchar(20) not null default 'LOBBY'
@@ -108,6 +112,10 @@ public class DatabaseSchemaInitializer {
                     "alter table messages add column if not exists attachment_base64 text",
                     "alter table messages add column if not exists attachment_storage_path varchar(1024)",
                     "alter table messages add column if not exists attachment_size bigint",
+                    "alter table messages add column if not exists recalled boolean not null default false",
+                    "alter table messages add column if not exists recalled_at timestamptz",
+                    "alter table messages add column if not exists pinned boolean not null default false",
+                    "alter table messages add column if not exists pinned_at timestamptz",
                     "alter table messages add column if not exists room varchar(512)",
                     "alter table messages add column if not exists type varchar(20) not null default 'LOBBY'",
                     "alter table messages alter column room type varchar(512)",
@@ -121,6 +129,8 @@ public class DatabaseSchemaInitializer {
                     "create index if not exists idx_messages_type_room_time on messages(type, room, timestamp)",
                     "create index if not exists idx_messages_type_group_time on messages(type, group_id, timestamp)",
                     "create index if not exists idx_messages_sender_recipient_time on messages(sender_email, recipient_email, timestamp)",
+                    "create index if not exists idx_messages_group_pinned on messages(type, group_id, pinned, pinned_at)",
+                    "create index if not exists idx_messages_direct_pinned on messages(type, sender_email, recipient_email, pinned, pinned_at)",
                     """
                             create unique index if not exists uq_friend_requests_pending_pair
                             on friend_requests (

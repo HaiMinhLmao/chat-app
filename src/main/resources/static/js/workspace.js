@@ -88,7 +88,8 @@ const el = {
   groupRailList: mustGetElement("groupRailList"),
   notificationToggleButton: mustGetButton("notificationToggleButton"),
   notificationBadge: mustGetElement("notificationBadge"),
-  newGroupBtn: mustGetButton("newGroupBtn"),
+  newGroupBtn: mustGetElement("newGroupBtn"),
+  newGroupToggleInput: mustGetInput("newGroupToggleInput"),
   studyTimerToggleButton: mustGetButton("studyTimerToggleButton"),
   profileToggleButton: getOptionalButton("profileToggleButton"),
   settingsToggleButton: mustGetButton("settingsToggleButton"),
@@ -99,7 +100,9 @@ const el = {
   userName: mustGetElement("userName"),
   userEmail: mustGetElement("userEmail"),
   friendCard: mustGetElement("friendCard"),
-  friendCardToggle: mustGetButton("friendCardToggle"),
+  friendCardToggle: mustGetElement("friendCardToggle"),
+  friendCardToggleInput: mustGetInput("friendCardToggleInput"),
+  previewSocialActionIdle: mustGetInput("previewSocialActionIdle"),
   friendsCard: mustGetElement("friendsCard"),
   friendsCardToggle: mustGetButton("friendsCardToggle"),
   friendRequestForm: mustGetForm("friendRequestForm"),
@@ -161,6 +164,7 @@ const el = {
   chatAvatar: getOptionalElement("chatAvatar"),
   connectionState: mustGetElement("connectionState"),
   headerInboxButton: getOptionalButton("headerInboxButton"),
+  pinnedMessageStrip: getOptionalElement("pinnedMessageStrip"),
   overviewFriends: mustGetElement("overviewFriends"),
   overviewNotifications: mustGetElement("overviewNotifications"),
   overviewGroups: mustGetElement("overviewGroups"),
@@ -178,6 +182,7 @@ const el = {
   groupInvitationsCount: mustGetElement("groupInvitationsCount"),
   groupInvitationsEmpty: mustGetElement("groupInvitationsEmpty"),
   toast: mustGetElement("toast"),
+  workspaceBootLoader: getOptionalElement("workspaceBootLoader"),
   previewApp: getOptionalElement("previewApp"),
   previewSidebarAvatar: getOptionalElement("previewSidebarAvatar"),
   previewDetails: getOptionalElement("previewDetails"),
@@ -202,6 +207,7 @@ const el = {
   previewGroupLeaveTools: getOptionalElement("previewGroupLeaveTools"),
   previewGroupLeaveBtn: getOptionalButton("previewGroupLeaveBtn"),
   previewGroupLeaveFeedback: getOptionalElement("previewGroupLeaveFeedback"),
+  previewPinnedPanel: getOptionalElement("previewPinnedPanel"),
   previewSharedPanel: getOptionalElement("previewSharedPanel"),
 };
 
@@ -226,15 +232,23 @@ const groupDetailsCache = new Map();
 const previews = new Map();
 const AUTH_SESSION_KEY = "authSession";
 const LEGACY_SESSION_KEY = "supabaseSession";
+const WORKSPACE_BOOT_LOADER_KEY = "workspaceBootLoader";
 const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
 const THEME_STORAGE_KEY = "workspaceTheme";
 const STUDY_TIMER_STORAGE_KEY = "workspaceStudyTimer";
 const SETTINGS_DRAWER_BREAKPOINT = 760;
 const MINUTE_MS = 60000;
+const WORKSPACE_BOOT_MIN_MS = 650;
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 let studyTimerTicker = null;
 const conversationHistoryCache = new Map();
+const pinnedMessagesCache = new Map();
+const workspaceBootStartedAt = Date.now();
+
+if (hasWorkspaceBootLoader() && el.workspaceBootLoader) {
+  el.workspaceBootLoader.setAttribute("aria-hidden", "false");
+}
 
 // Session and auth helpers
 function parseJson(value) {
@@ -380,6 +394,49 @@ async function authorizedRequest(url, options = {}) {
   }
   const data = await parseResponsePayload(response);
   return { ok: response.ok, data };
+}
+
+function hasWorkspaceBootLoader() {
+  return document.documentElement.classList.contains("workspace-booting");
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, ms)));
+}
+
+function nextFrame() {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
+async function finishWorkspaceBoot() {
+  if (!hasWorkspaceBootLoader()) {
+    try {
+      sessionStorage.removeItem(WORKSPACE_BOOT_LOADER_KEY);
+    } catch (error) {
+      console.warn("Could not clear workspace boot flag.", error);
+    }
+    return;
+  }
+
+  const waiters = [nextFrame(), nextFrame()];
+  const remainingMs = WORKSPACE_BOOT_MIN_MS - (Date.now() - workspaceBootStartedAt);
+  if (remainingMs > 0) {
+    waiters.push(wait(remainingMs));
+  }
+  if (document.fonts && document.fonts.ready) {
+    waiters.push(document.fonts.ready.catch(() => undefined));
+  }
+  await Promise.all(waiters);
+
+  document.documentElement.classList.remove("workspace-booting");
+  if (el.workspaceBootLoader) {
+    el.workspaceBootLoader.setAttribute("aria-hidden", "true");
+  }
+  try {
+    sessionStorage.removeItem(WORKSPACE_BOOT_LOADER_KEY);
+  } catch (error) {
+    console.warn("Could not clear workspace boot flag.", error);
+  }
 }
 
 // Formatting and UI helpers
@@ -733,17 +790,32 @@ function setConversationHistory(type, id, messages) {
     Array.isArray(messages) ? messages.slice() : [],
   );
   if (isSameChannel(type, id)) {
+    renderConversationHistoryList(activeConversationHistory(), true);
+    renderPinnedMessageStrip();
+    renderPreviewPinnedPanel();
     renderPreviewSharedPanel();
   }
 }
 
-function appendConversationHistory(type, id, message) {
+function upsertConversationHistory(type, id, message) {
   if (!message) return;
   const key = channelHistoryKey(type, id);
-  const history = conversationHistoryCache.get(key) || [];
-  history.push(message);
+  const history = (conversationHistoryCache.get(key) || []).slice();
+  const messageId = String((message && message.id) || "");
+  const existingIndex = messageId
+    ? history.findIndex((item) => String((item && item.id) || "") === messageId)
+    : -1;
+  if (existingIndex >= 0) {
+    history.splice(existingIndex, 1, { ...history[existingIndex], ...message });
+  } else {
+    history.push(message);
+  }
   conversationHistoryCache.set(key, history.slice(-120));
+  mergePinnedMessage(type, id, message);
   if (isSameChannel(type, id)) {
+    renderConversationHistoryList(activeConversationHistory(), existingIndex < 0);
+    renderPinnedMessageStrip();
+    renderPreviewPinnedPanel();
     renderPreviewSharedPanel();
   }
 }
@@ -753,6 +825,137 @@ function activeConversationHistory() {
     return [];
   }
   return conversationHistoryCache.get(channelHistoryKey(activeChannel.type, activeChannel.id)) || [];
+}
+
+function renderConversationHistoryList(messages, stickToBottom) {
+  const history = Array.isArray(messages) ? messages : [];
+  const previousScrollTop = el.messagesArea.scrollTop;
+  const previousScrollHeight = el.messagesArea.scrollHeight;
+  setMessagesSurfaceMode("conversation");
+  el.messagesArea.innerHTML = "";
+  history.forEach((message) => {
+    const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser && currentUser.email);
+    addMessage(message, sent, message.senderName || message.senderEmail || "User", message.timestamp, false);
+  });
+  if (stickToBottom) {
+    el.messagesArea.scrollTop = el.messagesArea.scrollHeight;
+    return;
+  }
+  const delta = el.messagesArea.scrollHeight - previousScrollHeight;
+  el.messagesArea.scrollTop = Math.max(0, previousScrollTop + delta);
+}
+
+function setPinnedMessages(type, id, messages) {
+  pinnedMessagesCache.set(
+    channelHistoryKey(type, id),
+    Array.isArray(messages) ? sortPinnedMessages(messages) : [],
+  );
+  if (isSameChannel(type, id)) {
+    renderPinnedMessageStrip();
+    renderPreviewPinnedPanel();
+  }
+}
+
+function mergePinnedMessage(type, id, message) {
+  if (!message || !message.id) return;
+  const key = channelHistoryKey(type, id);
+  const next = (pinnedMessagesCache.get(key) || []).slice();
+  const messageId = String(message.id);
+  const existingIndex = next.findIndex((item) => String((item && item.id) || "") === messageId);
+  if (message.pinned) {
+    if (existingIndex >= 0) {
+      next.splice(existingIndex, 1, { ...next[existingIndex], ...message });
+    } else {
+      next.push(message);
+    }
+  } else if (existingIndex >= 0) {
+    next.splice(existingIndex, 1);
+  }
+  pinnedMessagesCache.set(key, sortPinnedMessages(next));
+}
+
+function activePinnedMessages() {
+  if (activeChannel.type !== "direct" && activeChannel.type !== "group") {
+    return [];
+  }
+  return pinnedMessagesCache.get(channelHistoryKey(activeChannel.type, activeChannel.id)) || [];
+}
+
+function sortPinnedMessages(messages) {
+  return messages
+    .slice()
+    .filter((message) => Boolean(message && message.id && message.pinned))
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.pinnedAt || left.timestamp || 0) || 0;
+      const rightTime = Date.parse(right.pinnedAt || right.timestamp || 0) || 0;
+      return rightTime - leftTime;
+    });
+}
+
+function recalledMessageCopy() {
+  return "Tin nhắn đã được thu hồi";
+}
+
+function messageSummaryText(message) {
+  if (!message) return "";
+  if (message.recalled) return recalledMessageCopy();
+  const text = String(message.content || "").trim();
+  if (text) return text;
+  if (message.attachmentName) {
+    const kind = String(message.attachmentContentType || "").startsWith("image/")
+      ? "Ảnh"
+      : "Tệp";
+    return "[" + kind + "] " + message.attachmentName;
+  }
+  return "Tin nhắn";
+}
+
+function scrollToMessage(messageId) {
+  const id = String(messageId || "");
+  if (!id) return;
+  const row = el.messagesArea.querySelector('.message-row[data-message-id="' + id + '"]');
+  if (!row) return;
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  row.classList.add("message-row-flash");
+  window.setTimeout(() => row.classList.remove("message-row-flash"), 1200);
+}
+
+function conversationHistoryContainsMessage(type, id, messageId) {
+  const key = channelHistoryKey(type, id);
+  return (conversationHistoryCache.get(key) || []).some(
+    (message) => String((message && message.id) || "") === String(messageId || ""),
+  );
+}
+
+function refreshConversationPreviewFromHistory(type, id) {
+  const history = conversationHistoryCache.get(channelHistoryKey(type, id)) || [];
+  const last = history[history.length - 1];
+  if (!last) return;
+  const sent = normalizeEmail(last.senderEmail) === normalizeEmail(currentUser && currentUser.email);
+  const sender = sent ? "You" : last.senderName || last.senderEmail || "User";
+  setPreview(type, id, messagePreview(last, sent, sender));
+}
+
+function applyRealtimeConversationUpdate(type, id, message, updateOnly) {
+  if (!message) return;
+  const existsInHistory = conversationHistoryContainsMessage(type, id, message.id);
+  if (!updateOnly || existsInHistory) {
+    upsertConversationHistory(type, id, message);
+  } else {
+    mergePinnedMessage(type, id, message);
+    if (isSameChannel(type, id)) {
+      renderPinnedMessageStrip();
+      renderPreviewPinnedPanel();
+      renderPreviewSharedPanel();
+    }
+  }
+  refreshConversationPreviewFromHistory(type, id);
+}
+
+function applyMessageUpdate(type, id, message) {
+  if (!message) return;
+  upsertConversationHistory(type, id, message);
+  refreshConversationPreviewFromHistory(type, id);
 }
 
 function normalizeSharedUrl(url) {
@@ -882,6 +1085,96 @@ function renderPreviewSharedSection(title, items, kind) {
 
   section.appendChild(list);
   return section;
+}
+
+function renderPinnedMessageStrip() {
+  if (!el.pinnedMessageStrip) return;
+  const inConversation = activeChannel.type === "direct" || activeChannel.type === "group";
+  if (!inConversation) {
+    el.pinnedMessageStrip.hidden = true;
+    el.pinnedMessageStrip.innerHTML = "";
+    return;
+  }
+
+  const pins = activePinnedMessages();
+  if (!pins.length) {
+    el.pinnedMessageStrip.hidden = true;
+    el.pinnedMessageStrip.innerHTML = "";
+    return;
+  }
+
+  const latest = pins[0];
+  el.pinnedMessageStrip.hidden = false;
+  el.pinnedMessageStrip.innerHTML = "";
+
+  const head = document.createElement("div");
+  head.className = "preview-pinned-strip-head";
+
+  const label = document.createElement("strong");
+  label.textContent = pins.length > 1 ? "Tin ghim • " + String(pins.length) : "Tin ghim";
+
+  const meta = document.createElement("span");
+  meta.textContent = latest.senderName || latest.senderEmail || "User";
+  head.append(label, meta);
+
+  const body = document.createElement("button");
+  body.type = "button";
+  body.className = "preview-pinned-strip-body";
+  body.innerHTML =
+    '<span class="preview-pinned-strip-copy"></span><span class="preview-pinned-strip-hint">Xem</span>';
+  body.querySelector(".preview-pinned-strip-copy").textContent = messageSummaryText(latest);
+  body.addEventListener("click", () => scrollToMessage(latest.id));
+
+  el.pinnedMessageStrip.append(head, body);
+}
+
+function renderPreviewPinnedPanel() {
+  if (!el.previewPinnedPanel) return;
+  const inConversation = activeChannel.type === "direct" || activeChannel.type === "group";
+  if (!inConversation) {
+    el.previewPinnedPanel.hidden = true;
+    el.previewPinnedPanel.innerHTML = "";
+    return;
+  }
+
+  const pins = activePinnedMessages();
+  if (!pins.length) {
+    el.previewPinnedPanel.hidden = true;
+    el.previewPinnedPanel.innerHTML = "";
+    return;
+  }
+
+  el.previewPinnedPanel.hidden = false;
+  el.previewPinnedPanel.innerHTML = "";
+
+  const title = document.createElement("div");
+  title.className = "preview-group-panel-head";
+  title.innerHTML = "<span>Tin ghim</span><strong>" + String(pins.length) + "</strong>";
+  el.previewPinnedPanel.appendChild(title);
+
+  const list = document.createElement("div");
+  list.className = "preview-pinned-list";
+
+  pins.forEach((message) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "preview-pinned-item";
+
+    const sender = document.createElement("strong");
+    sender.textContent = message.senderName || message.senderEmail || "User";
+
+    const copy = document.createElement("span");
+    copy.textContent = messageSummaryText(message);
+
+    const time = document.createElement("small");
+    time.textContent = formatTime(message.pinnedAt || message.timestamp);
+
+    item.append(sender, copy, time);
+    item.addEventListener("click", () => scrollToMessage(message.id));
+    list.appendChild(item);
+  });
+
+  el.previewPinnedPanel.appendChild(list);
 }
 
 function renderPreviewSharedPanel() {
@@ -1993,18 +2286,29 @@ function createStudyTimerPanel() {
 
 function setFriendCardCollapsed(collapsed) {
   if (!el.friendCard || !el.friendCardToggle) return;
+  if (!collapsed && isCreateGroupPopoverOpen()) {
+    setCreateGroupPopoverOpen(false);
+  }
   el.friendCard.classList.toggle("is-collapsed", collapsed);
-  el.friendCardToggle.classList.toggle("active", !collapsed);
-  el.friendCardToggle.setAttribute("aria-expanded", String(!collapsed));
-  el.friendCardToggle.setAttribute(
-    "aria-label",
-    collapsed ? "Expand add friend" : "Collapse add friend",
-  );
+  syncSocialActionToggle();
   saveStoredFlag(FRIEND_CARD_STORAGE_KEY, collapsed);
 }
 
 function loadFriendCardPreference() {
   return loadStoredFlag(FRIEND_CARD_STORAGE_KEY, true);
+}
+
+function syncSocialActionToggle() {
+  if (!el.previewSocialActionIdle || !el.newGroupToggleInput || !el.friendCardToggleInput) return;
+  if (isCreateGroupPopoverOpen()) {
+    el.newGroupToggleInput.checked = true;
+    return;
+  }
+  if (el.friendCard && !el.friendCard.classList.contains("is-collapsed")) {
+    el.friendCardToggleInput.checked = true;
+    return;
+  }
+  el.previewSocialActionIdle.checked = true;
 }
 
 function setFriendsCardCollapsed(collapsed) {
@@ -2124,10 +2428,12 @@ function setCreateGroupPopoverOpen(nextOpen) {
   if (nextOpen && isStudyTimerPopoverOpen()) {
     setStudyTimerPopoverOpen(false);
   }
+  if (nextOpen && el.friendCard && !el.friendCard.classList.contains("is-collapsed")) {
+    setFriendCardCollapsed(true);
+  }
   document.body.classList.toggle("create-group-open", nextOpen);
   el.createGroupPopover.setAttribute("aria-hidden", String(!nextOpen));
-  el.newGroupBtn.classList.toggle("active", nextOpen);
-  el.newGroupBtn.setAttribute("aria-pressed", String(nextOpen));
+  syncSocialActionToggle();
   syncFlyoutScrim();
   if (nextOpen) {
     requestAnimationFrame(() => {
@@ -2711,7 +3017,7 @@ function attachmentDataUrl(message) {
 }
 
 function buildAttachment(message) {
-  if (!message || (!message.attachmentBase64 && !message.attachmentUrl)) return null;
+  if (!message || message.recalled || (!message.attachmentBase64 && !message.attachmentUrl)) return null;
   const href = attachmentDataUrl(message);
   if (!href) return null;
   const wrap = document.createElement("div");
@@ -2762,17 +3068,43 @@ function buildAttachment(message) {
 
 function messagePreview(message, sent, sender) {
   const prefix = sent ? "You" : sender;
-  const text = String((message && message.content) || "").trim();
-  if (message && message.attachmentName) {
-    const kind = String(message.attachmentContentType || "").startsWith("image/")
-      ? "image"
-      : "file";
-    return prefix + ": " + (text || "[" + kind + "] " + message.attachmentName);
-  }
-  return prefix + ": " + text;
+  return prefix + ": " + messageSummaryText(message);
 }
 
-function addMessage(message, sent, sender, timestamp) {
+function buildMessageActions(message, sent) {
+  if (!message || !message.id || (activeChannel.type !== "direct" && activeChannel.type !== "group")) {
+    return null;
+  }
+
+  const tools = document.createElement("div");
+  tools.className = "message-tools";
+
+  if (!message.recalled) {
+    const pinButton = document.createElement("button");
+    pinButton.type = "button";
+    pinButton.className = "message-tool-btn";
+    pinButton.textContent = message.pinned ? "Bỏ ghim" : "Ghim";
+    pinButton.addEventListener("click", () => {
+      void toggleMessagePin(message);
+    });
+    tools.appendChild(pinButton);
+  }
+
+  if (sent && !message.recalled) {
+    const recallButton = document.createElement("button");
+    recallButton.type = "button";
+    recallButton.className = "message-tool-btn danger";
+    recallButton.textContent = "Thu hồi";
+    recallButton.addEventListener("click", () => {
+      void recallMessage(message);
+    });
+    tools.appendChild(recallButton);
+  }
+
+  return tools.childElementCount ? tools : null;
+}
+
+function addMessage(message, sent, sender, timestamp, autoScroll = true) {
   if (
     el.messagesArea.querySelector(".empty-state") ||
     el.messagesArea.classList.contains("home-mode")
@@ -2781,7 +3113,10 @@ function addMessage(message, sent, sender, timestamp) {
   }
   setMessagesSurfaceMode("conversation");
   const row = document.createElement("div");
-  row.className = "message-row" + (sent ? " sent" : "");
+  row.className = "message-row" + (sent ? " sent" : "") + (message && message.recalled ? " recalled" : "");
+  if (message && message.id) {
+    row.dataset.messageId = String(message.id);
+  }
   row.innerHTML =
     '<div class="channel-avatar">' +
     initials(sender) +
@@ -2791,8 +3126,14 @@ function addMessage(message, sent, sender, timestamp) {
     formatTime(timestamp) +
     '</span></div><div class="message-bubble"></div></div>';
   const bubble = row.querySelector(".message-bubble");
+  const stack = row.querySelector(".message-stack");
   const text = String((message && message.content) || "").trim();
-  if (text) {
+  if (message && message.recalled) {
+    const copy = document.createElement("div");
+    copy.className = "message-copy recalled-copy";
+    copy.textContent = recalledMessageCopy();
+    bubble.appendChild(copy);
+  } else if (text) {
     const copy = document.createElement("div");
     copy.className = "message-copy";
     copy.textContent = text;
@@ -2802,8 +3143,14 @@ function addMessage(message, sent, sender, timestamp) {
   if (attachment) {
     bubble.appendChild(attachment);
   }
+  const tools = buildMessageActions(message, sent);
+  if (tools && stack) {
+    stack.appendChild(tools);
+  }
   el.messagesArea.appendChild(row);
-  el.messagesArea.scrollTop = el.messagesArea.scrollHeight;
+  if (autoScroll) {
+    el.messagesArea.scrollTop = el.messagesArea.scrollHeight;
+  }
 }
 
 // Channel selection and sidebar rendering
@@ -2820,6 +3167,8 @@ function selectHome() {
   highlightSelection();
   syncPreviewProfilePanel();
   renderFavoritesStrip();
+  renderPinnedMessageStrip();
+  renderPreviewPinnedPanel();
   renderHomeOverview();
   syncComposer();
 }
@@ -2841,6 +3190,8 @@ function selectDirect(friend) {
   highlightSelection();
   syncPreviewProfilePanel();
   renderFavoritesStrip();
+  renderPinnedMessageStrip();
+  renderPreviewPinnedPanel();
   syncComposer();
   loadDirectHistory(friend.email);
   subscribeToDirect(friend.email);
@@ -2858,6 +3209,8 @@ function selectGroup(group) {
   highlightSelection();
   syncPreviewProfilePanel();
   renderFavoritesStrip();
+  renderPinnedMessageStrip();
+  renderPreviewPinnedPanel();
   syncComposer();
   void ensureGroupDetails(group.id);
   loadGroupHistory(group.id);
@@ -3210,6 +3563,7 @@ async function loadDirectHistory(otherEmail) {
   if (activeChannel.type !== "direct" || normalizeEmail(activeChannel.email) !== directId) return;
   if (!result.ok) {
     setConversationHistory("direct", directId, []);
+    setPinnedMessages("direct", directId, []);
     clearMessages(
       "Chat unavailable",
       result.data.error || "Messaging unlocks after a friend request is accepted.",
@@ -3224,16 +3578,11 @@ async function loadDirectHistory(otherEmail) {
   showBanner("", "info");
   const messages = Array.isArray(result.data) ? result.data : [];
   setConversationHistory("direct", directId, messages);
+  void loadDirectPins(otherEmail);
   if (!messages.length) {
     clearMessages("No messages yet", "Start the conversation here.", "");
     return;
   }
-  setMessagesSurfaceMode("conversation");
-  el.messagesArea.innerHTML = "";
-  messages.forEach((message) => {
-    const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-    addMessage(message, sent, message.senderName || message.senderEmail || "User", message.timestamp);
-  });
   const last = messages[messages.length - 1];
   if (last) {
     const sender =
@@ -3251,6 +3600,7 @@ async function loadGroupHistory(groupId) {
   if (activeChannel.type !== "group" || String(activeChannel.id) !== currentGroupId) return;
   if (!result.ok) {
     setConversationHistory("group", currentGroupId, []);
+    setPinnedMessages("group", currentGroupId, []);
     clearMessages(
       "Group unavailable",
       result.data.error || "You cannot open this group right now.",
@@ -3262,16 +3612,11 @@ async function loadGroupHistory(groupId) {
   showBanner("", "info");
   const messages = Array.isArray(result.data) ? result.data : [];
   setConversationHistory("group", currentGroupId, messages);
+  void loadGroupPins(groupId);
   if (!messages.length) {
     clearMessages("No messages yet", "Send the first message to this study group.", "Group");
     return;
   }
-  setMessagesSurfaceMode("conversation");
-  el.messagesArea.innerHTML = "";
-  messages.forEach((message) => {
-    const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-    addMessage(message, sent, message.senderName || message.senderEmail || "User", message.timestamp);
-  });
   const last = messages[messages.length - 1];
   if (last) {
     const sender =
@@ -3280,6 +3625,22 @@ async function loadGroupHistory(groupId) {
         : last.senderName || last.senderEmail || "User";
     setPreview("group", groupId, messagePreview(last, sender === "You", sender));
   }
+}
+
+async function loadDirectPins(otherEmail) {
+  const directId = normalizeEmail(otherEmail);
+  const result = await authorizedRequest(
+    "/api/messages/direct/" + encodeURIComponent(otherEmail) + "/pins",
+  );
+  if (activeChannel.type !== "direct" || normalizeEmail(activeChannel.email) !== directId) return;
+  setPinnedMessages("direct", directId, result.ok && Array.isArray(result.data) ? result.data : []);
+}
+
+async function loadGroupPins(groupId) {
+  const currentGroupId = String(groupId || "");
+  const result = await authorizedRequest("/api/messages/groups/" + currentGroupId + "/pins");
+  if (activeChannel.type !== "group" || String(activeChannel.id) !== currentGroupId) return;
+  setPinnedMessages("group", currentGroupId, result.ok && Array.isArray(result.data) ? result.data : []);
 }
 
 // Realtime messaging
@@ -3311,13 +3672,19 @@ function subscribeToGroup(groupId) {
   if (!stompClient || !stompClient.connected) return;
   disconnectSubscription();
   activeSubscription = stompClient.subscribe("/topic/groups/" + groupId, (payload) => {
-    const message = JSON.parse(payload.body || "{}");
-    if (!String(message.content || "").trim() && !message.attachmentBase64 && !message.attachmentUrl) return;
-    const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-    const sender = message.senderName || message.senderEmail || "User";
-    appendConversationHistory("group", groupId, message);
-    setPreview("group", groupId, messagePreview(message, sent, sender));
-    addMessage(message, sent, sender, message.timestamp);
+    const data = JSON.parse(payload.body || "{}");
+    const updateOnly = Boolean(data && data.message);
+    const message = updateOnly ? data.message : data;
+    if (!message || !message.id) return;
+    if (
+      !updateOnly &&
+      !String(message.content || "").trim() &&
+      !message.attachmentBase64 &&
+      !message.attachmentUrl
+    ) {
+      return;
+    }
+    applyRealtimeConversationUpdate("group", groupId, message, updateOnly);
   });
 }
 
@@ -3327,13 +3694,19 @@ function subscribeToDirect(otherEmail) {
   const key = conversationKey(currentUser.email, otherEmail);
   const directId = normalizeEmail(otherEmail);
   activeSubscription = stompClient.subscribe("/topic/direct/" + key, (payload) => {
-    const message = JSON.parse(payload.body || "{}");
-    if (!String(message.content || "").trim() && !message.attachmentBase64 && !message.attachmentUrl) return;
-    const sent = normalizeEmail(message.senderEmail) === normalizeEmail(currentUser.email);
-    const sender = message.senderName || message.senderEmail || "User";
-    appendConversationHistory("direct", directId, message);
-    setPreview("direct", directId, messagePreview(message, sent, sender));
-    addMessage(message, sent, sender, message.timestamp);
+    const data = JSON.parse(payload.body || "{}");
+    const updateOnly = Boolean(data && data.message);
+    const message = updateOnly ? data.message : data;
+    if (!message || !message.id) return;
+    if (
+      !updateOnly &&
+      !String(message.content || "").trim() &&
+      !message.attachmentBase64 &&
+      !message.attachmentUrl
+    ) {
+      return;
+    }
+    applyRealtimeConversationUpdate("direct", directId, message, updateOnly);
   });
 }
 
@@ -3395,7 +3768,7 @@ async function sendGroupMessageFallback(content) {
   const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
   setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
   if (!stompClient || !stompClient.connected) {
-    appendConversationHistory("group", activeGroupId, result.data);
+    upsertConversationHistory("group", activeGroupId, result.data);
     if (isSameChannel("group", activeGroupId)) {
       addMessage(result.data, true, sender, result.data.timestamp);
     }
@@ -3425,7 +3798,7 @@ async function sendDirectMessageFallback(content) {
   const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
   setPreview("direct", channelId, messagePreview(result.data, true, sender));
   if (!stompClient || !stompClient.connected) {
-    appendConversationHistory("direct", channelId, result.data);
+    upsertConversationHistory("direct", channelId, result.data);
     if (isSameChannel("direct", channelId)) {
       addMessage(result.data, true, sender, result.data.timestamp);
     }
@@ -3468,7 +3841,7 @@ async function uploadDirectAttachment(file) {
   setPreview("direct", channelId, messagePreview(result.data, true, sender));
 
   if (!stompClient || !stompClient.connected) {
-    appendConversationHistory("direct", channelId, result.data);
+    upsertConversationHistory("direct", channelId, result.data);
     if (isSameChannel("direct", channelId)) {
       addMessage(result.data, true, sender, result.data.timestamp);
     }
@@ -3508,7 +3881,7 @@ async function uploadGroupAttachment(file) {
   setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
 
   if (!stompClient || !stompClient.connected) {
-    appendConversationHistory("group", activeGroupId, result.data);
+    upsertConversationHistory("group", activeGroupId, result.data);
     if (isSameChannel("group", activeGroupId)) {
       addMessage(result.data, true, sender, result.data.timestamp);
     }
@@ -3516,6 +3889,62 @@ async function uploadGroupAttachment(file) {
 
   clearDraftIfUnchanged("group", activeGroupId, caption);
   showToast("Attachment sent.");
+}
+
+async function recallMessage(message) {
+  if (!message || !message.id) return;
+  if (!window.confirm("Thu hồi tin nhắn này?")) return;
+
+  let result;
+  if (activeChannel.type === "group") {
+    result = await authorizedRequest(
+      "/api/messages/groups/" + activeChannel.id + "/messages/" + message.id + "/recall",
+      { method: "POST" },
+    );
+  } else if (activeChannel.type === "direct") {
+    result = await authorizedRequest(
+      "/api/messages/direct/" + encodeURIComponent(activeChannel.email) + "/messages/" + message.id + "/recall",
+      { method: "POST" },
+    );
+  } else {
+    return;
+  }
+
+  if (!result.ok || !result.data) {
+    showToast((result.data && result.data.error) || "Không thể thu hồi tin nhắn.");
+    return;
+  }
+
+  applyMessageUpdate(activeChannel.type, activeChannel.id, result.data);
+  showToast("Đã thu hồi tin nhắn.");
+}
+
+async function toggleMessagePin(message) {
+  if (!message || !message.id) return;
+  const nextPinned = !message.pinned;
+
+  let result;
+  if (activeChannel.type === "group") {
+    result = await authorizedRequest(
+      "/api/messages/groups/" + activeChannel.id + "/messages/" + message.id + "/pin",
+      { method: nextPinned ? "POST" : "DELETE" },
+    );
+  } else if (activeChannel.type === "direct") {
+    result = await authorizedRequest(
+      "/api/messages/direct/" + encodeURIComponent(activeChannel.email) + "/messages/" + message.id + "/pin",
+      { method: nextPinned ? "POST" : "DELETE" },
+    );
+  } else {
+    return;
+  }
+
+  if (!result.ok || !result.data) {
+    showToast((result.data && result.data.error) || "Không thể cập nhật ghim.");
+    return;
+  }
+
+  applyMessageUpdate(activeChannel.type, activeChannel.id, result.data);
+  showToast(nextPinned ? "Đã ghim tin nhắn." : "Đã bỏ ghim.");
 }
 
 // User actions and bootstrap
@@ -3553,41 +3982,48 @@ function handlePanelQuery() {
 }
 
 async function bootstrap() {
-  currentUser = requireAuth();
-  if (!currentUser) return;
-  await loadCurrentUserProfile();
-  applyTheme(loadThemePreference());
-  startStudyTimerTicker();
-  removeLanguageSettingsField();
-  if (!el.studyTimerPanelMount.firstChild) {
-    el.studyTimerPanelMount.appendChild(createStudyTimerPanel());
-    refreshStudyTimerUi();
+  try {
+    currentUser = requireAuth();
+    if (!currentUser) return;
+    await loadCurrentUserProfile();
+    applyTheme(loadThemePreference());
+    startStudyTimerTicker();
+    removeLanguageSettingsField();
+    if (!el.studyTimerPanelMount.firstChild) {
+      el.studyTimerPanelMount.appendChild(createStudyTimerPanel());
+      refreshStudyTimerUi();
+    }
+    syncCurrentUserUi();
+    setFriendCardCollapsed(true);
+    setFriendsCardCollapsed(false);
+    setRosterFilter("all");
+    el.settingsToggleButton.title = "Settings";
+    el.settingsToggleButton.setAttribute("aria-label", "Settings");
+    el.studyTimerToggleButton.title = "Study timer";
+    el.studyTimerToggleButton.setAttribute("aria-label", "Study timer");
+    closeSettingsPopover();
+    closeStudyTimerPopover();
+    closeCreateGroupPopover();
+    renderCreateGroupMembersPreview();
+    setSettingsProfileFeedback("", "success");
+    setCreateGroupFeedback("", "success");
+    syncInboxToggleState();
+    selectHome();
+    await refreshWorkspace();
+    handlePanelQuery();
+    connectWs();
+    if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
+    workspaceRefreshTimer = window.setInterval(refreshWorkspace, 5000);
+  } catch (error) {
+    console.error("Workspace bootstrap failed.", error);
+    showBanner("Không thể chuẩn bị workspace. Hãy tải lại trang.", "error");
+  } finally {
+    await finishWorkspaceBoot();
   }
-  syncCurrentUserUi();
-  setFriendCardCollapsed(true);
-  setFriendsCardCollapsed(false);
-  setRosterFilter("all");
-  el.settingsToggleButton.title = "Settings";
-  el.settingsToggleButton.setAttribute("aria-label", "Settings");
-  el.studyTimerToggleButton.title = "Study timer";
-  el.studyTimerToggleButton.setAttribute("aria-label", "Study timer");
-  closeSettingsPopover();
-  closeStudyTimerPopover();
-  closeCreateGroupPopover();
-  renderCreateGroupMembersPreview();
-  setSettingsProfileFeedback("", "success");
-  setCreateGroupFeedback("", "success");
-  syncInboxToggleState();
-  selectHome();
-  await refreshWorkspace();
-  handlePanelQuery();
-  connectWs();
-  if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
-  workspaceRefreshTimer = window.setInterval(refreshWorkspace, 5000);
 }
 
 // Event wiring
-el.friendCardToggle.addEventListener("click", () =>
+el.friendCardToggleInput.addEventListener("click", () =>
   setFriendCardCollapsed(!el.friendCard.classList.contains("is-collapsed")),
 );
 
@@ -3930,7 +4366,7 @@ el.homeRailButton.addEventListener("click", () => {
   setRosterFilter("all");
   selectHome();
 });
-el.newGroupBtn.addEventListener("click", toggleCreateGroupPopover);
+el.newGroupToggleInput.addEventListener("click", toggleCreateGroupPopover);
 el.studyTimerToggleButton.addEventListener("click", toggleStudyTimerPopover);
 el.settingsToggleButton.addEventListener("click", toggleSettingsPopover);
 el.settingsCloseButton.addEventListener("click", closeSettingsPopover);

@@ -113,6 +113,127 @@
             font-weight: 600;
         }
         .link a:hover { color: #764ba2; }
+
+        .auth-success-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background: rgba(15, 23, 42, 0.78);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.24s ease, visibility 0.24s ease;
+        }
+        .auth-success-loader.show {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+        .auth-success-loader-card {
+            min-width: min(100%, 340px);
+            padding: 28px 32px;
+            border-radius: 28px;
+            background: rgba(10, 15, 36, 0.94);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+            display: grid;
+            justify-items: center;
+            gap: 20px;
+        }
+        .loader-wrapper {
+            position: relative;
+            width: 126px;
+            height: 52px;
+        }
+        .loader-wrapper .packman::before,
+        .loader-wrapper .packman::after {
+            content: '';
+            position: absolute;
+            left: 26px;
+            width: 50px;
+            height: 25px;
+            background-color: #EFF107;
+            box-shadow: 0 0 18px rgba(239, 241, 7, 0.28);
+        }
+        .loader-wrapper .packman::before {
+            top: 0;
+            border-radius: 100px 100px 0 0;
+            transform: translate(-50%, -50%);
+            animation: pac-top 0.5s linear infinite;
+            transform-origin: center bottom;
+        }
+        .loader-wrapper .packman::after {
+            bottom: 0;
+            border-radius: 0 0 100px 100px;
+            transform: translate(-50%, 50%);
+            animation: pac-bot 0.5s linear infinite;
+            transform-origin: center top;
+        }
+        .dots .dot {
+            position: absolute;
+            z-index: -1;
+            top: 21px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 0 14px rgba(255, 255, 255, 0.24);
+        }
+        .dots .dot:nth-child(1) {
+            left: 92px;
+            animation: dot-stage1 0.5s infinite;
+        }
+        .dots .dot:nth-child(2) {
+            left: 64px;
+            animation: dot-stage1 0.5s infinite;
+        }
+        .dots .dot:nth-child(3) {
+            left: 36px;
+            animation: dot-stage1 0.5s infinite;
+        }
+        .dots .dot:nth-child(4) {
+            left: 10px;
+            animation: dot-stage2 0.5s infinite;
+        }
+        .auth-loader-copy {
+            text-align: center;
+        }
+        .auth-loader-copy strong {
+            display: block;
+            color: #fff;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+        .auth-loader-copy span {
+            display: block;
+            margin-top: 8px;
+            color: rgba(226, 232, 240, 0.82);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        @keyframes pac-top {
+            0% { transform: translate(-50%, -50%) rotate(0) }
+            50% { transform: translate(-50%, -50%) rotate(-30deg) }
+            100% { transform: translate(-50%, -50%) rotate(0) }
+        }
+        @keyframes pac-bot {
+            0% { transform: translate(-50%, 50%) rotate(0) }
+            50% { transform: translate(-50%, 50%) rotate(30deg) }
+            100% { transform: translate(-50%, 50%) rotate(0) }
+        }
+        @keyframes dot-stage1 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-24px, 0); }
+        }
+        @keyframes dot-stage2 {
+            0% { transform: scale(1); }
+            5%, 100% { transform: scale(0); }
+        }
     </style>
 </head>
 <body>
@@ -145,6 +266,24 @@
     </div>
 </div>
 
+<div class="auth-success-loader" id="authSuccessLoader" aria-hidden="true">
+    <div class="auth-success-loader-card">
+        <div class="loader-wrapper">
+            <div class="packman"></div>
+            <div class="dots">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        </div>
+        <div class="auth-loader-copy">
+            <strong>Đăng nhập thành công</strong>
+            <span>Đang chuẩn bị workspace và đồng bộ tài nguyên cho bạn.</span>
+        </div>
+    </div>
+</div>
+
 <script>
     function mustGetElement(id) {
         const element = document.getElementById(id);
@@ -156,12 +295,14 @@
 
     const AUTH_SESSION_KEY = 'authSession';
     const LEGACY_SESSION_KEY = 'supabaseSession';
+    const WORKSPACE_BOOT_LOADER_KEY = 'workspaceBootLoader';
     const loginForm = /** @type {HTMLFormElement} */ (mustGetElement('loginForm'));
     const loginBtn = /** @type {HTMLButtonElement} */ (mustGetElement('loginBtn'));
     const errorMessage = mustGetElement('errorMessage');
     const successMessage = mustGetElement('successMessage');
     const emailInput = /** @type {HTMLInputElement} */ (mustGetElement('email'));
     const passwordInput = /** @type {HTMLInputElement} */ (mustGetElement('password'));
+    const authSuccessLoader = mustGetElement('authSuccessLoader');
 
     const registrationEmail = sessionStorage.getItem('registrationEmail');
     if (registrationEmail) {
@@ -218,7 +359,15 @@
                 email: user?.email || email
             }));
 
-            window.location.href = '/index.html';
+            sessionStorage.setItem(WORKSPACE_BOOT_LOADER_KEY, '1');
+            authSuccessLoader.classList.add('show');
+            authSuccessLoader.setAttribute('aria-hidden', 'false');
+
+            const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+            const nextUrl = returnTo || '/index.html';
+            window.setTimeout(() => {
+                window.location.replace(nextUrl);
+            }, 220);
         } catch (err) {
             showError('Lỗi kết nối. Vui lòng thử lại.');
             resetBtn();

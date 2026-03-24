@@ -16,14 +16,17 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.UnaryOperator;
 
 @Service
 public class MessageService {
 
     private static final int HISTORY_LIMIT = 100;
+    private static final int PIN_LIMIT = 25;
     private static final int MAX_ATTACHMENT_BYTES = 30 * 1024 * 1024;
 
     private final MessageRepository messageRepository;
@@ -176,19 +179,7 @@ public class MessageService {
             Message saved = messageRepository.save(message);
             return toDirectChatMessage(canonicalKey, saved);
         } catch (RuntimeException exception) {
-            DirectChatMessage stored = new DirectChatMessage(
-                    canonicalKey,
-                    senderEmail,
-                    message.getSender(),
-                    recipientEmail,
-                    content,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    Instant.now()
-            );
+            DirectChatMessage stored = toDirectChatMessage(canonicalKey, copyMessage(message));
             storeTransientDirectMessage(canonicalKey, stored);
             return stored;
         }
@@ -297,6 +288,152 @@ public class MessageService {
         }
     }
 
+    public List<GroupChatMessage> getPinnedGroupMessages(Long groupId) {
+        if (groupId == null) {
+            return List.of();
+        }
+        try {
+            return messageRepository.findByTypeAndGroupIdAndPinnedTrueOrderByPinnedAtDescTimestampDesc(
+                            MessageType.GROUP,
+                            groupId,
+                            PageRequest.of(0, PIN_LIMIT)
+                    ).stream()
+                    .map(this::toGroupChatMessage)
+                    .toList();
+        } catch (RuntimeException exception) {
+            return latestTransientPinnedGroupMessages(groupId);
+        }
+    }
+
+    public List<DirectChatMessage> getPinnedDirectMessages(String currentUserEmail, String otherEmail) {
+        String first = UserIdentitySupport.normalizeEmail(currentUserEmail);
+        String second = UserIdentitySupport.normalizeEmail(otherEmail);
+        if (first == null || second == null) {
+            return List.of();
+        }
+
+        String conversationKey = buildConversationKey(first, second);
+        try {
+            return messageRepository.findPinnedDirectConversation(
+                            MessageType.DIRECT,
+                            first,
+                            second,
+                            PageRequest.of(0, PIN_LIMIT)
+                    ).stream()
+                    .map(message -> toDirectChatMessage(conversationKey, message))
+                    .toList();
+        } catch (RuntimeException exception) {
+            return latestTransientPinnedDirectMessages(conversationKey);
+        }
+    }
+
+    public GroupChatMessage recallGroupMessage(Long groupId, String requesterEmail, Long messageId) {
+        String normalizedRequester = UserIdentitySupport.normalizeEmail(requesterEmail);
+        if (groupId == null || normalizedRequester == null || messageId == null) {
+            throw new IllegalArgumentException("Group, requester and message are required.");
+        }
+        try {
+            Message message = messageRepository.findById(messageId)
+                    .orElseThrow(() -> new NoSuchElementException("Message not found."));
+            validateGroupMessage(message, groupId);
+            validateRecallPermission(message, normalizedRequester);
+            applyRecall(message);
+            return toGroupChatMessage(messageRepository.save(message));
+        } catch (NoSuchElementException | SecurityException | IllegalStateException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            GroupChatMessage updated = updateTransientGroupMessage(groupId, messageId, existing -> {
+                validateGroupMessage(existing, groupId);
+                validateRecallPermission(existing.senderEmail(), normalizedRequester);
+                return recall(existing);
+            });
+            if (updated != null) {
+                return updated;
+            }
+            throw new NoSuchElementException("Message not found.");
+        }
+    }
+
+    public DirectChatMessage recallDirectMessage(String requesterEmail, String otherEmail, Long messageId) {
+        String normalizedRequester = UserIdentitySupport.normalizeEmail(requesterEmail);
+        String normalizedOther = UserIdentitySupport.normalizeEmail(otherEmail);
+        if (normalizedRequester == null || normalizedOther == null || messageId == null) {
+            throw new IllegalArgumentException("Both emails and the message are required.");
+        }
+        String conversationKey = buildConversationKey(normalizedRequester, normalizedOther);
+        try {
+            Message message = messageRepository.findById(messageId)
+                    .orElseThrow(() -> new NoSuchElementException("Message not found."));
+            validateDirectMessage(message, conversationKey);
+            validateRecallPermission(message, normalizedRequester);
+            applyRecall(message);
+            return toDirectChatMessage(conversationKey, messageRepository.save(message));
+        } catch (NoSuchElementException | SecurityException | IllegalStateException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            DirectChatMessage updated = updateTransientDirectMessage(conversationKey, messageId, existing -> {
+                validateDirectMessage(existing, conversationKey);
+                validateRecallPermission(existing.senderEmail(), normalizedRequester);
+                return recall(existing);
+            });
+            if (updated != null) {
+                return updated;
+            }
+            throw new NoSuchElementException("Message not found.");
+        }
+    }
+
+    public GroupChatMessage setGroupMessagePinned(Long groupId, Long messageId, boolean pinned) {
+        if (groupId == null || messageId == null) {
+            throw new IllegalArgumentException("Group and message are required.");
+        }
+        try {
+            Message message = messageRepository.findById(messageId)
+                    .orElseThrow(() -> new NoSuchElementException("Message not found."));
+            validateGroupMessage(message, groupId);
+            applyPinnedState(message, pinned);
+            return toGroupChatMessage(messageRepository.save(message));
+        } catch (NoSuchElementException | IllegalStateException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            GroupChatMessage updated = updateTransientGroupMessage(groupId, messageId, existing -> {
+                validateGroupMessage(existing, groupId);
+                return setPinned(existing, pinned);
+            });
+            if (updated != null) {
+                return updated;
+            }
+            throw new NoSuchElementException("Message not found.");
+        }
+    }
+
+    public DirectChatMessage setDirectMessagePinned(String requesterEmail, String otherEmail, Long messageId, boolean pinned) {
+        String normalizedRequester = UserIdentitySupport.normalizeEmail(requesterEmail);
+        String normalizedOther = UserIdentitySupport.normalizeEmail(otherEmail);
+        if (normalizedRequester == null || normalizedOther == null || messageId == null) {
+            throw new IllegalArgumentException("Both emails and the message are required.");
+        }
+        String conversationKey = buildConversationKey(normalizedRequester, normalizedOther);
+        try {
+            Message message = messageRepository.findById(messageId)
+                    .orElseThrow(() -> new NoSuchElementException("Message not found."));
+            validateDirectMessage(message, conversationKey);
+            applyPinnedState(message, pinned);
+            return toDirectChatMessage(conversationKey, messageRepository.save(message));
+        } catch (NoSuchElementException | IllegalStateException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            DirectChatMessage updated = updateTransientDirectMessage(conversationKey, messageId, existing -> {
+                validateDirectMessage(existing, conversationKey);
+                return setPinned(existing, pinned);
+            });
+            if (updated != null) {
+                return updated;
+            }
+            throw new NoSuchElementException("Message not found.");
+        }
+    }
+
     public String buildConversationKey(String firstEmail, String secondEmail) {
         String first = UserIdentitySupport.normalizeEmail(firstEmail);
         String second = UserIdentitySupport.normalizeEmail(secondEmail);
@@ -352,6 +489,208 @@ public class MessageService {
         return List.copyOf(history.subList(fromIndex, history.size()));
     }
 
+    private List<GroupChatMessage> latestTransientPinnedGroupMessages(Long groupId) {
+        return transientGroupMessages.getOrDefault(groupId, List.of()).stream()
+                .filter(GroupChatMessage::pinned)
+                .sorted(Comparator.comparing(GroupChatMessage::pinnedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(GroupChatMessage::timestamp, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(PIN_LIMIT)
+                .toList();
+    }
+
+    private List<DirectChatMessage> latestTransientPinnedDirectMessages(String conversationKey) {
+        return transientDirectMessages.getOrDefault(conversationKey, List.of()).stream()
+                .filter(DirectChatMessage::pinned)
+                .sorted(Comparator.comparing(DirectChatMessage::pinnedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(DirectChatMessage::timestamp, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(PIN_LIMIT)
+                .toList();
+    }
+
+    private GroupChatMessage updateTransientGroupMessage(Long groupId, Long messageId, UnaryOperator<GroupChatMessage> updater) {
+        List<GroupChatMessage> history = transientGroupMessages.get(groupId);
+        if (history == null || updater == null) {
+            return null;
+        }
+        for (int index = 0; index < history.size(); index += 1) {
+            GroupChatMessage current = history.get(index);
+            if (current == null || !messageId.equals(current.id())) {
+                continue;
+            }
+            GroupChatMessage updated = updater.apply(current);
+            history.set(index, updated);
+            return updated;
+        }
+        return null;
+    }
+
+    private DirectChatMessage updateTransientDirectMessage(String conversationKey, Long messageId, UnaryOperator<DirectChatMessage> updater) {
+        List<DirectChatMessage> history = transientDirectMessages.get(conversationKey);
+        if (history == null || updater == null) {
+            return null;
+        }
+        for (int index = 0; index < history.size(); index += 1) {
+            DirectChatMessage current = history.get(index);
+            if (current == null || !messageId.equals(current.id())) {
+                continue;
+            }
+            DirectChatMessage updated = updater.apply(current);
+            history.set(index, updated);
+            return updated;
+        }
+        return null;
+    }
+
+    private void validateGroupMessage(Message message, Long groupId) {
+        if (message == null || message.getType() != MessageType.GROUP || !groupId.equals(message.getGroupId())) {
+            throw new NoSuchElementException("Message not found.");
+        }
+    }
+
+    private void validateGroupMessage(GroupChatMessage message, Long groupId) {
+        if (message == null || !groupId.equals(message.groupId())) {
+            throw new NoSuchElementException("Message not found.");
+        }
+    }
+
+    private void validateDirectMessage(Message message, String conversationKey) {
+        if (message == null || message.getType() != MessageType.DIRECT) {
+            throw new NoSuchElementException("Message not found.");
+        }
+        String sender = UserIdentitySupport.normalizeEmail(message.getSenderEmail());
+        String recipient = UserIdentitySupport.normalizeEmail(message.getRecipientEmail());
+        if (sender == null || recipient == null || !conversationKey.equals(buildConversationKey(sender, recipient))) {
+            throw new NoSuchElementException("Message not found.");
+        }
+    }
+
+    private void validateDirectMessage(DirectChatMessage message, String conversationKey) {
+        if (message == null || !conversationKey.equals(message.conversationKey())) {
+            throw new NoSuchElementException("Message not found.");
+        }
+    }
+
+    private void validateRecallPermission(Message message, String requesterEmail) {
+        validateRecallPermission(message == null ? null : message.getSenderEmail(), requesterEmail);
+    }
+
+    private void validateRecallPermission(String senderEmail, String requesterEmail) {
+        if (!UserIdentitySupport.normalizeEmail(requesterEmail).equals(UserIdentitySupport.normalizeEmail(senderEmail))) {
+            throw new SecurityException("You can only recall your own messages.");
+        }
+    }
+
+    private void applyRecall(Message message) {
+        if (message == null) {
+            throw new NoSuchElementException("Message not found.");
+        }
+        message.setRecalled(true);
+        message.setRecalledAt(Instant.now());
+        message.setPinned(false);
+        message.setPinnedAt(null);
+        message.setContent("");
+        message.setAttachmentName(null);
+        message.setAttachmentContentType(null);
+        message.setAttachmentBase64(null);
+        message.setAttachmentStoragePath(null);
+        message.setAttachmentSize(null);
+    }
+
+    private GroupChatMessage recall(GroupChatMessage message) {
+        return new GroupChatMessage(
+                message.id(),
+                message.groupId(),
+                message.senderEmail(),
+                message.senderName(),
+                "",
+                null,
+                null,
+                null,
+                null,
+                null,
+                message.timestamp(),
+                true,
+                false,
+                null
+        );
+    }
+
+    private DirectChatMessage recall(DirectChatMessage message) {
+        return new DirectChatMessage(
+                message.id(),
+                message.conversationKey(),
+                message.senderEmail(),
+                message.senderName(),
+                message.recipientEmail(),
+                "",
+                null,
+                null,
+                null,
+                null,
+                null,
+                message.timestamp(),
+                true,
+                false,
+                null
+        );
+    }
+
+    private void applyPinnedState(Message message, boolean pinned) {
+        if (message == null) {
+            throw new NoSuchElementException("Message not found.");
+        }
+        if (pinned && message.isRecalled()) {
+            throw new IllegalStateException("Cannot pin a recalled message.");
+        }
+        message.setPinned(pinned);
+        message.setPinnedAt(pinned ? Instant.now() : null);
+    }
+
+    private GroupChatMessage setPinned(GroupChatMessage message, boolean pinned) {
+        if (pinned && message.recalled()) {
+            throw new IllegalStateException("Cannot pin a recalled message.");
+        }
+        return new GroupChatMessage(
+                message.id(),
+                message.groupId(),
+                message.senderEmail(),
+                message.senderName(),
+                message.content(),
+                message.attachmentName(),
+                message.attachmentContentType(),
+                message.attachmentBase64(),
+                message.attachmentUrl(),
+                message.attachmentSize(),
+                message.timestamp(),
+                message.recalled(),
+                pinned,
+                pinned ? Instant.now() : null
+        );
+    }
+
+    private DirectChatMessage setPinned(DirectChatMessage message, boolean pinned) {
+        if (pinned && message.recalled()) {
+            throw new IllegalStateException("Cannot pin a recalled message.");
+        }
+        return new DirectChatMessage(
+                message.id(),
+                message.conversationKey(),
+                message.senderEmail(),
+                message.senderName(),
+                message.recipientEmail(),
+                message.content(),
+                message.attachmentName(),
+                message.attachmentContentType(),
+                message.attachmentBase64(),
+                message.attachmentUrl(),
+                message.attachmentSize(),
+                message.timestamp(),
+                message.recalled(),
+                pinned,
+                pinned ? Instant.now() : null
+        );
+    }
+
     private Message copyMessage(Message source) {
         Message stored = new Message();
         stored.setId(transientMessageIds.incrementAndGet());
@@ -365,6 +704,10 @@ public class MessageService {
         stored.setAttachmentBase64(source.getAttachmentBase64());
         stored.setAttachmentStoragePath(source.getAttachmentStoragePath());
         stored.setAttachmentSize(source.getAttachmentSize());
+        stored.setRecalled(source.isRecalled());
+        stored.setRecalledAt(source.getRecalledAt());
+        stored.setPinned(source.isPinned());
+        stored.setPinnedAt(source.getPinnedAt());
         stored.setTimestamp(source.getTimestamp() != null ? source.getTimestamp() : Instant.now());
         stored.setRoom(source.getRoom());
         stored.setType(source.getType());
@@ -382,6 +725,7 @@ public class MessageService {
             }
         }
         return new DirectChatMessage(
+                message.getId(),
                 conversationKey,
                 message.getSenderEmail(),
                 message.getSender(),
@@ -392,7 +736,10 @@ public class MessageService {
                 message.getAttachmentBase64(),
                 attachmentUrl,
                 message.getAttachmentSize(),
-                message.getTimestamp()
+                message.getTimestamp(),
+                message.isRecalled(),
+                message.isPinned(),
+                message.getPinnedAt()
         );
     }
 
@@ -407,6 +754,7 @@ public class MessageService {
             }
         }
         return new GroupChatMessage(
+                message.getId(),
                 message.getGroupId(),
                 message.getSenderEmail(),
                 message.getSender(),
@@ -416,7 +764,10 @@ public class MessageService {
                 message.getAttachmentBase64(),
                 attachmentUrl,
                 message.getAttachmentSize(),
-                message.getTimestamp()
+                message.getTimestamp(),
+                message.isRecalled(),
+                message.isPinned(),
+                message.getPinnedAt()
         );
     }
 

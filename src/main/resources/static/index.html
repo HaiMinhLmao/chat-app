@@ -12,9 +12,36 @@
     />
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <script>
+      try {
+        if (sessionStorage.getItem("workspaceBootLoader") === "1") {
+          document.documentElement.classList.add("workspace-booting");
+        }
+      } catch (error) {
+        console.warn("Could not read workspace boot flag.", error);
+      }
+    </script>
     <link rel="stylesheet" href="css/workspace.css" />
   </head>
   <body class="preview-page">
+    <div class="workspace-boot-loader" id="workspaceBootLoader" aria-hidden="true">
+      <div class="workspace-boot-loader-card">
+        <div class="workspace-boot-loader-wrapper">
+          <div class="workspace-boot-packman"></div>
+          <div class="workspace-boot-dots">
+            <span class="workspace-boot-dot"></span>
+            <span class="workspace-boot-dot"></span>
+            <span class="workspace-boot-dot"></span>
+            <span class="workspace-boot-dot"></span>
+          </div>
+        </div>
+        <div class="workspace-boot-copy">
+          <strong>Đang chuẩn bị workspace</strong>
+          <span>Đồng bộ hội thoại, nhóm và tài nguyên trước khi vào chat.</span>
+        </div>
+      </div>
+    </div>
+
     <main class="preview-shell">
       <section class="preview-app" id="previewApp">
         <aside class="preview-sidebar">
@@ -95,9 +122,22 @@
             <button class="preview-ghost-btn" id="homeRailButton" type="button">Overview</button>
           </div>
 
-          <div class="preview-social-row">
-            <button class="preview-create-btn" id="newGroupBtn" type="button">Create Group</button>
-            <button class="preview-add-btn" id="friendCardToggle" type="button">Add Friend</button>
+          <div class="preview-social-row preview-social-toggle" role="radiogroup" aria-label="Quick actions">
+            <input id="previewSocialActionIdle" class="preview-social-idle" name="previewSocialAction" type="radio" checked />
+
+            <label class="preview-social-option" id="newGroupBtn">
+              <input id="newGroupToggleInput" value="create-group" name="previewSocialAction" type="radio" class="preview-social-input" />
+              <span class="preview-social-btn">
+                <span class="preview-social-label">Create Group</span>
+              </span>
+            </label>
+
+            <label class="preview-social-option" id="friendCardToggle">
+              <input id="friendCardToggleInput" value="add-friend" name="previewSocialAction" type="radio" class="preview-social-input" />
+              <span class="preview-social-btn">
+                <span class="preview-social-label">Add Friend</span>
+              </span>
+            </label>
           </div>
 
           <section class="preview-inline-card collapsible-card is-collapsed" id="friendCard">
@@ -171,6 +211,7 @@
           </header>
 
           <div class="banner info" id="surfaceBanner"></div>
+          <section class="preview-pinned-strip" id="pinnedMessageStrip" hidden></section>
           <div class="preview-chat-stream messages-body" id="messagesArea"></div>
 
           <form class="preview-composer composer" id="messageForm">
@@ -247,6 +288,7 @@
               <div class="mini muted" id="previewGroupMembersEmpty">Open a group to see its members.</div>
             </section>
 
+            <section class="preview-pinned-panel" id="previewPinnedPanel" hidden></section>
             <section class="preview-shared-panel" id="previewSharedPanel" hidden></section>
           </div>
         </aside>

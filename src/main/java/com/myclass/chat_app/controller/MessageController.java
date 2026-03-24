@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 
 @RestController
@@ -93,6 +95,7 @@ public class MessageController {
         DirectChatMessage saved = messageService.saveDirectMessage(
                 conversationKey,
                 new DirectChatMessage(
+                        null,
                         conversationKey,
                         currentEmail,
                         currentName(jwt),
@@ -103,6 +106,9 @@ public class MessageController {
                         null,
                         null,
                         null,
+                        null,
+                        false,
+                        false,
                         null
                 )
         );
@@ -140,6 +146,62 @@ public class MessageController {
             messagingTemplate.convertAndSend("/topic/direct/" + saved.conversationKey(), saved);
             return saved;
         });
+    }
+
+    @GetMapping("/direct/{otherEmail}/pins")
+    public ResponseEntity<?> directPins(
+            @PathVariable String otherEmail,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String currentEmail = currentEmail(jwt);
+        if (!socialService.areFriends(currentEmail, otherEmail)) {
+            return errorResponse(HttpStatus.FORBIDDEN, "Direct messages unlock after the friend request is accepted.");
+        }
+        return ResponseEntity.ok(messageService.getPinnedDirectMessages(currentEmail, otherEmail));
+    }
+
+    @PostMapping("/direct/{otherEmail}/messages/{messageId}/recall")
+    public ResponseEntity<?> recallDirectMessage(
+            @PathVariable String otherEmail,
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String currentEmail = currentEmail(jwt);
+        if (!socialService.areFriends(currentEmail, otherEmail)) {
+            return errorResponse(HttpStatus.FORBIDDEN, "Direct messages unlock after the friend request is accepted.");
+        }
+        try {
+            DirectChatMessage updated = messageService.recallDirectMessage(currentEmail, otherEmail, messageId);
+            messagingTemplate.convertAndSend(
+                    "/topic/direct/" + updated.conversationKey(),
+                    Map.of("event", "message.update", "message", updated)
+            );
+            return ResponseEntity.ok(updated);
+        } catch (SecurityException exception) {
+            return errorResponse(HttpStatus.FORBIDDEN, exception.getMessage());
+        } catch (NoSuchElementException exception) {
+            return errorResponse(HttpStatus.NOT_FOUND, exception.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            return errorResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+    }
+
+    @PostMapping("/direct/{otherEmail}/messages/{messageId}/pin")
+    public ResponseEntity<?> pinDirectMessage(
+            @PathVariable String otherEmail,
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return updateDirectPin(otherEmail, messageId, jwt, true);
+    }
+
+    @DeleteMapping("/direct/{otherEmail}/messages/{messageId}/pin")
+    public ResponseEntity<?> unpinDirectMessage(
+            @PathVariable String otherEmail,
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return updateDirectPin(otherEmail, messageId, jwt, false);
     }
 
     @PostMapping(value = "/groups/{groupId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -187,6 +249,7 @@ public class MessageController {
         GroupChatMessage saved = messageService.saveGroupMessage(
                 groupId,
                 new GroupChatMessage(
+                        null,
                         groupId,
                         currentEmail,
                         currentName(jwt),
@@ -196,6 +259,9 @@ public class MessageController {
                         null,
                         null,
                         null,
+                        null,
+                        false,
+                        false,
                         null
                 )
         );
@@ -204,6 +270,62 @@ public class MessageController {
         }
         messagingTemplate.convertAndSend("/topic/groups/" + groupId, saved);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+    @GetMapping("/groups/{groupId}/pins")
+    public ResponseEntity<?> groupPins(
+            @PathVariable Long groupId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String currentEmail = currentEmail(jwt);
+        if (!groupService.isMember(groupId, currentEmail)) {
+            return errorResponse(HttpStatus.FORBIDDEN, "You are not a member of this group.");
+        }
+        return ResponseEntity.ok(messageService.getPinnedGroupMessages(groupId));
+    }
+
+    @PostMapping("/groups/{groupId}/messages/{messageId}/recall")
+    public ResponseEntity<?> recallGroupMessage(
+            @PathVariable Long groupId,
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String currentEmail = currentEmail(jwt);
+        if (!groupService.isMember(groupId, currentEmail)) {
+            return errorResponse(HttpStatus.FORBIDDEN, "You are not a member of this group.");
+        }
+        try {
+            GroupChatMessage updated = messageService.recallGroupMessage(groupId, currentEmail, messageId);
+            messagingTemplate.convertAndSend(
+                    "/topic/groups/" + groupId,
+                    Map.of("event", "message.update", "message", updated)
+            );
+            return ResponseEntity.ok(updated);
+        } catch (SecurityException exception) {
+            return errorResponse(HttpStatus.FORBIDDEN, exception.getMessage());
+        } catch (NoSuchElementException exception) {
+            return errorResponse(HttpStatus.NOT_FOUND, exception.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            return errorResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+    }
+
+    @PostMapping("/groups/{groupId}/messages/{messageId}/pin")
+    public ResponseEntity<?> pinGroupMessage(
+            @PathVariable Long groupId,
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return updateGroupPin(groupId, messageId, jwt, true);
+    }
+
+    @DeleteMapping("/groups/{groupId}/messages/{messageId}/pin")
+    public ResponseEntity<?> unpinGroupMessage(
+            @PathVariable Long groupId,
+            @PathVariable Long messageId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return updateGroupPin(groupId, messageId, jwt, false);
     }
 
     private ResponseEntity<?> handleAttachmentUpload(AttachmentSupplier<?> supplier) {
@@ -228,6 +350,44 @@ public class MessageController {
 
     private String currentName(Jwt jwt) {
         return jwt == null ? null : jwt.getClaimAsString("name");
+    }
+
+    private ResponseEntity<?> updateDirectPin(String otherEmail, Long messageId, Jwt jwt, boolean pinned) {
+        String currentEmail = currentEmail(jwt);
+        if (!socialService.areFriends(currentEmail, otherEmail)) {
+            return errorResponse(HttpStatus.FORBIDDEN, "Direct messages unlock after the friend request is accepted.");
+        }
+        try {
+            DirectChatMessage updated = messageService.setDirectMessagePinned(currentEmail, otherEmail, messageId, pinned);
+            messagingTemplate.convertAndSend(
+                    "/topic/direct/" + updated.conversationKey(),
+                    Map.of("event", "message.update", "message", updated)
+            );
+            return ResponseEntity.ok(updated);
+        } catch (NoSuchElementException exception) {
+            return errorResponse(HttpStatus.NOT_FOUND, exception.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            return errorResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+    }
+
+    private ResponseEntity<?> updateGroupPin(Long groupId, Long messageId, Jwt jwt, boolean pinned) {
+        String currentEmail = currentEmail(jwt);
+        if (!groupService.isMember(groupId, currentEmail)) {
+            return errorResponse(HttpStatus.FORBIDDEN, "You are not a member of this group.");
+        }
+        try {
+            GroupChatMessage updated = messageService.setGroupMessagePinned(groupId, messageId, pinned);
+            messagingTemplate.convertAndSend(
+                    "/topic/groups/" + groupId,
+                    Map.of("event", "message.update", "message", updated)
+            );
+            return ResponseEntity.ok(updated);
+        } catch (NoSuchElementException exception) {
+            return errorResponse(HttpStatus.NOT_FOUND, exception.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            return errorResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
     }
 
     @FunctionalInterface

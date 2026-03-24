@@ -31,4 +31,27 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             @Param("secondEmail") String secondEmail,
             Pageable pageable
     );
+
+    List<Message> findByTypeAndGroupIdAndPinnedTrueOrderByPinnedAtDescTimestampDesc(
+            MessageType type,
+            Long groupId,
+            Pageable pageable
+    );
+
+    @Query("""
+            select m from Message m
+            where m.type = :type
+              and m.pinned = true
+              and (
+                    (lower(m.senderEmail) = lower(:firstEmail) and lower(m.recipientEmail) = lower(:secondEmail))
+                 or (lower(m.senderEmail) = lower(:secondEmail) and lower(m.recipientEmail) = lower(:firstEmail))
+              )
+            order by m.pinnedAt desc, m.timestamp desc
+            """)
+    List<Message> findPinnedDirectConversation(
+            @Param("type") MessageType type,
+            @Param("firstEmail") String firstEmail,
+            @Param("secondEmail") String secondEmail,
+            Pageable pageable
+    );
 }

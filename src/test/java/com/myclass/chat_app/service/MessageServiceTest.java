@@ -79,6 +79,7 @@ class MessageServiceTest {
         GroupChatMessage saved = service.saveGroupMessage(
                 12L,
                 new GroupChatMessage(
+                        null,
                         12L,
                         "alice@example.com",
                         " ",
@@ -88,6 +89,9 @@ class MessageServiceTest {
                         null,
                         null,
                         null,
+                        null,
+                        false,
+                        false,
                         null
                 )
         );

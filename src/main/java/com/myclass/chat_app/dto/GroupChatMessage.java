@@ -3,6 +3,7 @@ package com.myclass.chat_app.dto;
 import java.time.Instant;
 
 public record GroupChatMessage(
+        Long id,
         Long groupId,
         String senderEmail,
         String senderName,
@@ -12,7 +13,10 @@ public record GroupChatMessage(
         String attachmentBase64,
         String attachmentUrl,
         Long attachmentSize,
-        Instant timestamp
+        Instant timestamp,
+        boolean recalled,
+        boolean pinned,
+        Instant pinnedAt
 ) {
 }
 
