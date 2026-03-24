@@ -1775,8 +1775,8 @@ body.inbox-open .inbox {
   gap: 8px;
   padding: 10px 14px;
   border-radius: 999px;
-  background: var(--warning-soft);
-  color: var(--warning);
+  background: rgba(37, 99, 235, 0.08);
+  color: #49638f;
   font-size: 12px;
   font-weight: 800;
 }
@@ -1790,6 +1790,11 @@ body.inbox-open .inbox {
 .status-pill.online {
   color: var(--success);
   background: var(--success-soft);
+}
+
+.status-pill.delayed {
+  color: #49638f;
+  background: rgba(37, 99, 235, 0.08);
 }
 
 .stats {
@@ -3719,7 +3724,15 @@ body.preview-page {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
+.preview-chat-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .preview-chat-head {
+  flex: 0 0 auto;
   padding-bottom: 18px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
 }
@@ -3737,9 +3750,12 @@ body.preview-page {
 .preview-chat-stream {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 18px;
-  min-height: 720px;
+  min-height: 0;
   padding: 20px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .preview-day-chip {
@@ -3849,6 +3865,7 @@ body.preview-page {
   display: flex;
   align-items: center;
   gap: 14px;
+  flex: 0 0 auto;
   min-height: 76px;
   padding: 0 18px;
   border-radius: 24px;
@@ -4243,8 +4260,8 @@ body.preview-page {
 }
 
 .preview-chat-panel {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   min-height: 0;
   overflow: hidden;
 }
@@ -4270,7 +4287,7 @@ body.preview-page {
 .preview-chat-stream.messages-body.conversation-mode {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .preview-chat-stream.messages-body.conversation-mode > * {
@@ -4442,6 +4459,7 @@ body.preview-page {
 }
 
 .preview-chat-panel .message-stack {
+  min-width: 0;
   max-width: min(74%, 560px);
   display: flex;
   flex-direction: column;
@@ -4481,6 +4499,7 @@ body.preview-page {
 }
 
 .preview-chat-panel .message-bubble {
+  min-width: 0;
   padding: 16px 18px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.92);
@@ -4497,6 +4516,8 @@ body.preview-page {
   color: inherit;
   line-height: 1.65;
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .preview-chat-panel .message-attachment {
@@ -4523,6 +4544,8 @@ body.preview-page {
   color: inherit;
   font-size: 14px;
   font-weight: 700;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .preview-chat-panel .message-attachment-meta,
@@ -4538,10 +4561,11 @@ body.preview-page {
 .preview-chat-panel .message-attachment img,
 .preview-chat-panel .message-attachment video {
   border-radius: 16px;
+  max-width: 100%;
 }
 
 .preview-chat-panel .preview-composer {
-  margin-top: 18px;
+  margin-top: 12px;
   flex: 0 0 auto;
 }
 

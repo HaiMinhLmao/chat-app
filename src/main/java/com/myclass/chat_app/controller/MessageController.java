@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -75,6 +76,43 @@ public class MessageController {
         return ResponseEntity.ok(messageService.getDirectMessages(currentEmail, otherEmail));
     }
 
+    @PostMapping("/direct/{otherEmail}")
+    public ResponseEntity<?> sendDirectMessage(
+            @PathVariable String otherEmail,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody(required = false) DirectChatMessage message
+    ) {
+        String currentEmail = currentEmail(jwt);
+        if (currentEmail == null || currentEmail.isBlank()) {
+            return errorResponse(HttpStatus.UNAUTHORIZED, "Sign in again.");
+        }
+        if (!socialService.areFriends(currentEmail, otherEmail)) {
+            return errorResponse(HttpStatus.FORBIDDEN, "Direct messages unlock after the friend request is accepted.");
+        }
+        String conversationKey = messageService.buildConversationKey(currentEmail, otherEmail);
+        DirectChatMessage saved = messageService.saveDirectMessage(
+                conversationKey,
+                new DirectChatMessage(
+                        conversationKey,
+                        currentEmail,
+                        currentName(jwt),
+                        otherEmail,
+                        message == null ? null : message.content(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        );
+        if (saved == null) {
+            return errorResponse(HttpStatus.BAD_REQUEST, "Message content is required.");
+        }
+        messagingTemplate.convertAndSend("/topic/direct/" + saved.conversationKey(), saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
     @PostMapping(value = "/direct/{otherEmail}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadDirectAttachment(
             @PathVariable String otherEmail,
@@ -131,6 +169,41 @@ public class MessageController {
             messagingTemplate.convertAndSend("/topic/groups/" + groupId, saved);
             return saved;
         });
+    }
+
+    @PostMapping("/groups/{groupId}")
+    public ResponseEntity<?> sendGroupMessage(
+            @PathVariable Long groupId,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody(required = false) GroupChatMessage message
+    ) {
+        String currentEmail = currentEmail(jwt);
+        if (currentEmail == null || currentEmail.isBlank()) {
+            return errorResponse(HttpStatus.UNAUTHORIZED, "Sign in again.");
+        }
+        if (!groupService.isMember(groupId, currentEmail)) {
+            return errorResponse(HttpStatus.FORBIDDEN, "You are not a member of this group.");
+        }
+        GroupChatMessage saved = messageService.saveGroupMessage(
+                groupId,
+                new GroupChatMessage(
+                        groupId,
+                        currentEmail,
+                        currentName(jwt),
+                        message == null ? null : message.content(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        );
+        if (saved == null) {
+            return errorResponse(HttpStatus.BAD_REQUEST, "Message content is required.");
+        }
+        messagingTemplate.convertAndSend("/topic/groups/" + groupId, saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     private ResponseEntity<?> handleAttachmentUpload(AttachmentSupplier<?> supplier) {

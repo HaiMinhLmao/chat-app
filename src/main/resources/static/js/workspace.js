@@ -1879,27 +1879,22 @@ function syncSurfaceMode() {
 
 function syncComposer() {
   const inConversation = activeChannel.type !== "home";
-  const canSendText = inConversation && stompClient && stompClient.connected;
   const canAttach = activeChannel.type === "direct" || activeChannel.type === "group";
   el.messageInput.disabled = !inConversation;
-  el.sendBtn.disabled = !canSendText;
+  el.sendBtn.disabled = !inConversation;
   el.attachBtn.disabled = !canAttach;
   if (!inConversation) {
     el.messageInput.placeholder = "Pick a chat to start typing...";
   } else if (activeChannel.type === "direct") {
-    el.messageInput.placeholder = canSendText
-      ? "Write a message or add a caption..."
-      : "Reconnecting before this message can be sent...";
+    el.messageInput.placeholder = "Write a message or add a caption...";
   } else {
-    el.messageInput.placeholder = canSendText
-      ? "Write a message..."
-      : "Reconnecting before group messages can be sent...";
+    el.messageInput.placeholder = "Write a message...";
   }
 }
 
 function setConnectionState(text, online) {
   el.connectionState.textContent = text;
-  el.connectionState.className = "status-pill" + (online ? " online" : "");
+  el.connectionState.className = "status-pill " + (online ? "online" : "delayed");
   syncComposer();
 }
 
@@ -2298,26 +2293,28 @@ function formatBytes(bytes) {
 }
 
 function attachmentDataUrl(message) {
-  if (message && message.attachmentUrl) return message.attachmentUrl;
-  if (!message || !message.attachmentBase64) return "";
+  const attachmentUrl = String((message && message.attachmentUrl) || "").trim();
+  if (attachmentUrl) return attachmentUrl;
+  const attachmentBase64 = String((message && message.attachmentBase64) || "").trim();
+  if (!attachmentBase64) return "";
   return (
     "data:" +
     (message.attachmentContentType || "application/octet-stream") +
     ";base64," +
-    message.attachmentBase64
+    attachmentBase64
   );
 }
 
 function buildAttachment(message) {
   if (!message || (!message.attachmentBase64 && !message.attachmentUrl)) return null;
+  const href = attachmentDataUrl(message);
+  if (!href) return null;
   const wrap = document.createElement("div");
   wrap.className = "message-attachment";
 
   const type = String(message.attachmentContentType || "");
   if (type.startsWith("image/")) {
     wrap.classList.add("is-image");
-  } else if (type.startsWith("video/")) {
-    wrap.classList.add("is-video");
   } else {
     wrap.classList.add("is-file");
   }
@@ -2330,15 +2327,7 @@ function buildAttachment(message) {
   label.textContent = message.attachmentName || "attachment";
   header.appendChild(label);
 
-  const href = attachmentDataUrl(message);
-
-  if (type.startsWith("video/")) {
-    const video = document.createElement("video");
-    video.controls = true;
-    video.preload = "metadata";
-    video.src = href;
-    wrap.appendChild(video);
-  } else if (type.startsWith("image/")) {
+  if (type.startsWith("image/")) {
     const image = document.createElement("img");
     image.loading = "lazy";
     image.alt = message.attachmentName || "Attachment";
@@ -2360,11 +2349,7 @@ function buildAttachment(message) {
   download.download = message.attachmentName || "attachment";
   download.target = "_blank";
   download.rel = "noopener noreferrer";
-  download.textContent = type.startsWith("video/")
-    ? "Download video"
-    : type.startsWith("image/")
-      ? "Open image"
-      : "Download file";
+  download.textContent = type.startsWith("image/") ? "Open image" : "Download file";
   wrap.appendChild(download);
 
   return wrap;
@@ -2374,8 +2359,8 @@ function messagePreview(message, sent, sender) {
   const prefix = sent ? "You" : sender;
   const text = String((message && message.content) || "").trim();
   if (message && message.attachmentName) {
-    const kind = String(message.attachmentContentType || "").startsWith("video/")
-      ? "video"
+    const kind = String(message.attachmentContentType || "").startsWith("image/")
+      ? "image"
       : "file";
     return prefix + ": " + (text || "[" + kind + "] " + message.attachmentName);
   }
@@ -2903,19 +2888,24 @@ async function loadGroupHistory(groupId) {
 // Realtime messaging
 function connectWs() {
   if (reconnectTimer) window.clearTimeout(reconnectTimer);
+  if (typeof SockJS === "undefined" || typeof Stomp === "undefined") {
+    setConnectionState("Sync delayed", false);
+    reconnectTimer = window.setTimeout(connectWs, 15000);
+    return;
+  }
   const socket = new SockJS("/ws");
   stompClient = Stomp.over(socket);
   stompClient.debug = null;
   stompClient.connect(
     {},
     () => {
-      setConnectionState("Connected", true);
+      setConnectionState("Live sync", true);
       if (activeChannel.type === "group") subscribeToGroup(activeChannel.id);
       if (activeChannel.type === "direct") subscribeToDirect(activeChannel.email);
     },
     () => {
-      setConnectionState("Reconnecting", false);
-      reconnectTimer = window.setTimeout(connectWs, 3000);
+      setConnectionState("Sync delayed", false);
+      reconnectTimer = window.setTimeout(connectWs, 5000);
     },
   );
 }
@@ -2975,8 +2965,77 @@ function sendDirectMessage(content) {
   );
 }
 
+function isSameChannel(type, id) {
+  return activeChannel.type === type && String(activeChannel.id || "") === String(id || "");
+}
+
+function clearDraftIfUnchanged(type, id, expectedValue) {
+  if (!isSameChannel(type, id)) return;
+  if (String(el.messageInput.value || "").trim() !== String(expectedValue || "").trim()) return;
+  el.messageInput.value = "";
+}
+
+async function sendGroupMessageFallback(content) {
+  if (activeChannel.type !== "group") return false;
+  const activeGroupId = String(activeChannel.id);
+  const result = await authorizedRequest("/api/messages/groups/" + activeGroupId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      groupId: activeChannel.id,
+      senderEmail: currentUser.email,
+      senderName: displayName(currentUser),
+      content,
+    }),
+  });
+  if (!result.ok || !result.data) {
+    showToast((result.data && result.data.error) || "Could not send the message.");
+    return false;
+  }
+  const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
+  setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
+  if (!stompClient || !stompClient.connected) {
+    if (isSameChannel("group", activeGroupId)) {
+      addMessage(result.data, true, sender, result.data.timestamp);
+    }
+  }
+  clearDraftIfUnchanged("group", activeGroupId, content);
+  return true;
+}
+
+async function sendDirectMessageFallback(content) {
+  if (activeChannel.type !== "direct") return false;
+  const channelId = activeChannel.id;
+  const recipientEmail = activeChannel.email;
+  const result = await authorizedRequest("/api/messages/direct/" + encodeURIComponent(recipientEmail), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      senderEmail: currentUser.email,
+      senderName: displayName(currentUser),
+      recipientEmail,
+      content,
+    }),
+  });
+  if (!result.ok || !result.data) {
+    showToast((result.data && result.data.error) || "Could not send the message.");
+    return false;
+  }
+  const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
+  setPreview("direct", channelId, messagePreview(result.data, true, sender));
+  if (!stompClient || !stompClient.connected) {
+    if (isSameChannel("direct", channelId)) {
+      addMessage(result.data, true, sender, result.data.timestamp);
+    }
+  }
+  clearDraftIfUnchanged("direct", channelId, content);
+  return true;
+}
+
 async function uploadDirectAttachment(file) {
   if (!file || activeChannel.type !== "direct") return;
+  const channelId = activeChannel.id;
+  const recipientEmail = activeChannel.email;
   const formData = new FormData();
   formData.append("file", file);
   const caption = el.messageInput.value.trim();
@@ -2985,15 +3044,17 @@ async function uploadDirectAttachment(file) {
   }
 
   el.attachBtn.disabled = true;
-  el.attachBtn.textContent = "Uploading...";
+  el.attachBtn.title = "Uploading attachment...";
+  el.attachBtn.setAttribute("aria-label", "Uploading attachment");
   const result = await authorizedRequest(
-    "/api/messages/direct/" + encodeURIComponent(activeChannel.email) + "/attachments",
+    "/api/messages/direct/" + encodeURIComponent(recipientEmail) + "/attachments",
     {
       method: "POST",
       body: formData,
     },
   );
-  el.attachBtn.textContent = "Video/File";
+  el.attachBtn.title = "Attach";
+  el.attachBtn.setAttribute("aria-label", "Attach");
   syncComposer();
   el.attachmentInput.value = "";
 
@@ -3001,14 +3062,16 @@ async function uploadDirectAttachment(file) {
     showToast(result.data.error || "Could not send the file.");
     return;
   }
+  const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
+  setPreview("direct", channelId, messagePreview(result.data, true, sender));
 
   if (!stompClient || !stompClient.connected) {
-    const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
-    setPreview("direct", activeChannel.id, messagePreview(result.data, true, sender));
-    addMessage(result.data, true, sender, result.data.timestamp);
+    if (isSameChannel("direct", channelId)) {
+      addMessage(result.data, true, sender, result.data.timestamp);
+    }
   }
 
-  el.messageInput.value = "";
+  clearDraftIfUnchanged("direct", channelId, caption);
   showToast("Attachment sent.");
 }
 
@@ -3023,12 +3086,14 @@ async function uploadGroupAttachment(file) {
   }
 
   el.attachBtn.disabled = true;
-  el.attachBtn.textContent = "Uploading...";
+  el.attachBtn.title = "Uploading attachment...";
+  el.attachBtn.setAttribute("aria-label", "Uploading attachment");
   const result = await authorizedRequest("/api/messages/groups/" + activeGroupId + "/attachments", {
     method: "POST",
     body: formData,
   });
-  el.attachBtn.textContent = "Video/File";
+  el.attachBtn.title = "Attach";
+  el.attachBtn.setAttribute("aria-label", "Attach");
   syncComposer();
   el.attachmentInput.value = "";
 
@@ -3036,14 +3101,16 @@ async function uploadGroupAttachment(file) {
     showToast(result.data.error || "Could not send the file.");
     return;
   }
+  const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
+  setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
 
   if (!stompClient || !stompClient.connected) {
-    const sender = result.data.senderName || displayName(currentUser) || currentUser.email;
-    setPreview("group", activeGroupId, messagePreview(result.data, true, sender));
-    addMessage(result.data, true, sender, result.data.timestamp);
+    if (isSameChannel("group", activeGroupId)) {
+      addMessage(result.data, true, sender, result.data.timestamp);
+    }
   }
 
-  el.messageInput.value = "";
+  clearDraftIfUnchanged("group", activeGroupId, caption);
   showToast("Attachment sent.");
 }
 
@@ -3387,10 +3454,27 @@ el.friendRequestForm.addEventListener("submit", async (event) => {
   }
 });
 
-el.messageForm.addEventListener("submit", (event) => {
+el.messageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const content = el.messageInput.value.trim();
-  if (!content || !stompClient || !stompClient.connected) return;
+  if (!content) return;
+  if (activeChannel.type === "home") {
+    showToast("Pick a chat before sending a message.");
+    return;
+  }
+  if (!stompClient || !stompClient.connected) {
+    connectWs();
+    const sent =
+      activeChannel.type === "group"
+        ? await sendGroupMessageFallback(content)
+        : await sendDirectMessageFallback(content);
+    if (sent) {
+      el.messageInput.value = "";
+      showToast("Message sent. Live sync is reconnecting.");
+    }
+    syncComposer();
+    return;
+  }
   if (activeChannel.type === "group") {
     sendGroupMessage(content);
     setPreview("group", activeChannel.id, "You: " + content);
@@ -3414,6 +3498,16 @@ el.attachmentInput.addEventListener("change", async (event) => {
   const input = /** @type {HTMLInputElement} */ (event.currentTarget);
   const file = input.files && input.files[0];
   if (!file) return;
+  if (!file.size) {
+    input.value = "";
+    showToast("The selected file is empty.");
+    return;
+  }
+  if (String(file.type || "").startsWith("video/")) {
+    input.value = "";
+    showToast("Video attachments are not supported in this chat.");
+    return;
+  }
   if (activeChannel.type === "direct") {
     await uploadDirectAttachment(file);
     return;

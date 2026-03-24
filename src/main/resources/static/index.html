@@ -10,6 +10,8 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
       rel="stylesheet"
     />
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
     <link rel="stylesheet" href="css/workspace.css" />
   </head>
   <body class="preview-page">
@@ -38,16 +40,6 @@
                 </svg>
               </span>
               <span>Dashboard</span>
-            </button>
-            <button class="preview-nav-item" type="button">
-              <span class="preview-nav-icon">
-                <svg viewBox="0 0 24 24">
-                  <path d="M6 12h12"></path>
-                  <path d="M6 7h12"></path>
-                  <path d="M6 17h7"></path>
-                </svg>
-              </span>
-              <span>Assignments</span>
             </button>
             <button class="preview-nav-item" id="studyTimerToggleButton" type="button" title="Study timer">
               <span class="preview-nav-icon">
@@ -174,17 +166,6 @@
               </div>
             </div>
             <div class="preview-chat-actions">
-              <button class="preview-circle-btn" type="button" aria-label="Call">
-                <svg viewBox="0 0 24 24">
-                  <path d="M5 4h3l2 5-2.5 1.8a16 16 0 0 0 5.2 5.2L14 13l5 2v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 7.2 2 2 0 0 1 5 4z"></path>
-                </svg>
-              </button>
-              <button class="preview-circle-btn" type="button" aria-label="Video call">
-                <svg viewBox="0 0 24 24">
-                  <rect x="3.5" y="6.5" width="11" height="11" rx="2"></rect>
-                  <path d="M14.5 10l5-3v10l-5-3"></path>
-                </svg>
-              </button>
               <button class="preview-circle-btn" id="headerInboxButton" type="button" aria-label="Open details" title="Open details">
                 <svg viewBox="0 0 24 24">
                   <circle cx="6.5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
@@ -192,7 +173,7 @@
                   <circle cx="17.5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
                 </svg>
               </button>
-              <div class="status-pill" id="connectionState">Reconnecting</div>
+              <div class="status-pill delayed" id="connectionState">Sync delayed</div>
             </div>
           </header>
 
@@ -200,28 +181,18 @@
           <div class="preview-chat-stream messages-body" id="messagesArea"></div>
 
           <form class="preview-composer composer" id="messageForm">
-            <input id="attachmentInput" type="file" hidden />
+            <input
+              id="attachmentInput"
+              type="file"
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+              hidden
+            />
             <button class="preview-plain-icon btn secondary attach-btn" id="attachBtn" type="button" aria-label="Attach">
               <svg viewBox="0 0 24 24">
                 <path d="M21.4 11.6l-8.5 8.5a5 5 0 1 1-7.1-7.1l9.2-9.2a3.5 3.5 0 0 1 5 5L9.9 18.9a2 2 0 1 1-2.8-2.8l8-8"></path>
               </svg>
             </button>
             <input class="composer-input" id="messageInput" type="text" placeholder="Write a message..." />
-            <button class="preview-plain-icon" type="button" aria-label="Emoji">
-              <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="8"></circle>
-                <path d="M9 10h.01"></path>
-                <path d="M15 10h.01"></path>
-                <path d="M8.5 14.5a5 5 0 0 0 7 0"></path>
-              </svg>
-            </button>
-            <button class="preview-plain-icon" type="button" aria-label="More">
-              <svg viewBox="0 0 24 24">
-                <circle cx="6.5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
-                <circle cx="17.5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle>
-              </svg>
-            </button>
             <button class="preview-send-btn btn" id="sendBtn" type="submit" aria-label="Send">
               <svg viewBox="0 0 24 24">
                 <path d="M5 12l14-7-4 14-3.5-5z"></path>
