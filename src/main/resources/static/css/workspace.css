@@ -37,7 +37,9 @@
 body {
   margin: 0;
   min-height: 100vh;
+  height: 100dvh;
   overflow-x: hidden;
+  overflow-y: hidden;
   font-family: "Manrope", sans-serif;
   color: var(--text);
   background:
@@ -90,6 +92,7 @@ select {
   max-width: 1680px;
   margin: 0 auto;
   min-height: 100vh;
+  height: 100dvh;
   padding: 14px;
   display: grid;
   grid-template-columns: 88px 310px minmax(0, 1fr) var(--inbox-width);
@@ -109,6 +112,11 @@ select {
 .main,
 .inbox {
   min-height: 0;
+}
+
+.sidebar,
+.main {
+  overflow: hidden;
 }
 
 .rail {
@@ -262,6 +270,10 @@ select {
   gap: 16px;
 }
 
+.sidebar {
+  overflow-y: auto;
+}
+
 .inbox {
   min-width: 0;
   overflow: hidden;
@@ -310,10 +322,18 @@ select {
 .channel-avatar.has-image,
 .settings-avatar-preview.has-image,
 #selfRailLabel.has-image {
-  background-size: cover;
+  background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
+  background-color: rgba(255, 255, 255, 0.92);
   color: transparent;
+}
+
+body.theme-dark .avatar.has-image,
+body.theme-dark .channel-avatar.has-image,
+body.theme-dark .settings-avatar-preview.has-image,
+body.theme-dark #selfRailLabel.has-image {
+  background-color: #0f172a;
 }
 
 .headline,
@@ -1189,6 +1209,7 @@ body.study-timer-open .study-timer-popover {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .main-top {
@@ -1286,12 +1307,13 @@ body.study-timer-open .study-timer-popover {
 
 .messages-body {
   flex: 1;
-  min-height: 480px;
+  min-height: 0;
   overflow-y: auto;
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overscroll-behavior: contain;
 }
 
 .empty-state {
@@ -2196,7 +2218,14 @@ body.compact-chat .empty-state h2 {
 }
 
 @media (max-width: 760px) {
+  body {
+    height: auto;
+    overflow-y: auto;
+  }
+
   .app-shell {
+    height: auto;
+    min-height: 100vh;
     padding: 10px;
     gap: 10px;
     grid-template-columns: minmax(0, 1fr);
