@@ -33,36 +33,12 @@
             <button class="preview-nav-item" type="button">
               <span class="preview-nav-icon">
                 <svg viewBox="0 0 24 24">
-                  <path d="M4 20h16"></path>
-                  <path d="M6 20V8l6-4 6 4v12"></path>
-                  <path d="M9 11h1"></path>
-                  <path d="M9 14h1"></path>
-                  <path d="M14 11h1"></path>
-                  <path d="M14 14h1"></path>
-                </svg>
-              </span>
-              <span>Apartments</span>
-            </button>
-            <button class="preview-nav-item" type="button">
-              <span class="preview-nav-icon">
-                <svg viewBox="0 0 24 24">
-                  <rect x="4" y="5" width="16" height="15" rx="2"></rect>
-                  <path d="M8 3v4"></path>
-                  <path d="M16 3v4"></path>
-                  <path d="M4 10h16"></path>
-                </svg>
-              </span>
-              <span>Bookings</span>
-            </button>
-            <button class="preview-nav-item" type="button">
-              <span class="preview-nav-icon">
-                <svg viewBox="0 0 24 24">
                   <path d="M6 12h12"></path>
                   <path d="M6 7h12"></path>
                   <path d="M6 17h7"></path>
                 </svg>
               </span>
-              <span>Tasks</span>
+              <span>Assignments</span>
             </button>
             <button class="preview-nav-item" id="studyTimerToggleButton" type="button" title="Study timer">
               <span class="preview-nav-icon">
@@ -72,27 +48,6 @@
                 </svg>
               </span>
               <span>Time</span>
-            </button>
-            <button class="preview-nav-item" id="friendsNavButton" type="button">
-              <span class="preview-nav-icon">
-                <svg viewBox="0 0 24 24">
-                  <circle cx="9" cy="9" r="3"></circle>
-                  <path d="M4 18a5 5 0 0 1 10 0"></path>
-                  <circle cx="17" cy="10" r="2.2"></circle>
-                  <path d="M14.8 18a4 4 0 0 1 5.2-3.8"></path>
-                </svg>
-              </span>
-              <span>Friends</span>
-            </button>
-            <button class="preview-nav-item" id="groupNavButton" type="button">
-              <span class="preview-nav-icon">
-                <svg viewBox="0 0 24 24">
-                  <path d="M4 7h16"></path>
-                  <path d="M4 12h12"></path>
-                  <path d="M4 17h9"></path>
-                </svg>
-              </span>
-              <span>Group Chat</span>
             </button>
             <button class="preview-nav-item" id="notificationToggleButton" type="button" title="Notifications">
               <span class="preview-active-pill" aria-hidden="true"></span>
@@ -113,6 +68,15 @@
                 </svg>
               </span>
               <span>AI Bot</span>
+            </button>
+            <button class="preview-nav-item" id="profileToggleButton" type="button" title="Profile">
+              <span class="preview-nav-icon">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="8.5" r="3.5"></circle>
+                  <path d="M5.5 19a6.5 6.5 0 0 1 13 0"></path>
+                </svg>
+              </span>
+              <span>Profile</span>
             </button>
             <button class="preview-nav-item" id="settingsToggleButton" type="button" title="Settings">
               <span class="preview-nav-icon">
@@ -137,25 +101,19 @@
               </svg>
               <input id="friendsSearchInput" type="search" placeholder="Search" />
             </label>
-            <button class="preview-circle-btn" type="button" aria-label="Find friends">
-              <svg viewBox="0 0 24 24">
-                <circle cx="11" cy="11" r="5.5"></circle>
-                <path d="M16 16l4 4"></path>
-              </svg>
-            </button>
           </div>
 
           <div class="preview-list-head">
             <div>
               <h2>Inbox</h2>
-              <span class="preview-new-badge" id="previewRosterBadge">Ready</span>
+              <span class="preview-new-badge" id="previewRosterBadge">0</span>
             </div>
             <button class="preview-create-btn" id="newGroupBtn" type="button">Create Group</button>
           </div>
 
           <div class="preview-social-row">
-            <button class="preview-add-btn" id="friendCardToggle" type="button">Add Friend</button>
             <button class="preview-ghost-btn" id="homeRailButton" type="button">Overview</button>
+            <button class="preview-add-btn" id="friendCardToggle" type="button">Add Friend</button>
           </div>
 
           <section class="preview-inline-card collapsible-card is-collapsed" id="friendCard">
@@ -299,60 +257,6 @@
             <div class="preview-profile-actions">
               <button type="button" id="previewAddFriendBtn">Add Friend</button>
               <button type="button" id="previewGroupInfoBtn">View Group Info</button>
-            </div>
-
-            <div class="preview-rating">
-              <span>4.6 Rating</span>
-              <div class="preview-stars">★ ★ ★ ★ ☆</div>
-            </div>
-          </div>
-
-          <section class="preview-info-block">
-            <div class="preview-info-head">
-              <strong>Last bookings</strong>
-              <a href="#" role="button">See all</a>
-            </div>
-            <div class="preview-info-card">
-              <span>Manhattan cozy</span>
-              <small>Manhattan, New York</small>
-            </div>
-            <div class="preview-info-card">
-              <span>Minimalist clean and white</span>
-              <small>Hell's Kitchen, Barcelona</small>
-            </div>
-          </section>
-
-          <section class="preview-info-block">
-            <div class="preview-info-head">
-              <strong>Shared groups</strong>
-              <a href="#" role="button">See all</a>
-            </div>
-            <div class="preview-chip-row">
-              <span>Design Sprint</span>
-              <span>Time Focus</span>
-              <span>AI Bot</span>
-            </div>
-          </section>
-
-          <section class="preview-info-block">
-            <div class="preview-info-head">
-              <strong>Recent files</strong>
-              <a href="#" role="button">See all</a>
-            </div>
-            <div class="preview-info-card">
-              <span>Losra logo.ai</span>
-              <small>Shared 2 hours ago</small>
-            </div>
-          </section>
-
-          <section class="preview-info-block">
-            <div class="preview-info-head">
-              <strong>Upcoming tasks</strong>
-              <a href="#" role="button">See all</a>
-            </div>
-            <div class="preview-info-card">
-              <span>Finalize UI review</span>
-              <small>Tomorrow, 09:00 AM</small>
             </div>
           </section>
         </aside>
@@ -516,7 +420,7 @@
       <div class="settings-popover-header">
         <div>
           <div class="eyebrow">New Group</div>
-          <div class="headline settings-popover-title">Create a room</div>
+          <div class="headline settings-popover-title">Create a study group</div>
         </div>
         <button class="settings-close-btn" id="createGroupCloseButton" type="button" aria-label="Close create group">
           <span aria-hidden="true">&times;</span>

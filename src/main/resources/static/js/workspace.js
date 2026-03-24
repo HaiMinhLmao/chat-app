@@ -83,6 +83,7 @@ const el = {
   notificationBadge: mustGetElement("notificationBadge"),
   newGroupBtn: mustGetButton("newGroupBtn"),
   studyTimerToggleButton: mustGetButton("studyTimerToggleButton"),
+  profileToggleButton: getOptionalButton("profileToggleButton"),
   settingsToggleButton: mustGetButton("settingsToggleButton"),
   dashboardNavButton: getOptionalButton("dashboardNavButton"),
   friendsNavButton: getOptionalButton("friendsNavButton"),
@@ -580,6 +581,10 @@ function syncCurrentUserUi() {
 function setPreviewDetailsOpen(nextOpen) {
   if (!el.previewApp || !el.previewDetails) return;
   el.previewApp.classList.toggle("details-open", nextOpen);
+  if (el.profileToggleButton) {
+    el.profileToggleButton.classList.toggle("active", nextOpen);
+    el.profileToggleButton.setAttribute("aria-pressed", String(nextOpen));
+  }
   if (nextOpen) {
     el.previewDetails.scrollTop = 0;
   }
@@ -644,8 +649,8 @@ function syncPreviewProfilePanel() {
     if (group) {
       name = group.name || "Study Group";
       avatarUrl = "";
-      contact = group.category || "Group room";
-      detail = group.description || "Shared workspace for classmates and team members.";
+      contact = group.category || "Study group";
+      detail = group.description || "Shared space for classmates to chat, review, and coordinate.";
       status = "Group conversation";
       meta = String(groups.length) + " groups available";
       emailHref = "#";
@@ -1777,6 +1782,20 @@ function createHomeAction(label, copy, action) {
   return button;
 }
 
+function createHomeMetric(label, value, tone) {
+  const card = document.createElement("div");
+  card.className = "home-metric" + (tone ? " " + tone : "");
+
+  const valueNode = document.createElement("strong");
+  valueNode.textContent = value;
+
+  const labelNode = document.createElement("span");
+  labelNode.textContent = label;
+
+  card.append(valueNode, labelNode);
+  return card;
+}
+
 function createHomeShortcut(name, meta, datasetKey, datasetValue, avatarUrl) {
   const button = document.createElement("button");
   button.type = "button";
@@ -1840,24 +1859,38 @@ function renderHomeOverview() {
   const frame = document.createElement("section");
   frame.className = "home-frame";
 
-  const hero = document.createElement("section");
-  hero.className = "home-hero";
+  const summary = document.createElement("section");
+  summary.className = "home-summary";
+
+  const summaryHead = document.createElement("div");
+  summaryHead.className = "home-summary-head";
   const kicker = document.createElement("div");
   kicker.className = "eyebrow";
   kicker.textContent = "Workspace";
   const heading = document.createElement("h2");
-  heading.textContent = "Everything is ready to continue.";
+  heading.textContent = "Quick access";
   const copy = document.createElement("p");
-  copy.textContent =
-    "Jump back into a friend chat, open one of your groups, or handle requests from one place.";
+  copy.textContent = "Open a chat, manage requests, or create a new study group.";
+  summaryHead.append(kicker, heading, copy);
+
+  const metrics = document.createElement("div");
+  metrics.className = "home-metrics";
+  const pendingCount =
+    socialState.incomingFriendRequests.length + socialState.groupInvitations.length;
+  metrics.append(
+    createHomeMetric("Friends", String(socialState.friends.length), "primary"),
+    createHomeMetric("Groups", String(groups.length), "soft"),
+    createHomeMetric("Pending", String(pendingCount), "soft"),
+  );
+
   const actions = document.createElement("div");
   actions.className = "home-actions";
   actions.append(
     createHomeAction("Add Friend", "Send a request and unlock direct chat.", "add-friend"),
     createHomeAction("Open Notifications", "Review invites and friend requests.", "notifications"),
-    createHomeAction("Create Group", "Start a fresh room for your class or team.", "create-group"),
+    createHomeAction("Create Group", "Start a fresh study group for your class or team.", "create-group"),
   );
-  hero.append(kicker, heading, copy, actions);
+  summary.append(summaryHead, metrics, actions);
 
   const sections = document.createElement("div");
   sections.className = "home-sections";
@@ -1876,7 +1909,7 @@ function renderHomeOverview() {
   const groupButtons = groups.slice(0, 4).map((group) =>
     createHomeShortcut(
       group.name || "Study Group",
-      getPreview("group", group.id, group.category || "Open room"),
+      getPreview("group", group.id, group.category || "Open study group"),
       "homeGroup",
       group.id,
       "",
@@ -1894,11 +1927,11 @@ function renderHomeOverview() {
       "Your groups",
       groups.length + " active",
       groupButtons,
-      "Join or create a group to see room shortcuts here.",
+      "Join or create a group to see study group shortcuts here.",
     ),
   );
 
-  frame.append(hero, sections);
+  frame.append(summary, sections);
   wrap.append(frame);
   el.messagesArea.appendChild(wrap);
   el.messagesArea.scrollTop = 0;
@@ -2056,12 +2089,12 @@ async function submitCreateGroup(event) {
   const category = String((el.createGroupCategoryInput && el.createGroupCategoryInput.value) || "").trim();
   const members = parseMemberEmails(el.createGroupMembersInput && el.createGroupMembersInput.value);
   if (!groupName) {
-    setCreateGroupFeedback("Enter a group name before creating the room.", "error");
+    setCreateGroupFeedback("Enter a group name before creating the study group.", "error");
     return;
   }
   const invalidEmail = members.find((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
   if (invalidEmail) {
-    setCreateGroupFeedback("Check the invited emails before creating the room.", "error");
+    setCreateGroupFeedback("Check the invited emails before creating the study group.", "error");
     return;
   }
   setCreateGroupFeedback("", "success");
@@ -2378,7 +2411,10 @@ function syncRosterFilterUi() {
 
   if (el.previewRosterBadge) {
     const totalVisible = personalCount + groupCount;
-    el.previewRosterBadge.textContent = totalVisible ? String(totalVisible) + " ready" : "Ready";
+    el.previewRosterBadge.textContent = String(totalVisible);
+    el.previewRosterBadge.title = totalVisible
+      ? String(totalVisible) + " active conversations"
+      : "No active conversations";
   }
 }
 
@@ -2435,7 +2471,7 @@ function renderGroups() {
           "group",
           group.id,
           group.name || "Study Group",
-          getPreview("group", group.id, group.category || "Accepted room"),
+          getPreview("group", group.id, group.category || "Accepted study group"),
           group.role || "",
           () => selectGroup(group),
         ),
@@ -2461,7 +2497,7 @@ function renderGroups() {
         '</span><span class="rail-btn-copy"><strong class="rail-btn-title">' +
         (group.name || "Study Group") +
         '</strong><span class="rail-btn-subtitle">' +
-        (group.category || group.role || "Study room") +
+        (group.category || group.role || "Study group") +
         "</span></span>";
       button.title = group.name || "Study Group";
       button.addEventListener("click", () => selectGroup(group));
@@ -2663,13 +2699,13 @@ async function loadDirectHistory(otherEmail) {
 
 async function loadGroupHistory(groupId) {
   const currentGroupId = String(groupId);
-  clearMessages("Loading room", "Pulling the latest messages.", "Group");
+  clearMessages("Loading group", "Pulling the latest group messages.", "Group");
   const result = await authorizedRequest("/api/messages/groups/" + groupId);
   if (activeChannel.type !== "group" || String(activeChannel.id) !== currentGroupId) return;
   if (!result.ok) {
     clearMessages(
       "Group unavailable",
-      result.data.error || "You cannot open this room right now.",
+      result.data.error || "You cannot open this group right now.",
       "Group",
     );
     showBanner(result.data.error || "Group history is unavailable.", "error");
@@ -2678,7 +2714,7 @@ async function loadGroupHistory(groupId) {
   showBanner("", "info");
   const messages = Array.isArray(result.data) ? result.data : [];
   if (!messages.length) {
-    clearMessages("No messages yet", "Send the first message to this room.", "Group");
+    clearMessages("No messages yet", "Send the first message to this study group.", "Group");
     return;
   }
   el.messagesArea.innerHTML = "";
@@ -2938,6 +2974,13 @@ if (previewChatHead) {
 
 if (el.previewCloseProfile) {
   el.previewCloseProfile.addEventListener("click", closePreviewDetails);
+}
+
+if (el.profileToggleButton) {
+  el.profileToggleButton.addEventListener("click", () => {
+    const isOpen = Boolean(el.previewApp && el.previewApp.classList.contains("details-open"));
+    setPreviewDetailsOpen(!isOpen);
+  });
 }
 
 if (el.previewAddFriendBtn) {
