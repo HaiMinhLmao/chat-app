@@ -435,20 +435,11 @@ function normalizeAvatarUrl(value) {
 
 function loadThemePreference() {
   try {
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return savedTheme === "dark" || savedTheme === "auto" ? savedTheme : "light";
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
   } catch (_) {
-    return "light";
+    // no-op
   }
-}
-
-function resolveTheme(nextTheme) {
-  if (nextTheme === "auto") {
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  }
-  return nextTheme === "dark" ? "dark" : "light";
+  return "light";
 }
 
 function syncThemeInputs(preference) {
@@ -458,12 +449,11 @@ function syncThemeInputs(preference) {
 }
 
 function applyTheme(nextTheme) {
-  const preference = nextTheme === "auto" ? "auto" : nextTheme === "dark" ? "dark" : "light";
-  const theme = resolveTheme(preference);
-  document.body.classList.toggle("theme-dark", theme === "dark");
-  syncThemeInputs(preference);
+  void nextTheme;
+  document.body.classList.remove("theme-dark");
+  syncThemeInputs("light");
   try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
   } catch (_) {
     // no-op
   }
