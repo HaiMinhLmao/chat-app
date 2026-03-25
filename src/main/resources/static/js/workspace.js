@@ -249,6 +249,7 @@ const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 let studyTimerTicker = null;
 const conversationHistoryCache = new Map();
 const pinnedMessagesCache = new Map();
+let messageActionMenuState = null;
 const workspaceBootStartedAt = Date.now();
 
 if (hasWorkspaceBootLoader() && el.workspaceBootLoader) {
@@ -911,6 +912,7 @@ function renderConversationHistoryList(messages, stickToBottom) {
   const history = Array.isArray(messages) ? messages : [];
   const previousScrollTop = el.messagesArea.scrollTop;
   const previousScrollHeight = el.messagesArea.scrollHeight;
+  closeMessageActionMenu();
   setMessagesSurfaceMode("conversation");
   el.messagesArea.innerHTML = "";
   history.forEach((message) => {
@@ -3283,7 +3285,170 @@ function messagePreview(message, sent, sender) {
   return prefix + ": " + messageSummaryText(message);
 }
 
-function buildMessageActions(message, sent) {
+function canToggleMessagePin(message, sent) {
+  return Boolean(message) && !message.recalled && (!sent || Boolean(message.pinned));
+}
+
+function canForwardMessage(message) {
+  return Boolean(message) && !message.recalled && Boolean(messageSummaryText(message));
+}
+
+function closeMessageActionMenu() {
+  if (!messageActionMenuState) return;
+  const { menu, trigger, tools } = messageActionMenuState;
+  if (tools) {
+    tools.classList.remove("is-open");
+  }
+  if (trigger) {
+    trigger.classList.remove("active");
+    trigger.setAttribute("aria-expanded", "false");
+  }
+  if (menu && menu.parentNode) {
+    menu.parentNode.removeChild(menu);
+  }
+  messageActionMenuState = null;
+}
+
+function positionMessageActionMenu(menu, trigger) {
+  if (!menu || !trigger) return;
+  const triggerRect = trigger.getBoundingClientRect();
+  const menuWidth = menu.offsetWidth || 220;
+  const menuHeight = menu.offsetHeight || 180;
+  const gutter = 12;
+  const nextLeft = Math.max(
+    gutter,
+    Math.min(window.innerWidth - menuWidth - gutter, triggerRect.right - menuWidth + 8),
+  );
+  let nextTop = triggerRect.top - menuHeight - gutter;
+  let placement = "above";
+  if (nextTop < gutter) {
+    nextTop = Math.min(window.innerHeight - menuHeight - gutter, triggerRect.bottom + gutter);
+    placement = "below";
+  }
+  const arrowLeft = Math.max(
+    28,
+    Math.min(menuWidth - 28, triggerRect.left + triggerRect.width / 2 - nextLeft),
+  );
+  menu.dataset.placement = placement;
+  menu.style.left = nextLeft + "px";
+  menu.style.top = nextTop + "px";
+  menu.style.setProperty("--message-menu-arrow-left", arrowLeft + "px");
+}
+
+function buildForwardDraft(message, sent, sender) {
+  const summary = messageSummaryText(message);
+  if (!summary) return "";
+  const identity = resolveMessageIdentity(message, sent, sender);
+  const sourceName =
+    (identity && identity.name) ||
+    sender ||
+    localizeText("Người dùng", "User");
+  return localizeText("Chuyển tiếp từ ", "Forwarded from ") + sourceName + ":\n" + summary;
+}
+
+function queueForwardedMessageDraft(message, sent, sender) {
+  const draft = buildForwardDraft(message, sent, sender);
+  closeMessageActionMenu();
+  if (!draft) {
+    showToast(localizeText("Tin nhắn này chưa thể chuyển tiếp.", "This message cannot be forwarded yet."));
+    return;
+  }
+  const existing = String(el.messageInput.value || "").trim();
+  el.messageInput.value = existing ? existing + "\n\n" + draft : draft;
+  syncComposer();
+  el.messageInput.focus();
+  const caret = el.messageInput.value.length;
+  if (typeof el.messageInput.setSelectionRange === "function") {
+    el.messageInput.setSelectionRange(caret, caret);
+  }
+  showToast(
+    localizeText(
+      "Đã đưa tin vào ô soạn. Mở đoạn chat cần chuyển tiếp rồi gửi.",
+      "Added to the composer. Open the chat you want to forward to, then send it.",
+    ),
+  );
+}
+
+function createMessageActionItem(label, onClick, danger) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "message-action-item" + (danger ? " danger" : "");
+  button.setAttribute("role", "menuitem");
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function buildMessageActionMenu(message, sent, sender) {
+  const menu = document.createElement("div");
+  menu.className = "message-action-menu";
+  menu.setAttribute("role", "menu");
+
+  if (sent && !message.recalled) {
+    menu.appendChild(
+      createMessageActionItem(
+        localizeText("Gỡ", "Unsend"),
+        () => {
+          closeMessageActionMenu();
+          void recallMessage(message);
+        },
+        false,
+      ),
+    );
+  }
+
+  if (canForwardMessage(message)) {
+    menu.appendChild(
+      createMessageActionItem(
+        localizeText("Chuyển tiếp", "Forward"),
+        () => {
+          queueForwardedMessageDraft(message, sent, sender);
+        },
+        false,
+      ),
+    );
+  }
+
+  if (canToggleMessagePin(message, sent)) {
+    menu.appendChild(
+      createMessageActionItem(
+        message.pinned ? localizeText("Bỏ ghim", "Unpin") : localizeText("Ghim", "Pin"),
+        () => {
+          closeMessageActionMenu();
+          void toggleMessagePin(message);
+        },
+        false,
+      ),
+    );
+  }
+
+  return menu.childElementCount ? menu : null;
+}
+
+function openMessageActionMenu(trigger, tools, message, sent, sender) {
+  closeMessageActionMenu();
+  const menu = buildMessageActionMenu(message, sent, sender);
+  if (!menu) return;
+  document.body.appendChild(menu);
+  positionMessageActionMenu(menu, trigger);
+  window.requestAnimationFrame(() => {
+    menu.classList.add("is-open");
+  });
+  tools.classList.add("is-open");
+  trigger.classList.add("active");
+  trigger.setAttribute("aria-expanded", "true");
+  messageActionMenuState = { menu, trigger, tools };
+}
+
+function toggleMessageActionMenu(trigger, tools, message, sent, sender) {
+  if (messageActionMenuState && messageActionMenuState.trigger === trigger) {
+    closeMessageActionMenu();
+    return;
+  }
+  openMessageActionMenu(trigger, tools, message, sent, sender);
+}
+
+function buildMessageActionsLegacy(message, sent) {
   if (!message || !message.id || (activeChannel.type !== "direct" && activeChannel.type !== "group")) {
     return null;
   }
@@ -3314,6 +3479,42 @@ function buildMessageActions(message, sent) {
   }
 
   return tools.childElementCount ? tools : null;
+}
+
+function buildMessageActions(message, sent, sender) {
+  if (!message || !message.id || (activeChannel.type !== "direct" && activeChannel.type !== "group")) {
+    return null;
+  }
+
+  const hasRecall = sent && !message.recalled;
+  const hasForward = canForwardMessage(message);
+  const hasPin = canToggleMessagePin(message, sent);
+  if (!hasRecall && !hasForward && !hasPin) {
+    return null;
+  }
+
+  const tools = document.createElement("div");
+  tools.className = "message-tools";
+
+  const menuButton = document.createElement("button");
+  menuButton.type = "button";
+  menuButton.className = "message-action-trigger";
+  menuButton.setAttribute("aria-haspopup", "menu");
+  menuButton.setAttribute("aria-expanded", "false");
+  menuButton.setAttribute("aria-label", localizeText("Tùy chọn tin nhắn", "Message options"));
+  menuButton.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<circle cx="12" cy="5" r="1.8" fill="currentColor" stroke="none"></circle>' +
+    '<circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"></circle>' +
+    '<circle cx="12" cy="19" r="1.8" fill="currentColor" stroke="none"></circle>' +
+    "</svg>";
+  menuButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleMessageActionMenu(menuButton, tools, message, sent, sender);
+  });
+  tools.appendChild(menuButton);
+
+  return tools;
 }
 
 function addMessage(message, sent, sender, timestamp, autoScroll = true) {
@@ -3358,7 +3559,7 @@ function addMessage(message, sent, sender, timestamp, autoScroll = true) {
   if (attachment) {
     bubble.appendChild(attachment);
   }
-  const tools = buildMessageActions(message, sent);
+  const tools = buildMessageActions(message, sent, sender);
   if (tools && stack) {
     stack.appendChild(tools);
   }
@@ -3370,6 +3571,7 @@ function addMessage(message, sent, sender, timestamp, autoScroll = true) {
 
 // Channel selection and sidebar rendering
 function selectHome() {
+  closeMessageActionMenu();
   activeChannel = { type: "home" };
   closePreviewDetails();
   syncSurfaceMode();
@@ -3389,6 +3591,7 @@ function selectHome() {
 }
 
 function selectDirect(friend) {
+  closeMessageActionMenu();
   activeChannel = {
     type: "direct",
     id: normalizeEmail(friend.email),
@@ -3413,6 +3616,7 @@ function selectDirect(friend) {
 }
 
 function selectGroup(group) {
+  closeMessageActionMenu();
   activeChannel = { type: "group", id: group.id, name: group.name || "Study Group" };
   closePreviewDetails();
   syncSurfaceMode();
@@ -4600,6 +4804,7 @@ el.studyNotesCloseButton.addEventListener("click", closeStudyNotesPopover);
 el.createGroupCloseButton.addEventListener("click", closeCreateGroupPopover);
 el.createGroupCancelBtn.addEventListener("click", closeCreateGroupPopover);
 el.settingsScrim.addEventListener("click", () => {
+  closeMessageActionMenu();
   closeInboxPanel();
   closeSettingsPopover();
   closeStudyTimerPopover();
@@ -4631,6 +4836,21 @@ window.addEventListener("beforeunload", () => {
 window.addEventListener("focus", refreshWorkspace);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshWorkspace();
+});
+document.addEventListener("pointerdown", (event) => {
+  if (!messageActionMenuState) return;
+  const target = event.target;
+  if (!(target instanceof Node)) {
+    closeMessageActionMenu();
+    return;
+  }
+  if (
+    messageActionMenuState.menu.contains(target) ||
+    messageActionMenuState.trigger.contains(target)
+  ) {
+    return;
+  }
+  closeMessageActionMenu();
 });
 document.addEventListener("keydown", (event) => {
   const target = asElement(event.target);
@@ -4665,6 +4885,10 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (event.key !== "Escape") return;
+  if (messageActionMenuState) {
+    closeMessageActionMenu();
+    return;
+  }
   if (isInboxPanelOpen()) {
     closeInboxPanel();
     return;
@@ -4686,6 +4910,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("resize", () => {
+  closeMessageActionMenu();
   syncInboxToggleState();
   if (isInboxPanelOpen()) {
     positionInboxPanel();
@@ -4704,6 +4929,7 @@ window.addEventListener("resize", () => {
 window.addEventListener(
   "scroll",
   () => {
+    closeMessageActionMenu();
     if (isInboxPanelOpen()) {
       positionInboxPanel();
     }

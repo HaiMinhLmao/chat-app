@@ -3747,6 +3747,15 @@ html.workspace-booting .preview-shell {
   border-radius: 999px;
   background: #fff;
   transform: translateY(-50%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.preview-nav-item.active .preview-active-pill {
+  opacity: 1;
+  visibility: visible;
 }
 
 .preview-nav-icon,
@@ -5370,42 +5379,118 @@ html.workspace-booting .preview-shell {
 
 .preview-chat-panel .message-tools {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  width: 100%;
+  justify-content: flex-end;
+  margin-top: 8px;
   opacity: 0;
-  transition: opacity 0.18s ease;
+  transform: translateY(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .preview-chat-panel .message-row:hover .message-tools,
-.preview-chat-panel .message-row:focus-within .message-tools {
+.preview-chat-panel .message-row:focus-within .message-tools,
+.preview-chat-panel .message-tools.is-open {
   opacity: 1;
+  transform: translateY(0);
 }
 
-.preview-chat-panel .message-tool-btn {
-  min-height: 28px;
-  padding: 0 10px;
+.preview-chat-panel .message-action-trigger {
+  width: 38px;
+  height: 38px;
   border: 0;
   border-radius: 999px;
-  background: rgba(88, 107, 255, 0.1);
-  color: #4a5cff;
-  font-size: 11px;
-  font-weight: 800;
+  background: rgba(148, 163, 184, 0.18);
+  color: #64748b;
+  display: inline-grid;
+  place-items: center;
   cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
 }
 
-.preview-chat-panel .message-tool-btn.danger {
-  background: rgba(239, 68, 68, 0.12);
-  color: #dc2626;
+.preview-chat-panel .message-action-trigger:hover,
+.preview-chat-panel .message-action-trigger.active {
+  transform: translateY(-1px);
+  background: rgba(71, 85, 105, 0.18);
+  color: #0f172a;
 }
 
-.preview-chat-panel .message-row.sent .message-tool-btn {
+.preview-chat-panel .message-action-trigger svg {
+  width: 18px;
+  height: 18px;
+}
+
+.preview-chat-panel .message-row.sent .message-action-trigger {
   background: rgba(255, 255, 255, 0.16);
   color: rgba(255, 255, 255, 0.94);
 }
 
-.preview-chat-panel .message-row.sent .message-tool-btn.danger {
-  background: rgba(255, 255, 255, 0.22);
+.preview-chat-panel .message-row.sent .message-action-trigger:hover,
+.preview-chat-panel .message-row.sent .message-action-trigger.active {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.message-action-menu {
+  --message-menu-arrow-left: 50%;
+  position: fixed;
+  min-width: 188px;
+  max-width: min(240px, calc(100vw - 24px));
+  padding: 10px;
+  border-radius: 24px;
+  background: rgba(39, 39, 42, 0.96);
+  color: #fff;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.98);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 45;
+}
+
+.message-action-menu::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--message-menu-arrow-left) - 9px);
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.message-action-menu[data-placement="above"]::after {
+  bottom: -7px;
+}
+
+.message-action-menu[data-placement="below"]::after {
+  top: -7px;
+}
+
+.message-action-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.message-action-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.message-action-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.message-action-item.danger {
+  color: #fecaca;
 }
 
 .preview-chat-panel .message-row.recalled .message-bubble {
@@ -5811,6 +5896,7 @@ html.workspace-booting .preview-shell {
 
   .preview-chat-panel .message-tools {
     opacity: 1;
+    transform: translateY(0);
   }
 
   .preview-composer {
