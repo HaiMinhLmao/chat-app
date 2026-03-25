@@ -232,6 +232,7 @@ let workspaceRefreshTimer = null;
 let notificationsPrimed = false;
 let friendSearchQuery = "";
 let rosterFilter = "all";
+let previewDetailsMode = "self";
 const groupDetailsCache = new Map();
 const previews = new Map();
 const AUTH_SESSION_KEY = "authSession";
@@ -241,15 +242,24 @@ const FRIEND_CARD_STORAGE_KEY = "workspaceFriendCardCollapsed";
 const FRIENDS_CARD_STORAGE_KEY = "workspaceFriendsCardCollapsed";
 const THEME_STORAGE_KEY = "workspaceTheme";
 const STUDY_TIMER_STORAGE_KEY = "workspaceStudyTimer";
+const DASHBOARD_PROGRESS_STORAGE_KEY = "workspaceDashboardProgress";
+const PLANNER_STORAGE_KEY = "workspacePlannerDesk";
 const SETTINGS_DRAWER_BREAKPOINT = 760;
 const MINUTE_MS = 60000;
 const REQUEST_TIMEOUT_MS = 10000;
 const WORKSPACE_BOOT_MIN_MS = 650;
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
+const PLANNER_STATUS_OPTIONS = ["todo", "progress", "done"];
+const PLANNER_PRIORITY_OPTIONS = ["low", "medium", "high", "urgent"];
+const PLANNER_NOTE_COLOR_OPTIONS = ["amber", "sky", "mint", "rose", "violet", "slate"];
 let studyTimerTicker = null;
 const conversationHistoryCache = new Map();
 const pinnedMessagesCache = new Map();
 let messageActionMenuState = null;
+let plannerFloatingLayer = null;
+let plannerNoteDragState = null;
+let plannerLiveSecond = -1;
+let plannerDraggedTaskId = "";
 const workspaceBootStartedAt = Date.now();
 
 if (hasWorkspaceBootLoader() && el.workspaceBootLoader) {
@@ -602,6 +612,7 @@ function setPreview(type, id, value) {
     '.channel-item[data-type="' + type + '"][data-id="' + String(id) + '"] .channel-preview',
   );
   if (node) node.textContent = value;
+  refreshHomeOverviewIfNeeded();
 }
 
 function getPreview(type, id, fallback) {
@@ -688,7 +699,12 @@ function syncCurrentUserUi() {
   }
   document.documentElement.lang = activeLanguage();
   if (activeChannel.type === "home") {
-    el.chatTitle.textContent = name;
+    el.chatKicker.textContent = "Dashboard";
+    el.chatTitle.textContent = localizeText("Nhịp học hôm nay", "Today's flow");
+    el.chatSubtitle.textContent = localizeText(
+      "Continue, notes, task và focus trong cùng một màn hình.",
+      "Continue learning, notes, tasks, and focus in one place.",
+    );
     syncAvatarNode(el.chatAvatar, name, currentUser.avatarUrl);
     refreshHomeOverviewIfNeeded();
   }
@@ -700,16 +716,18 @@ function setPreviewDetailsOpen(nextOpen) {
   if (!el.previewApp || !el.previewDetails) return;
   el.previewApp.classList.toggle("details-open", nextOpen);
   if (el.profileToggleButton) {
-    el.profileToggleButton.classList.toggle("active", nextOpen);
-    el.profileToggleButton.setAttribute("aria-pressed", String(nextOpen));
+    const selfOpen = nextOpen && previewDetailsMode === "self";
+    el.profileToggleButton.classList.toggle("active", selfOpen);
+    el.profileToggleButton.setAttribute("aria-pressed", String(selfOpen));
   }
   if (el.headerInboxButton) {
-    el.headerInboxButton.classList.toggle("active", nextOpen);
-    el.headerInboxButton.setAttribute("aria-pressed", String(nextOpen));
+    const channelOpen = nextOpen && previewDetailsMode === "channel";
+    el.headerInboxButton.classList.toggle("active", channelOpen);
+    el.headerInboxButton.setAttribute("aria-pressed", String(channelOpen));
   }
   if (nextOpen) {
     el.previewDetails.scrollTop = 0;
-    if (activeChannel.type === "group") {
+    if (previewDetailsMode === "channel" && activeChannel.type === "group") {
       void ensureGroupDetails(activeChannel.id);
     }
   }
@@ -717,6 +735,18 @@ function setPreviewDetailsOpen(nextOpen) {
 
 function closePreviewDetails() {
   setPreviewDetailsOpen(false);
+}
+
+function openCurrentUserProfile() {
+  previewDetailsMode = "self";
+  syncPreviewProfilePanel();
+  setPreviewDetailsOpen(true);
+}
+
+function openActiveChannelDetails() {
+  previewDetailsMode = "channel";
+  syncPreviewProfilePanel();
+  setPreviewDetailsOpen(true);
 }
 
 function showPreviewAction(button, visible, label, disabled) {
@@ -1261,7 +1291,9 @@ function renderPreviewPinnedPanel() {
 
 function renderPreviewSharedPanel() {
   if (!el.previewSharedPanel) return;
-  const inConversation = activeChannel.type === "direct" || activeChannel.type === "group";
+  const inConversation =
+    previewDetailsMode === "channel" &&
+    (activeChannel.type === "direct" || activeChannel.type === "group");
   if (!inConversation) {
     el.previewSharedPanel.hidden = true;
     el.previewSharedPanel.innerHTML = "";
@@ -1419,10 +1451,10 @@ function syncPreviewProfilePanel() {
   let status = "Your workspace";
   let meta = String(socialState.friends.length) + " active friends";
   let emailHref = currentUser && currentUser.email ? "mailto:" + currentUser.email : "#";
-  let detailsTitle = "Profile";
+  let detailsTitle = "My profile";
   let groupRecord = null;
 
-  if (activeChannel.type === "direct") {
+  if (previewDetailsMode === "channel" && activeChannel.type === "direct") {
     const friend = activeFriendRecord();
     if (friend) {
       name = displayName(friend);
@@ -1432,8 +1464,9 @@ function syncPreviewProfilePanel() {
       status = "Accepted friend";
       meta = groups.length ? String(groups.length) + " active groups in workspace" : "Ready to chat";
       emailHref = friend.email ? "mailto:" + friend.email : "#";
+      detailsTitle = "Profile";
     }
-  } else if (activeChannel.type === "group") {
+  } else if (previewDetailsMode === "channel" && activeChannel.type === "group") {
     const group = activeGroupRecord();
     if (group) {
       groupRecord = group;
@@ -1463,13 +1496,13 @@ function syncPreviewProfilePanel() {
 
   showPreviewAction(
     el.previewAddFriendBtn,
-    activeChannel.type === "direct",
+    previewDetailsMode === "channel" && activeChannel.type === "direct",
     "Pinned Contact",
-    activeChannel.type === "direct",
+    previewDetailsMode === "channel" && activeChannel.type === "direct",
   );
   showPreviewAction(
     el.previewGroupInfoBtn,
-    activeChannel.type === "group",
+    previewDetailsMode === "channel" && activeChannel.type === "group",
     "Refresh Members",
     false,
   );
@@ -1700,6 +1733,593 @@ function persistStudyTimerState() {
   } catch (_) {
     // no-op
   }
+}
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (character) => {
+    if (character === "&") return "&amp;";
+    if (character === "<") return "&lt;";
+    if (character === ">") return "&gt;";
+    if (character === '"') return "&quot;";
+    return "&#39;";
+  });
+}
+
+function normalizePlannerSingleLine(value, limit = 120) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
+}
+
+function normalizePlannerTextBlock(value, limit = 4000) {
+  return String(value || "")
+    .replace(/\r/g, "")
+    .slice(0, limit);
+}
+
+function normalizePlannerDateTimeValue(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return Number.isFinite(Date.parse(trimmed)) ? trimmed.slice(0, 16) : "";
+}
+
+function normalizePlannerMinutesValue(value, fallback, maximum = 1440) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(maximum, Math.round(numeric)));
+}
+
+function normalizePlannerStatus(value) {
+  return PLANNER_STATUS_OPTIONS.includes(value) ? value : "todo";
+}
+
+function normalizePlannerPriority(value) {
+  return PLANNER_PRIORITY_OPTIONS.includes(value) ? value : "medium";
+}
+
+function normalizePlannerNoteColor(value) {
+  return PLANNER_NOTE_COLOR_OPTIONS.includes(value) ? value : "amber";
+}
+
+function buildPlannerId(prefix) {
+  return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+}
+
+function plannerDayKey(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
+function plannerDateTimeLabel(value) {
+  const parsed = Date.parse(value || "");
+  if (!Number.isFinite(parsed)) return localizeText("Chưa đặt", "Not set");
+  return new Intl.DateTimeFormat(activeLocale(), {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(parsed));
+}
+
+function formatPlannerDurationMinutes(minutes) {
+  const safe = Math.max(0, Math.round(Number(minutes) || 0));
+  const hours = Math.floor(safe / 60);
+  const remainder = safe % 60;
+  if (hours && remainder) return hours + "h " + remainder + "m";
+  if (hours) return hours + "h";
+  return remainder + "m";
+}
+
+function formatPlannerTrackedMs(ms) {
+  return formatPlannerDurationMinutes(Math.round(Math.max(0, Number(ms) || 0) / 60000));
+}
+
+function createPlannerTask(seed = {}) {
+  const createdAt = Number(seed.createdAt) || Date.now();
+  return {
+    id: String(seed.id || buildPlannerId("task")),
+    title: normalizePlannerSingleLine(seed.title, 120),
+    description: normalizePlannerTextBlock(seed.description, 600),
+    deadline: normalizePlannerDateTimeValue(seed.deadline),
+    scheduledAt: normalizePlannerDateTimeValue(seed.scheduledAt),
+    priority: normalizePlannerPriority(seed.priority),
+    status: normalizePlannerStatus(seed.status),
+    tag: normalizePlannerSingleLine(seed.tag, 48),
+    project: normalizePlannerSingleLine(seed.project, 64),
+    estimateMinutes: normalizePlannerMinutesValue(seed.estimateMinutes, 30, 720),
+    trackedMs: Math.max(0, Number(seed.trackedMs) || 0),
+    createdAt,
+    updatedAt: Number(seed.updatedAt) || createdAt,
+  };
+}
+
+function createPlannerNote(seed = {}) {
+  const createdAt = Number(seed.createdAt) || Date.now();
+  return {
+    id: String(seed.id || buildPlannerId("note")),
+    title: normalizePlannerSingleLine(seed.title, 80) || localizeText("Ghi chú mới", "New note"),
+    content: normalizePlannerTextBlock(seed.content, 5000),
+    color: normalizePlannerNoteColor(seed.color),
+    pinned: Boolean(seed.pinned),
+    minimized: Boolean(seed.minimized),
+    isOpen: Boolean(seed.isOpen),
+    x: Number.isFinite(Number(seed.x)) ? Number(seed.x) : 0,
+    y: Number.isFinite(Number(seed.y)) ? Number(seed.y) : 0,
+    z: Math.max(1, Math.round(Number(seed.z) || 1)),
+    createdAt,
+    updatedAt: Number(seed.updatedAt) || createdAt,
+  };
+}
+
+function sanitizePlannerTasks(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => createPlannerTask(item))
+    .filter((item) => item.title);
+}
+
+function sanitizePlannerNotes(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => createPlannerNote(item))
+    .filter((item) => item.title || item.content);
+}
+
+function buildLegacyPlannerSeed() {
+  const tasks = sanitizeStudyTodos(studyTimerState.todos).map((item) =>
+    createPlannerTask({
+      title: item.text,
+      status: item.done ? "done" : "todo",
+      priority: item.done ? "low" : "medium",
+      project: localizeText("Workspace", "Workspace"),
+      tag: localizeText("Legacy", "Legacy"),
+      estimateMinutes: 25,
+      createdAt: Date.now(),
+    }),
+  );
+  const notes = [];
+  if (String(studyTimerState.noteText || "").trim()) {
+    notes.push(
+      createPlannerNote({
+        title: localizeText("Ghi chú cũ", "Legacy note"),
+        content: studyTimerState.noteText,
+        color: "amber",
+        isOpen: false,
+        x: 96,
+        y: 96,
+        z: 1,
+      }),
+    );
+  }
+  return { tasks, notes };
+}
+
+function buildDefaultPlannerState() {
+  const legacy = buildLegacyPlannerSeed();
+  const zCounter = Math.max(
+    6,
+    ...legacy.notes.map((note) => Math.max(1, Number(note.z) || 1)),
+  );
+  return {
+    viewMode: "board",
+    searchText: "",
+    priorityFilter: "all",
+    statusFilter: "all",
+    deadlineFilter: "all",
+    projectFilter: "all",
+    quickNote: "",
+    selectedTaskId: legacy.tasks[0] ? legacy.tasks[0].id : "",
+    activeTaskId: "",
+    activeTaskStartedAt: null,
+    noteZCounter: zCounter,
+    tasks: legacy.tasks,
+    notes: legacy.notes,
+  };
+}
+
+function loadPlannerState() {
+  const defaults = buildDefaultPlannerState();
+  try {
+    const parsed = parseJson(window.localStorage.getItem(PLANNER_STORAGE_KEY));
+    if (!parsed || typeof parsed !== "object") return defaults;
+    const tasks = sanitizePlannerTasks(parsed.tasks);
+    const notes = sanitizePlannerNotes(parsed.notes);
+    const zCounter = Math.max(
+      Number(parsed.noteZCounter) || defaults.noteZCounter,
+      ...notes.map((note) => Math.max(1, Number(note.z) || 1)),
+      1,
+    );
+    return {
+      viewMode: parsed.viewMode === "list" ? "list" : "board",
+      searchText: normalizePlannerSingleLine(parsed.searchText, 80),
+      priorityFilter:
+        parsed.priorityFilter === "all" || PLANNER_PRIORITY_OPTIONS.includes(parsed.priorityFilter)
+          ? parsed.priorityFilter
+          : "all",
+      statusFilter:
+        parsed.statusFilter === "all" || PLANNER_STATUS_OPTIONS.includes(parsed.statusFilter)
+          ? parsed.statusFilter
+          : "all",
+      deadlineFilter: ["all", "today", "upcoming", "overdue"].includes(parsed.deadlineFilter)
+        ? parsed.deadlineFilter
+        : "all",
+      projectFilter: parsed.projectFilter === "all"
+        ? "all"
+        : normalizePlannerSingleLine(parsed.projectFilter, 64),
+      quickNote: normalizePlannerTextBlock(parsed.quickNote, 1200),
+      selectedTaskId: String(parsed.selectedTaskId || ""),
+      activeTaskId: String(parsed.activeTaskId || ""),
+      activeTaskStartedAt: Number.isFinite(Number(parsed.activeTaskStartedAt))
+        ? Number(parsed.activeTaskStartedAt)
+        : null,
+      noteZCounter: zCounter,
+      tasks: tasks.length ? tasks : defaults.tasks,
+      notes: notes.length ? notes : defaults.notes,
+    };
+  } catch (_) {
+    return defaults;
+  }
+}
+
+const plannerState = loadPlannerState();
+
+function persistPlannerState() {
+  try {
+    window.localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(plannerState));
+  } catch (_) {
+    // no-op
+  }
+}
+
+function sanitizeDashboardStudyByDay(value) {
+  const safe = {};
+  if (!value || typeof value !== "object") return safe;
+  Object.entries(value).forEach(([key, amount]) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key) && Number.isFinite(Number(amount)) && Number(amount) > 0) {
+      safe[key] = Math.max(0, Number(amount));
+    }
+  });
+  return safe;
+}
+
+function loadDashboardProgressState() {
+  try {
+    const parsed = parseJson(window.localStorage.getItem(DASHBOARD_PROGRESS_STORAGE_KEY));
+    if (!parsed || typeof parsed !== "object") {
+      return { studyByDay: {}, lastSampleAt: Date.now() };
+    }
+    return {
+      studyByDay: sanitizeDashboardStudyByDay(parsed.studyByDay),
+      lastSampleAt: Number.isFinite(Number(parsed.lastSampleAt))
+        ? Number(parsed.lastSampleAt)
+        : Date.now(),
+    };
+  } catch (_) {
+    return { studyByDay: {}, lastSampleAt: Date.now() };
+  }
+}
+
+const dashboardProgressState = loadDashboardProgressState();
+
+function persistDashboardProgressState() {
+  try {
+    window.localStorage.setItem(DASHBOARD_PROGRESS_STORAGE_KEY, JSON.stringify(dashboardProgressState));
+  } catch (_) {
+    // no-op
+  }
+}
+
+function pruneDashboardStudyByDay(limit = 84) {
+  const keys = Object.keys(dashboardProgressState.studyByDay).sort();
+  if (keys.length <= limit) return;
+  keys.slice(0, keys.length - limit).forEach((key) => delete dashboardProgressState.studyByDay[key]);
+}
+
+function syncDashboardStudyProgress(now = Date.now()) {
+  const previous = Number(dashboardProgressState.lastSampleAt) || now;
+  dashboardProgressState.lastSampleAt = now;
+  const isActive = Boolean(studyTimerState.isRunning || plannerState.activeTaskId);
+  if (!isActive) {
+    persistDashboardProgressState();
+    return;
+  }
+  const delta = Math.max(0, Math.min(5000, now - previous));
+  if (!delta) return;
+  const dayKey = plannerDayKey(now);
+  dashboardProgressState.studyByDay[dayKey] =
+    Math.max(0, Number(dashboardProgressState.studyByDay[dayKey]) || 0) + delta;
+  pruneDashboardStudyByDay();
+  persistDashboardProgressState();
+}
+
+function dashboardStudyMsForDay(dayKey = plannerDayKey()) {
+  return Math.max(0, Number(dashboardProgressState.studyByDay[dayKey]) || 0);
+}
+
+function dashboardStudyMsForRecentDays(days = 7) {
+  let total = 0;
+  for (let index = 0; index < days; index += 1) {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - index);
+    total += dashboardStudyMsForDay(plannerDayKey(date));
+  }
+  return total;
+}
+
+function dashboardStudyStreak() {
+  let streak = 0;
+  for (let index = 0; index < 84; index += 1) {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - index);
+    if (dashboardStudyMsForDay(plannerDayKey(date)) > 0) {
+      streak += 1;
+      continue;
+    }
+    break;
+  }
+  return streak;
+}
+
+function dashboardStudyHeatmapCells(days = 21) {
+  const cells = [];
+  for (let index = days - 1; index >= 0; index -= 1) {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - index);
+    const key = plannerDayKey(date);
+    const studyMs = dashboardStudyMsForDay(key);
+    let level = 0;
+    if (studyMs >= 3600000) {
+      level = 4;
+    } else if (studyMs >= 1800000) {
+      level = 3;
+    } else if (studyMs >= 900000) {
+      level = 2;
+    } else if (studyMs > 0) {
+      level = 1;
+    }
+    cells.push({
+      key,
+      label: new Intl.DateTimeFormat(activeLocale(), { month: "short", day: "numeric" }).format(date),
+      studyMs,
+      level,
+    });
+  }
+  return cells;
+}
+
+function getPlannerStudioPanel() {
+  return document.querySelector("[data-planner-studio]");
+}
+
+function getPlannerTaskById(id) {
+  const taskId = String(id || "");
+  return plannerState.tasks.find((item) => item.id === taskId) || null;
+}
+
+function getPlannerNoteById(id) {
+  const noteId = String(id || "");
+  return plannerState.notes.find((item) => item.id === noteId) || null;
+}
+
+function getPlannerTaskTrackedMs(task, now = Date.now()) {
+  if (!task) return 0;
+  const base = Math.max(0, Number(task.trackedMs) || 0);
+  if (
+    plannerState.activeTaskId &&
+    plannerState.activeTaskId === task.id &&
+    Number.isFinite(Number(plannerState.activeTaskStartedAt))
+  ) {
+    return base + Math.max(0, now - Number(plannerState.activeTaskStartedAt));
+  }
+  return base;
+}
+
+function getPlannerTaskProgressRatio(task, now = Date.now()) {
+  if (!task) return 0;
+  if (task.status === "done") return 1;
+  const estimateMs = Math.max(1, (Number(task.estimateMinutes) || 0) * MINUTE_MS);
+  return Math.max(0, Math.min(1, getPlannerTaskTrackedMs(task, now) / estimateMs));
+}
+
+function plannerDeadlineState(task, now = Date.now()) {
+  const parsed = Date.parse(task && task.deadline);
+  if (!Number.isFinite(parsed)) {
+    return {
+      kind: "none",
+      copy: localizeText("Không có deadline", "No deadline"),
+      msLeft: null,
+    };
+  }
+  const diff = parsed - now;
+  if (diff < 0) {
+    return {
+      kind: "overdue",
+      copy: localizeText("Trễ " + formatAgo(parsed), "Overdue"),
+      msLeft: diff,
+    };
+  }
+  const hoursLeft = diff / 3600000;
+  return {
+    kind: hoursLeft <= 18 ? "soon" : "upcoming",
+    copy: localizeText("Còn " + formatAgo(now + diff), "Due " + formatAgo(now + diff)),
+    msLeft: diff,
+  };
+}
+
+function plannerTaskMatchesFilters(task) {
+  if (!task) return false;
+  const query = plannerState.searchText.trim().toLowerCase();
+  if (query) {
+    const haystack = [
+      task.title,
+      task.description,
+      task.tag,
+      task.project,
+      task.priority,
+      task.status,
+    ]
+      .join(" ")
+      .toLowerCase();
+    if (!haystack.includes(query)) return false;
+  }
+  if (plannerState.priorityFilter !== "all" && task.priority !== plannerState.priorityFilter) return false;
+  if (plannerState.statusFilter !== "all" && task.status !== plannerState.statusFilter) return false;
+  if (plannerState.projectFilter !== "all" && task.project !== plannerState.projectFilter) return false;
+  if (plannerState.deadlineFilter !== "all") {
+    const state = plannerDeadlineState(task);
+    if (plannerState.deadlineFilter === "overdue" && state.kind !== "overdue") return false;
+    if (plannerState.deadlineFilter === "upcoming" && !["soon", "upcoming"].includes(state.kind)) return false;
+    if (plannerState.deadlineFilter === "today") {
+      const deadlineKey = plannerDayKey(task.deadline);
+      const scheduledKey = plannerDayKey(task.scheduledAt);
+      const todayKey = plannerDayKey();
+      if (deadlineKey !== todayKey && scheduledKey !== todayKey) return false;
+    }
+  }
+  return true;
+}
+
+function plannerVisibleTasks() {
+  return plannerState.tasks
+    .filter((task) => plannerTaskMatchesFilters(task))
+    .sort((left, right) => {
+      const leftDeadline = Date.parse(left.deadline || "") || Number.MAX_SAFE_INTEGER;
+      const rightDeadline = Date.parse(right.deadline || "") || Number.MAX_SAFE_INTEGER;
+      if (left.status !== right.status) {
+        return PLANNER_STATUS_OPTIONS.indexOf(left.status) - PLANNER_STATUS_OPTIONS.indexOf(right.status);
+      }
+      if (leftDeadline !== rightDeadline) return leftDeadline - rightDeadline;
+      return Number(right.updatedAt || 0) - Number(left.updatedAt || 0);
+    });
+}
+
+function plannerProjectOptions() {
+  return plannerState.tasks
+    .map((task) => task.project)
+    .filter(Boolean)
+    .filter((value, index, list) => list.indexOf(value) === index)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function plannerTodayTasks() {
+  const todayKey = plannerDayKey();
+  const matches = plannerVisibleTasks().filter((task) => {
+    if (task.status === "done") return false;
+    return plannerDayKey(task.scheduledAt) === todayKey || plannerDayKey(task.deadline) === todayKey;
+  });
+  return matches.length ? matches : plannerVisibleTasks().filter((task) => task.status !== "done").slice(0, 4);
+}
+
+function plannerUpcomingTasks(limit = 4) {
+  const now = Date.now();
+  return plannerVisibleTasks()
+    .filter((task) => task.status !== "done" && plannerDeadlineState(task, now).kind !== "none")
+    .sort((left, right) => (Date.parse(left.deadline || "") || 0) - (Date.parse(right.deadline || "") || 0))
+    .slice(0, limit);
+}
+
+function plannerTimelineTasks() {
+  const todayKey = plannerDayKey();
+  return plannerVisibleTasks()
+    .filter((task) => {
+      if (task.status === "done") return false;
+      return plannerDayKey(task.scheduledAt) === todayKey || plannerDayKey(task.deadline) === todayKey;
+    })
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.scheduledAt || left.deadline || "") || Number.MAX_SAFE_INTEGER;
+      const rightTime = Date.parse(right.scheduledAt || right.deadline || "") || Number.MAX_SAFE_INTEGER;
+      return leftTime - rightTime;
+    })
+    .slice(0, 6);
+}
+
+function plannerOverviewSnapshot(now = Date.now()) {
+  const total = plannerState.tasks.length;
+  const done = plannerState.tasks.filter((task) => task.status === "done").length;
+  const active = plannerState.tasks.filter((task) => task.status === "progress").length;
+  const dueSoon = plannerState.tasks.filter((task) => plannerDeadlineState(task, now).kind === "soon").length;
+  return {
+    total,
+    done,
+    active,
+    dueSoon,
+    completionRatio: total ? done / total : 0,
+  };
+}
+
+function ensurePlannerFloatingLayer() {
+  if (plannerFloatingLayer && document.body.contains(plannerFloatingLayer)) return plannerFloatingLayer;
+  plannerFloatingLayer = document.createElement("div");
+  plannerFloatingLayer.className = "planner-floating-layer";
+  document.body.appendChild(plannerFloatingLayer);
+  return plannerFloatingLayer;
+}
+
+function nextPlannerNotePosition() {
+  const openCount = plannerState.notes.filter((note) => note.isOpen).length;
+  const baseX = window.innerWidth <= 900 ? 16 : 96;
+  const baseY = window.innerWidth <= 900 ? 88 : 104;
+  const step = window.innerWidth <= 900 ? 18 : 28;
+  return {
+    x: Math.max(16, Math.min(window.innerWidth - 336, baseX + openCount * step)),
+    y: Math.max(72, Math.min(window.innerHeight - 220, baseY + openCount * step)),
+  };
+}
+
+function bringPlannerNoteToFront(noteId, persist = true) {
+  const note = getPlannerNoteById(noteId);
+  if (!note) return;
+  plannerState.noteZCounter = Math.max(1, Number(plannerState.noteZCounter) || 1) + 1;
+  note.z = plannerState.noteZCounter;
+  note.updatedAt = Date.now();
+  if (persist) persistPlannerState();
+}
+
+function stopPlannerTaskTimer(now = Date.now()) {
+  if (!plannerState.activeTaskId || !plannerState.activeTaskStartedAt) {
+    plannerState.activeTaskId = "";
+    plannerState.activeTaskStartedAt = null;
+    return;
+  }
+  const task = getPlannerTaskById(plannerState.activeTaskId);
+  if (task) {
+    task.trackedMs = getPlannerTaskTrackedMs(task, now);
+    task.updatedAt = now;
+  }
+  plannerState.activeTaskId = "";
+  plannerState.activeTaskStartedAt = null;
+}
+
+function togglePlannerTaskTimer(taskId) {
+  const target = getPlannerTaskById(taskId);
+  if (!target) return;
+  const now = Date.now();
+  if (plannerState.activeTaskId === target.id) {
+    stopPlannerTaskTimer(now);
+  } else {
+    stopPlannerTaskTimer(now);
+    plannerState.activeTaskId = target.id;
+    plannerState.activeTaskStartedAt = now;
+    target.status = target.status === "done" ? "progress" : target.status;
+    target.updatedAt = now;
+  }
+  persistPlannerState();
+  refreshHomeOverviewIfNeeded();
+}
+
+function resetPlannerFilters() {
+  plannerState.searchText = "";
+  plannerState.priorityFilter = "all";
+  plannerState.statusFilter = "all";
+  plannerState.deadlineFilter = "all";
+  plannerState.projectFilter = "all";
+  persistPlannerState();
 }
 
 function getStudyTimerPanel() {
@@ -2247,8 +2867,18 @@ function syncStudyTimerState(now) {
 function startStudyTimerTicker() {
   if (studyTimerTicker) window.clearInterval(studyTimerTicker);
   studyTimerTicker = window.setInterval(() => {
+    const now = Date.now();
     syncStudyTimerState();
-    refreshStudyTimerUi();
+    refreshStudyTimerUi(now);
+    const liveSecond = Math.floor(now / 1000);
+    if (plannerLiveSecond !== liveSecond) {
+      plannerLiveSecond = liveSecond;
+      syncDashboardStudyProgress(now);
+      if (isStudyNotesPopoverOpen() || document.body.classList.contains("planner-note-layer-open")) {
+        refreshPlannerLiveUi(now);
+      }
+      refreshHomeOverviewIfNeeded();
+    }
   }, 250);
 }
 
@@ -2563,7 +3193,674 @@ function createStudyTimerPanel() {
   return panel;
 }
 
-function createStudyNotesPanel() {
+function plannerPriorityLabel(priority) {
+  if (priority === "low") return localizeText("Thấp", "Low");
+  if (priority === "high") return localizeText("Cao", "High");
+  if (priority === "urgent") return localizeText("Gấp", "Urgent");
+  return localizeText("Vừa", "Medium");
+}
+
+function plannerStatusLabel(status) {
+  if (status === "progress") return localizeText("Đang làm", "In progress");
+  if (status === "done") return localizeText("Hoàn thành", "Done");
+  return "Todo";
+}
+
+function plannerTaskBadgeHtml(task, now = Date.now()) {
+  const deadline = plannerDeadlineState(task, now);
+  const tracked = formatPlannerTrackedMs(getPlannerTaskTrackedMs(task, now));
+  const estimate = formatPlannerDurationMinutes(task.estimateMinutes);
+  return (
+    '<div class="planner-task-meta">' +
+    '<span class="planner-pill" data-tone="' + escapeHtml(task.priority) + '">' +
+    escapeHtml(plannerPriorityLabel(task.priority)) +
+    "</span>" +
+    (task.project
+      ? '<span class="planner-pill subtle">' + escapeHtml(task.project) + "</span>"
+      : "") +
+    (task.tag
+      ? '<span class="planner-pill subtle">' + escapeHtml(task.tag) + "</span>"
+      : "") +
+    "</div>" +
+    '<div class="planner-task-stats">' +
+    '<span data-planner-task-deadline="' + escapeHtml(task.id) + '">' + escapeHtml(deadline.copy) + "</span>" +
+    '<span data-planner-task-tracked="' + escapeHtml(task.id) + '">' +
+    escapeHtml(localizeText("Đã track ", "Tracked ") + tracked) +
+    "</span>" +
+    '<span>' + escapeHtml(localizeText("Ước tính ", "Estimate ") + estimate) + "</span>" +
+    "</div>"
+  );
+}
+
+function plannerTaskCardHtml(task, viewMode) {
+  const now = Date.now();
+  const progress = Math.round(getPlannerTaskProgressRatio(task, now) * 100);
+  const deadline = plannerDeadlineState(task, now);
+  return (
+    '<article class="planner-task-card' +
+    (deadline.kind === "overdue" ? " is-overdue" : deadline.kind === "soon" ? " is-due-soon" : "") +
+    '" draggable="true" data-planner-task-drag="' + escapeHtml(task.id) + '">' +
+    '<div class="planner-task-card-head">' +
+    '<button type="button" class="planner-task-check' + (task.status === "done" ? " is-done" : "") +
+    '" data-planner-task-toggle="' + escapeHtml(task.id) + '" aria-pressed="' +
+    String(task.status === "done") +
+    '">' +
+    '<span aria-hidden="true"></span></button>' +
+    '<div class="planner-task-card-copy">' +
+    '<strong>' + escapeHtml(task.title) + "</strong>" +
+    (task.description ? '<p>' + escapeHtml(task.description) + "</p>" : "") +
+    "</div>" +
+    "</div>" +
+    plannerTaskBadgeHtml(task, now) +
+    '<div class="planner-task-progress"><span style="width:' + String(progress) +
+    '%" data-planner-task-progress="' + escapeHtml(task.id) + '"></span></div>' +
+    '<div class="planner-task-actions">' +
+    '<button type="button" class="planner-mini-btn" data-planner-task-track="' + escapeHtml(task.id) + '">' +
+    escapeHtml(plannerState.activeTaskId === task.id ? localizeText("Dừng", "Stop") : localizeText("Track", "Track")) +
+    "</button>" +
+    '<button type="button" class="planner-mini-btn" data-planner-task-select="' + escapeHtml(task.id) + '">' +
+    escapeHtml(viewMode === "list" ? localizeText("Sửa", "Edit") : localizeText("Chi tiết", "Details")) +
+    "</button>" +
+    '<button type="button" class="planner-mini-btn danger" data-planner-task-remove="' + escapeHtml(task.id) + '">' +
+    escapeHtml(localizeText("Xóa", "Delete")) +
+    "</button>" +
+    "</div>" +
+    "</article>"
+  );
+}
+
+function plannerBoardHtml(tasks) {
+  return PLANNER_STATUS_OPTIONS.map((status) => {
+    const items = tasks.filter((task) => task.status === status);
+    return (
+      '<section class="planner-board-column" data-planner-drop-zone="' + escapeHtml(status) + '">' +
+      '<div class="planner-board-head"><strong>' + escapeHtml(plannerStatusLabel(status)) + "</strong><span>" +
+      String(items.length) +
+      "</span></div>" +
+      '<div class="planner-board-list">' +
+      (items.length
+        ? items.map((task) => plannerTaskCardHtml(task, "board")).join("")
+        : '<div class="planner-empty-mini">' +
+          escapeHtml(localizeText("Kéo task vào đây", "Drop tasks here")) +
+          "</div>") +
+      "</div></section>"
+    );
+  }).join("");
+}
+
+function plannerListHtml(tasks) {
+  if (!tasks.length) {
+    return (
+      '<div class="planner-empty-block">' +
+      '<strong>' + escapeHtml(localizeText("Chưa có task phù hợp", "No matching tasks")) + "</strong>" +
+      '<span>' +
+      escapeHtml(localizeText("Thử đổi filter hoặc tạo nhanh một task mới từ ô Quick Add.", "Try changing the filters or create a new task from Quick Add.")) +
+      "</span></div>"
+    );
+  }
+  return '<div class="planner-task-list">' + tasks.map((task) => plannerTaskCardHtml(task, "list")).join("") + "</div>";
+}
+
+function plannerTimelineHtml() {
+  const items = plannerTimelineTasks();
+  return (
+    '<section class="planner-panel timeline">' +
+    '<div class="planner-panel-head"><strong>' + escapeHtml(localizeText("Timeline hôm nay", "Today timeline")) +
+    "</strong><span>" + escapeHtml(localizeText("Theo giờ", "By hour")) + "</span></div>" +
+    '<div class="planner-timeline">' +
+    (items.length
+      ? items.map((task) => {
+          const stamp = task.scheduledAt || task.deadline;
+          return (
+            '<div class="planner-timeline-item">' +
+            '<div class="planner-timeline-time">' + escapeHtml(plannerDateTimeLabel(stamp)) + "</div>" +
+            '<div class="planner-timeline-card">' +
+            '<strong>' + escapeHtml(task.title) + "</strong>" +
+            '<span>' + escapeHtml(task.project || plannerStatusLabel(task.status)) + "</span>" +
+            "</div></div>"
+          );
+        }).join("")
+      : '<div class="planner-empty-mini">' +
+        escapeHtml(localizeText("Chưa có mốc giờ nào cho hôm nay.", "No scheduled slots for today yet.")) +
+        "</div>") +
+    "</div></section>"
+  );
+}
+
+function plannerUpcomingHtml() {
+  const items = plannerUpcomingTasks(4);
+  return (
+    '<section class="planner-panel due">' +
+    '<div class="planner-panel-head"><strong>' + escapeHtml(localizeText("Sắp đến hạn", "Due soon")) +
+    "</strong><span>" + escapeHtml(localizeText("Ưu tiên", "Priority")) + "</span></div>" +
+    '<div class="planner-due-list">' +
+    (items.length
+      ? items.map((task) => {
+          const deadline = plannerDeadlineState(task);
+          return (
+            '<button type="button" class="planner-due-item" data-planner-task-select="' + escapeHtml(task.id) + '">' +
+            '<strong>' + escapeHtml(task.title) + "</strong>" +
+            '<span>' + escapeHtml(deadline.copy) + "</span></button>"
+          );
+        }).join("")
+      : '<div class="planner-empty-mini">' +
+        escapeHtml(localizeText("Không có task sát deadline.", "Nothing urgent is coming up.")) +
+        "</div>") +
+    "</div></section>"
+  );
+}
+
+function plannerNotesLibraryHtml() {
+  return (
+    '<section class="planner-panel notes">' +
+    '<div class="planner-panel-head"><strong>' + escapeHtml(localizeText("Sticky notes", "Sticky notes")) +
+    "</strong><button type=\"button\" class=\"planner-mini-btn\" data-planner-note-new=\"true\">" +
+    escapeHtml(localizeText("Tạo note", "New note")) +
+    "</button></div>" +
+    '<div class="planner-note-library">' +
+    (plannerState.notes.length
+      ? plannerState.notes
+          .slice()
+          .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
+          .map((note) => {
+            return (
+              '<article class="planner-note-library-card" data-color="' + escapeHtml(note.color) + '">' +
+              '<div class="planner-note-library-head"><strong>' + escapeHtml(note.title) + "</strong>" +
+              (note.pinned ? '<span class="planner-pill subtle">' + escapeHtml(localizeText("Ghim", "Pinned")) + "</span>" : "") +
+              "</div>" +
+              '<p>' + escapeHtml(note.content || localizeText("Note trống, bấm Open để bắt đầu viết.", "Empty note, open it to start writing.")) + "</p>" +
+              '<div class="planner-note-library-actions">' +
+              '<button type="button" class="planner-mini-btn" data-planner-note-open="' + escapeHtml(note.id) + '">' +
+              escapeHtml(note.isOpen ? localizeText("Đang mở", "Open now") : localizeText("Mở", "Open")) +
+              "</button>" +
+              '<button type="button" class="planner-mini-btn" data-planner-note-pin="' + escapeHtml(note.id) + '">' +
+              escapeHtml(note.pinned ? localizeText("Bỏ ghim", "Unpin") : localizeText("Ghim", "Pin")) +
+              "</button>" +
+              '<button type="button" class="planner-mini-btn" data-planner-note-convert="' + escapeHtml(note.id) + '">' +
+              escapeHtml(localizeText("Ra task", "To task")) +
+              "</button>" +
+              '<button type="button" class="planner-mini-btn danger" data-planner-note-delete="' + escapeHtml(note.id) + '">' +
+              escapeHtml(localizeText("Xóa", "Delete")) +
+              "</button>" +
+              "</div></article>"
+            );
+          }).join("")
+      : '<div class="planner-empty-block compact">' +
+        '<strong>' + escapeHtml(localizeText("Chưa có sticky note", "No sticky notes yet")) + "</strong>" +
+        '<span>' + escapeHtml(localizeText("Tạo note để mở nhiều cửa sổ ghi chú kéo-thả trên màn hình.", "Create a note to open draggable sticky windows on the screen.")) + "</span></div>") +
+    "</div></section>"
+  );
+}
+
+function plannerTaskFormHtml() {
+  const selected = getPlannerTaskById(plannerState.selectedTaskId);
+  return (
+    '<section class="planner-panel editor">' +
+    '<div class="planner-panel-head"><strong>' + escapeHtml(selected ? localizeText("Chi tiết task", "Task details") : localizeText("Tạo task", "Create task")) +
+    "</strong><button type=\"button\" class=\"planner-mini-btn\" data-planner-task-reset=\"true\">" +
+    escapeHtml(localizeText("Task mới", "New task")) +
+    "</button></div>" +
+    '<form class="planner-task-form" data-planner-task-form="true">' +
+    '<input type="hidden" name="taskId" value="' + escapeHtml(selected ? selected.id : "") + '">' +
+    '<label><span>' + escapeHtml(localizeText("Tên công việc", "Task name")) +
+    '</span><input class="settings-text-input" name="title" maxlength="120" value="' + escapeHtml(selected ? selected.title : "") +
+    '" placeholder="' + escapeHtml(localizeText("Ví dụ: soạn báo cáo sprint", "Example: draft sprint report")) + '"></label>' +
+    '<label><span>' + escapeHtml(localizeText("Mô tả ngắn", "Short description")) +
+    '</span><textarea class="settings-textarea-input" name="description" rows="3" maxlength="600" placeholder="' +
+    escapeHtml(localizeText("Thêm ngữ cảnh, checklist hoặc link tham chiếu...", "Add context, checklist, or reference links...")) +
+    '">' + escapeHtml(selected ? selected.description : "") + '</textarea></label>' +
+    '<div class="planner-task-grid">' +
+    '<label><span>Deadline</span><input class="settings-text-input" type="datetime-local" name="deadline" value="' +
+    escapeHtml(selected ? selected.deadline : "") + '"></label>' +
+    '<label><span>' + escapeHtml(localizeText("Lên lịch", "Schedule")) + '</span><input class="settings-text-input" type="datetime-local" name="scheduledAt" value="' +
+    escapeHtml(selected ? selected.scheduledAt : "") + '"></label>' +
+    '<label><span>Priority</span><select class="settings-select-input" name="priority">' +
+    PLANNER_PRIORITY_OPTIONS.map((priority) =>
+      '<option value="' + priority + '"' + ((selected ? selected.priority : "medium") === priority ? " selected" : "") + ">" +
+      escapeHtml(plannerPriorityLabel(priority)) + "</option>"
+    ).join("") + '</select></label>' +
+    '<label><span>Status</span><select class="settings-select-input" name="status">' +
+    PLANNER_STATUS_OPTIONS.map((status) =>
+      '<option value="' + status + '"' + ((selected ? selected.status : "todo") === status ? " selected" : "") + ">" +
+      escapeHtml(plannerStatusLabel(status)) + "</option>"
+    ).join("") + '</select></label>' +
+    '<label><span>Project</span><input class="settings-text-input" name="project" maxlength="64" value="' +
+    escapeHtml(selected ? selected.project : "") + '" placeholder="' +
+    escapeHtml(localizeText("Ví dụ: Marketing", "Example: Marketing")) + '"></label>' +
+    '<label><span>Tag</span><input class="settings-text-input" name="tag" maxlength="48" value="' +
+    escapeHtml(selected ? selected.tag : "") + '" placeholder="' +
+    escapeHtml(localizeText("Ví dụ: nội bộ", "Example: internal")) + '"></label>' +
+    '<label><span>' + escapeHtml(localizeText("Ước tính (phút)", "Estimate (minutes)")) +
+    '</span><input class="settings-text-input" type="number" min="0" max="720" step="5" name="estimateMinutes" value="' +
+    escapeHtml(String(selected ? selected.estimateMinutes : 30)) + '"></label>' +
+    '<div class="planner-live-card"><span>' + escapeHtml(localizeText("Đã track", "Tracked")) + '</span><strong data-planner-task-tracked="' +
+    escapeHtml(selected ? selected.id : "") + '">' + escapeHtml(selected ? localizeText("Đã track ", "Tracked ") + formatPlannerTrackedMs(getPlannerTaskTrackedMs(selected)) : localizeText("Chưa có", "No data")) +
+    "</strong></div></div>" +
+    '<div class="planner-form-actions">' +
+    '<button type="submit" class="btn">' + escapeHtml(selected ? localizeText("Lưu task", "Save task") : localizeText("Tạo task", "Create task")) + "</button>" +
+    '<button type="button" class="btn secondary" data-planner-task-reset="true">' + escapeHtml(localizeText("Reset", "Reset")) + "</button>" +
+    "</div></form></section>"
+  );
+}
+
+function plannerWorkspaceHtml() {
+  const visibleTasks = plannerVisibleTasks();
+  return (
+    '<div class="planner-workspace-grid">' +
+    '<section class="planner-main-panel">' +
+    '<div class="planner-view-surface">' +
+    (plannerState.viewMode === "list" ? plannerListHtml(visibleTasks) : '<div class="planner-board">' + plannerBoardHtml(visibleTasks) + "</div>") +
+    "</div></section>" +
+    '<aside class="planner-side-panel">' + plannerTaskFormHtml() + plannerNotesLibraryHtml() + "</aside>" +
+    "</div>"
+  );
+}
+
+function plannerOverviewHtml() {
+  const snapshot = plannerOverviewSnapshot();
+  return (
+    '<div class="planner-overview-grid">' +
+    '<section class="planner-panel stats">' +
+    '<div class="planner-stat-card"><span>' + escapeHtml(localizeText("Tiến độ", "Progress")) + "</span><strong>" +
+    String(Math.round(snapshot.completionRatio * 100)) + '%</strong><small>' +
+    escapeHtml(localizeText(snapshot.done + " / " + snapshot.total + " task xong", snapshot.done + " / " + snapshot.total + " tasks done")) +
+    "</small></div>" +
+    '<div class="planner-stat-card"><span>' + escapeHtml(localizeText("Hôm nay", "Today")) + "</span><strong>" +
+    String(plannerTodayTasks().length) + "</strong><small>" +
+    escapeHtml(localizeText("task cần xử lý", "tasks in focus")) + "</small></div>" +
+    '<div class="planner-stat-card"><span>' + escapeHtml(localizeText("Sắp tới hạn", "Due soon")) + "</span><strong>" +
+    String(snapshot.dueSoon) + "</strong><small>" +
+    escapeHtml(localizeText("cần ưu tiên", "need attention")) + "</small></div>" +
+    '<div class="planner-stat-card"><span>' + escapeHtml(localizeText("Đang chạy", "Active")) + "</span><strong>" +
+    String(snapshot.active) + "</strong><small>" +
+    escapeHtml(localizeText("task đang làm", "tasks in progress")) + "</small></div>" +
+    "</section>" +
+    '<section class="planner-panel quick-note">' +
+    '<div class="planner-panel-head"><strong>' + escapeHtml(localizeText("Ghi chú nhanh", "Quick note")) + "</strong><span>" +
+    escapeHtml(localizeText("Auto save", "Autosave")) + "</span></div>" +
+    '<textarea class="planner-quick-note-input" data-planner-quick-note="true" rows="5" maxlength="1200" placeholder="' +
+    escapeHtml(localizeText("Ghi ý tưởng, việc vụn hoặc mốc cần nhớ cho hôm nay...", "Drop ideas, loose thoughts, or key checkpoints for today...")) +
+    '">' + escapeHtml(plannerState.quickNote) + "</textarea></section>" +
+    plannerUpcomingHtml() +
+    plannerTimelineHtml() +
+    "</div>"
+  );
+}
+
+function plannerStudioMarkup() {
+  return (
+    '<section class="planner-studio" data-planner-studio="true">' +
+    '<section class="planner-hero">' +
+    '<div class="planner-hero-copy"><div class="eyebrow">Flow Desk</div><h3>' +
+    escapeHtml(localizeText("Notes, task và timeline trong một khối", "Notes, tasks, and timeline in one block")) +
+    '</h3><p>' +
+    escapeHtml(localizeText(
+      "Một khu planner tách biệt hoàn toàn khỏi chat: quick add, Kanban, list view và sticky note nổi nhiều lớp như một bàn làm việc số.",
+      "A planner block isolated from chat: quick add, Kanban, list view, and layered sticky notes like a digital desk.",
+    )) +
+    '</p></div>' +
+    '<div class="planner-hero-actions">' +
+    '<form class="planner-quick-add-form" data-planner-quick-add-form="true">' +
+    '<input class="settings-text-input planner-quick-add-input" name="quickAdd" maxlength="160" placeholder="' +
+    escapeHtml(localizeText("Quick Add: nhập tiêu đề rồi chọn Task hoặc Note", "Quick Add: type a title then choose Task or Note")) +
+    '">' +
+    '<div class="planner-quick-add-actions">' +
+    '<button type="submit" class="btn" data-planner-quick-submit="task">' + escapeHtml(localizeText("Task", "Task")) + "</button>" +
+    '<button type="submit" class="btn secondary" data-planner-quick-submit="note">' + escapeHtml(localizeText("Note", "Note")) + "</button>" +
+    "</div></form>" +
+    '<button type="button" class="planner-note-launch-btn" data-planner-note-new="true">' +
+    escapeHtml(localizeText("New Note", "New Note")) +
+    "</button></div></section>" +
+    plannerOverviewHtml() +
+    '<section class="planner-toolbar">' +
+    '<label class="preview-search planner-search">' +
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="5.5"></circle><path d="M16 16l4 4"></path></svg>' +
+    '<input type="search" data-planner-search="true" placeholder="' + escapeHtml(localizeText("Search task, tag, project...", "Search tasks, tags, projects...")) +
+    '" value="' + escapeHtml(plannerState.searchText) + '"></label>' +
+    '<select class="settings-select-input" data-planner-filter="priority">' +
+    '<option value="all">' + escapeHtml(localizeText("Mọi priority", "All priorities")) + "</option>" +
+    PLANNER_PRIORITY_OPTIONS.map((priority) =>
+      '<option value="' + priority + '"' + (plannerState.priorityFilter === priority ? " selected" : "") + ">" +
+      escapeHtml(plannerPriorityLabel(priority)) + "</option>"
+    ).join("") + '</select>' +
+    '<select class="settings-select-input" data-planner-filter="status">' +
+    '<option value="all">' + escapeHtml(localizeText("Mọi status", "All statuses")) + "</option>" +
+    PLANNER_STATUS_OPTIONS.map((status) =>
+      '<option value="' + status + '"' + (plannerState.statusFilter === status ? " selected" : "") + ">" +
+      escapeHtml(plannerStatusLabel(status)) + "</option>"
+    ).join("") + '</select>' +
+    '<select class="settings-select-input" data-planner-filter="deadline">' +
+    '<option value="all">' + escapeHtml(localizeText("Mọi deadline", "All deadlines")) + '</option>' +
+    '<option value="today"' + (plannerState.deadlineFilter === "today" ? " selected" : "") + '>' + escapeHtml(localizeText("Hôm nay", "Today")) + '</option>' +
+    '<option value="upcoming"' + (plannerState.deadlineFilter === "upcoming" ? " selected" : "") + '>' + escapeHtml(localizeText("Sắp tới", "Upcoming")) + '</option>' +
+    '<option value="overdue"' + (plannerState.deadlineFilter === "overdue" ? " selected" : "") + '>' + escapeHtml(localizeText("Quá hạn", "Overdue")) + '</option>' +
+    '</select>' +
+    '<select class="settings-select-input" data-planner-filter="project">' +
+    '<option value="all">' + escapeHtml(localizeText("Mọi project", "All projects")) + "</option>" +
+    plannerProjectOptions().map((project) =>
+      '<option value="' + escapeHtml(project) + '"' + (plannerState.projectFilter === project ? " selected" : "") + ">" +
+      escapeHtml(project) + "</option>"
+    ).join("") + '</select>' +
+    '<div class="planner-view-toggle">' +
+    '<button type="button" class="' + (plannerState.viewMode === "board" ? "active" : "") + '" data-planner-view="board">Board</button>' +
+    '<button type="button" class="' + (plannerState.viewMode === "list" ? "active" : "") + '" data-planner-view="list">List</button>' +
+    "</div>" +
+    '<button type="button" class="planner-mini-btn" data-planner-filter-reset="true">' + escapeHtml(localizeText("Reset filter", "Reset filters")) + "</button>" +
+    "</section>" +
+    plannerWorkspaceHtml() +
+    "</section>"
+  );
+}
+
+function refreshPlannerStudioUi(panel = getPlannerStudioPanel()) {
+  if (!panel) return;
+  panel.innerHTML = plannerStudioMarkup();
+  refreshPlannerLiveUi();
+}
+
+function renderPlannerFloatingNotes() {
+  const layer = ensurePlannerFloatingLayer();
+  const openNotes = plannerState.notes
+    .filter((note) => note.isOpen)
+    .sort((left, right) => Number(left.z || 0) - Number(right.z || 0));
+  layer.innerHTML = openNotes
+    .map((note) => {
+      return (
+        '<article class="planner-note-window' + (note.minimized ? " is-minimized" : "") +
+        '" data-planner-note-window="' + escapeHtml(note.id) + '" data-color="' + escapeHtml(note.color) +
+        '" style="left:' + String(note.x) + "px;top:" + String(note.y) + "px;z-index:" + String(note.z) + ';">' +
+        '<header class="planner-note-window-head" data-planner-note-drag="' + escapeHtml(note.id) + '">' +
+        '<div class="planner-note-window-kicker"><span></span>' + escapeHtml(note.pinned ? localizeText("Ghim", "Pinned") : localizeText("Sticky note", "Sticky note")) + "</div>" +
+        '<div class="planner-note-window-actions">' +
+        '<button type="button" data-planner-note-pin="' + escapeHtml(note.id) + '">' + escapeHtml(note.pinned ? "•" : "○") + "</button>" +
+        '<button type="button" data-planner-note-minimize="' + escapeHtml(note.id) + '">' + escapeHtml(note.minimized ? "+" : "–") + "</button>" +
+        '<button type="button" data-planner-note-close="' + escapeHtml(note.id) + '">×</button>' +
+        "</div></header>" +
+        '<div class="planner-note-window-body">' +
+        '<input class="planner-note-title-input" data-planner-note-title="' + escapeHtml(note.id) + '" maxlength="80" value="' + escapeHtml(note.title) + '">' +
+        '<textarea class="planner-note-body-input" data-planner-note-content="' + escapeHtml(note.id) + '" rows="8" maxlength="5000" placeholder="' +
+        escapeHtml(localizeText("Viết note, checklist hoặc ý tưởng ở đây...", "Write notes, checklists, or ideas here...")) +
+        '">' + escapeHtml(note.content) + '</textarea>' +
+        '<div class="planner-note-palette">' +
+        PLANNER_NOTE_COLOR_OPTIONS.map((color) =>
+          '<button type="button" class="' + (note.color === color ? "active" : "") +
+          '" data-planner-note-color="' + escapeHtml(note.id) + '" data-color-value="' + escapeHtml(color) + '"></button>'
+        ).join("") +
+        "</div></div></article>"
+      );
+    })
+    .join("");
+  document.body.classList.toggle("planner-note-layer-open", Boolean(openNotes.length));
+}
+
+function refreshPlannerLiveUi(now = Date.now()) {
+  document.querySelectorAll("[data-planner-task-deadline]").forEach((node) => {
+    const task = getPlannerTaskById(node.getAttribute("data-planner-task-deadline"));
+    if (!task) return;
+    node.textContent = plannerDeadlineState(task, now).copy;
+  });
+  document.querySelectorAll("[data-planner-task-tracked]").forEach((node) => {
+    const task = getPlannerTaskById(node.getAttribute("data-planner-task-tracked"));
+    if (!task) {
+      node.textContent = localizeText("Chưa có", "No data");
+      return;
+    }
+    node.textContent = localizeText("Đã track ", "Tracked ") + formatPlannerTrackedMs(getPlannerTaskTrackedMs(task, now));
+  });
+  document.querySelectorAll("[data-planner-task-progress]").forEach((node) => {
+    const task = getPlannerTaskById(node.getAttribute("data-planner-task-progress"));
+    if (!task) return;
+    node.style.width = String(Math.round(getPlannerTaskProgressRatio(task, now) * 100)) + "%";
+  });
+}
+
+function openPlannerNoteWindow(noteId) {
+  const note = getPlannerNoteById(noteId);
+  if (!note) return;
+  note.isOpen = true;
+  note.minimized = false;
+  if (!Number.isFinite(note.x) || !Number.isFinite(note.y) || (!note.x && !note.y)) {
+    const next = nextPlannerNotePosition();
+    note.x = next.x;
+    note.y = next.y;
+  }
+  bringPlannerNoteToFront(noteId, false);
+  note.updatedAt = Date.now();
+  persistPlannerState();
+  renderPlannerFloatingNotes();
+  refreshPlannerStudioUi();
+}
+
+function closePlannerNoteWindow(noteId) {
+  const note = getPlannerNoteById(noteId);
+  if (!note) return;
+  note.isOpen = false;
+  note.updatedAt = Date.now();
+  persistPlannerState();
+  renderPlannerFloatingNotes();
+  refreshPlannerStudioUi();
+}
+
+function togglePlannerNotePinned(noteId) {
+  const note = getPlannerNoteById(noteId);
+  if (!note) return;
+  note.pinned = !note.pinned;
+  note.updatedAt = Date.now();
+  persistPlannerState();
+  renderPlannerFloatingNotes();
+  refreshPlannerStudioUi();
+  refreshHomeOverviewIfNeeded();
+}
+
+function togglePlannerNoteMinimized(noteId) {
+  const note = getPlannerNoteById(noteId);
+  if (!note) return;
+  note.minimized = !note.minimized;
+  note.updatedAt = Date.now();
+  persistPlannerState();
+  renderPlannerFloatingNotes();
+  refreshPlannerStudioUi();
+}
+
+function deletePlannerNote(noteId) {
+  plannerState.notes = plannerState.notes.filter((note) => note.id !== String(noteId || ""));
+  persistPlannerState();
+  renderPlannerFloatingNotes();
+  refreshPlannerStudioUi();
+  refreshHomeOverviewIfNeeded();
+}
+
+function convertPlannerNoteToTask(noteId) {
+  const note = getPlannerNoteById(noteId);
+  if (!note) return false;
+  const task = createPlannerTask({
+    title: normalizePlannerSingleLine(note.title, 120) || localizeText("Task từ note", "Task from note"),
+    description: note.content,
+    project: activeChannel.type === "group" ? normalizePlannerSingleLine(activeChannel.name, 64) : "",
+    tag: localizeText("From note", "From note"),
+    priority: note.pinned ? "high" : "medium",
+    status: "todo",
+    estimateMinutes: 30,
+  });
+  plannerState.tasks.unshift(task);
+  plannerState.selectedTaskId = task.id;
+  note.updatedAt = Date.now();
+  persistPlannerState();
+  refreshPlannerStudioUi();
+  refreshHomeOverviewIfNeeded();
+  return true;
+}
+
+function createPlannerStickyNote(seedTitle, seedContent) {
+  const nextPosition = nextPlannerNotePosition();
+  plannerState.noteZCounter = Math.max(1, Number(plannerState.noteZCounter) || 1) + 1;
+  plannerState.notes.unshift(
+    createPlannerNote({
+      title: seedTitle,
+      content: seedContent,
+      color: PLANNER_NOTE_COLOR_OPTIONS[plannerState.notes.length % PLANNER_NOTE_COLOR_OPTIONS.length],
+      isOpen: true,
+      minimized: false,
+      x: nextPosition.x,
+      y: nextPosition.y,
+      z: plannerState.noteZCounter,
+      updatedAt: Date.now(),
+    }),
+  );
+  persistPlannerState();
+  renderPlannerFloatingNotes();
+  refreshPlannerStudioUi();
+  refreshHomeOverviewIfNeeded();
+}
+
+function updatePlannerNoteField(noteId, field, value) {
+  const note = getPlannerNoteById(noteId);
+  if (!note) return;
+  if (field === "title") {
+    note.title = normalizePlannerSingleLine(value, 80) || localizeText("Ghi chú mới", "New note");
+  } else if (field === "content") {
+    note.content = normalizePlannerTextBlock(value, 5000);
+  } else if (field === "color") {
+    note.color = normalizePlannerNoteColor(value);
+  }
+  note.updatedAt = Date.now();
+  persistPlannerState();
+  if (isStudyNotesPopoverOpen()) {
+    refreshPlannerStudioUi();
+  }
+}
+
+function selectPlannerTask(taskId) {
+  plannerState.selectedTaskId = String(taskId || "");
+  persistPlannerState();
+  refreshPlannerStudioUi();
+}
+
+function resetPlannerTaskSelection() {
+  plannerState.selectedTaskId = "";
+  persistPlannerState();
+  refreshPlannerStudioUi();
+}
+
+function upsertPlannerTask(payload) {
+  const normalized = createPlannerTask(payload);
+  if (!normalized.title) return false;
+  const existing = getPlannerTaskById(payload.taskId || payload.id);
+  if (existing) {
+    Object.assign(existing, normalized, {
+      id: existing.id,
+      createdAt: existing.createdAt,
+      trackedMs: existing.trackedMs,
+      updatedAt: Date.now(),
+    });
+    plannerState.selectedTaskId = existing.id;
+  } else {
+    normalized.updatedAt = Date.now();
+    plannerState.tasks.unshift(normalized);
+    plannerState.selectedTaskId = normalized.id;
+  }
+  persistPlannerState();
+  refreshPlannerStudioUi();
+  refreshHomeOverviewIfNeeded();
+  return true;
+}
+
+function setPlannerTaskStatus(taskId, status) {
+  const task = getPlannerTaskById(taskId);
+  if (!task) return;
+  task.status = normalizePlannerStatus(status);
+  task.updatedAt = Date.now();
+  if (task.status === "done" && plannerState.activeTaskId === task.id) {
+    stopPlannerTaskTimer(Date.now());
+  }
+  persistPlannerState();
+  refreshPlannerStudioUi();
+  refreshHomeOverviewIfNeeded();
+}
+
+function togglePlannerTaskDone(taskId) {
+  const task = getPlannerTaskById(taskId);
+  if (!task) return;
+  setPlannerTaskStatus(task.id, task.status === "done" ? "todo" : "done");
+}
+
+function removePlannerTask(taskId) {
+  const targetId = String(taskId || "");
+  if (plannerState.activeTaskId === targetId) {
+    stopPlannerTaskTimer(Date.now());
+  }
+  plannerState.tasks = plannerState.tasks.filter((task) => task.id !== targetId);
+  if (plannerState.selectedTaskId === targetId) {
+    plannerState.selectedTaskId = "";
+  }
+  persistPlannerState();
+  refreshPlannerStudioUi();
+  refreshHomeOverviewIfNeeded();
+}
+
+function quickAddPlannerItem(kind, rawValue) {
+  const text = normalizePlannerSingleLine(rawValue, 160);
+  if (!text) return false;
+  if (kind === "note") {
+    createPlannerStickyNote(text, "");
+    return true;
+  }
+  plannerState.tasks.unshift(
+    createPlannerTask({
+      title: text,
+      description: "",
+      priority: "medium",
+      status: "todo",
+      tag: localizeText("Quick add", "Quick add"),
+      project: "",
+      estimateMinutes: 30,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }),
+  );
+  plannerState.selectedTaskId = plannerState.tasks[0].id;
+  persistPlannerState();
+  refreshPlannerStudioUi();
+  return true;
+}
+
+function startPlannerNoteDrag(noteId, clientX, clientY) {
+  const note = getPlannerNoteById(noteId);
+  if (!note) return;
+  bringPlannerNoteToFront(noteId, false);
+  plannerNoteDragState = {
+    noteId,
+    offsetX: clientX - Number(note.x || 0),
+    offsetY: clientY - Number(note.y || 0),
+  };
+  document.body.classList.add("planner-note-dragging");
+  renderPlannerFloatingNotes();
+}
+
+function updatePlannerNoteDrag(clientX, clientY) {
+  if (!plannerNoteDragState) return;
+  const note = getPlannerNoteById(plannerNoteDragState.noteId);
+  if (!note) return;
+  note.x = Math.max(12, Math.min(window.innerWidth - 332, clientX - plannerNoteDragState.offsetX));
+  note.y = Math.max(60, Math.min(window.innerHeight - 120, clientY - plannerNoteDragState.offsetY));
+  note.updatedAt = Date.now();
+  const node = ensurePlannerFloatingLayer().querySelector(
+    '[data-planner-note-window="' + note.id + '"]',
+  );
+  if (node) {
+    node.style.left = String(note.x) + "px";
+    node.style.top = String(note.y) + "px";
+  }
+}
+
+function stopPlannerNoteDrag() {
+  if (!plannerNoteDragState) return;
+  plannerNoteDragState = null;
+  document.body.classList.remove("planner-note-dragging");
+  persistPlannerState();
+}
+
+function createLegacyStudyNotesPanel() {
   const panel = document.createElement("section");
   panel.className = "study-notes-panel";
   panel.dataset.studyNotebookPanel = "true";
@@ -2582,6 +3879,16 @@ function createStudyNotesPanel() {
 
   panel.append(intro, createStudyNotebookSection());
   refreshStudyNotebookUi(panel);
+  return panel;
+}
+
+function createStudyNotesPanel() {
+  const panel = document.createElement("section");
+  panel.className = "study-notes-panel";
+  panel.dataset.studyNotebookPanel = "true";
+  panel.dataset.plannerStudio = "true";
+  refreshPlannerStudioUi(panel);
+  renderPlannerFloatingNotes();
   return panel;
 }
 
@@ -2823,9 +4130,10 @@ function setStudyNotesPopoverOpen(nextOpen) {
   if (nextOpen) {
     requestAnimationFrame(() => {
       positionStudyNotesPopover();
-      refreshStudyNotebookUi();
-      const noteInput = el.studyNotesPopover.querySelector("[data-study-note-input]");
-      if (noteInput) noteInput.focus();
+      refreshPlannerStudioUi();
+      renderPlannerFloatingNotes();
+      const quickAddInput = el.studyNotesPopover.querySelector(".planner-quick-add-input");
+      if (quickAddInput) quickAddInput.focus();
     });
   }
 }
@@ -2986,17 +4294,422 @@ function clearMessages(title, copy, kicker) {
     "</div></div>";
 }
 
-function renderHomeOverview() {
-  clearMessages(
-    "Select a conversation",
-    "Choose a friend or study group from the inbox to start chatting.",
-    "Inbox",
+function formatDashboardDuration(ms) {
+  return formatPlannerTrackedMs(Math.max(0, Number(ms) || 0));
+}
+
+function homeTodayTasksSnapshot() {
+  const todayKey = plannerDayKey();
+  let tasks = plannerState.tasks.filter((task) =>
+    plannerDayKey(task.scheduledAt) === todayKey || plannerDayKey(task.deadline) === todayKey
   );
-  el.messagesArea.scrollTop = 0;
+  if (!tasks.length) {
+    tasks = plannerState.tasks
+      .slice()
+      .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0));
+  }
+  const ordered = tasks
+    .slice()
+    .sort((left, right) => {
+      if ((left.status === "done") !== (right.status === "done")) {
+        return left.status === "done" ? 1 : -1;
+      }
+      const leftTime = Date.parse(left.deadline || left.scheduledAt || "") || Number.MAX_SAFE_INTEGER;
+      const rightTime = Date.parse(right.deadline || right.scheduledAt || "") || Number.MAX_SAFE_INTEGER;
+      return leftTime - rightTime;
+    })
+    .slice(0, 5);
+  return {
+    tasks: ordered,
+    total: tasks.length,
+    done: tasks.filter((task) => task.status === "done").length,
+  };
+}
+
+function homeContinueLearningItems() {
+  const items = [];
+  plannerState.tasks
+    .filter((task) => task.status !== "done")
+    .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
+    .slice(0, 2)
+    .forEach((task) => {
+      items.push({
+        kind: "task",
+        value: task.id,
+        kicker: localizeText("Study plan", "Study plan"),
+        title: task.project || task.title,
+        meta: task.project && task.project !== task.title ? task.title : (task.tag || plannerStatusLabel(task.status)),
+        detail: task.deadline ? plannerDeadlineState(task).copy : localizeText("Continue from your planner", "Continue from your planner"),
+      });
+    });
+
+  groups.slice(0, Math.max(0, 3 - items.length)).forEach((group) => {
+    items.push({
+      kind: "group",
+      value: group.id,
+      kicker: localizeText("Room", "Room"),
+      title: group.name || "Study Group",
+      meta: getPreview("group", group.id, group.category || localizeText("Active room", "Active room")),
+      detail: localizeText("Continue", "Continue"),
+    });
+  });
+
+  socialState.friends.slice(0, Math.max(0, 3 - items.length)).forEach((friend) => {
+    items.push({
+      kind: "direct",
+      value: friend.email,
+      kicker: localizeText("Chat", "Chat"),
+      title: displayName(friend),
+      meta: getPreview("direct", normalizeEmail(friend.email), friend.email || localizeText("Direct chat", "Direct chat")),
+      detail: localizeText("Continue", "Continue"),
+    });
+  });
+
+  return items.slice(0, 3);
+}
+
+function homeTimelineItems() {
+  const todayKey = plannerDayKey();
+  return plannerState.tasks
+    .filter((task) => {
+      if (task.status === "done") return false;
+      return plannerDayKey(task.scheduledAt) === todayKey || plannerDayKey(task.deadline) === todayKey;
+    })
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.scheduledAt || left.deadline || "") || Number.MAX_SAFE_INTEGER;
+      const rightTime = Date.parse(right.scheduledAt || right.deadline || "") || Number.MAX_SAFE_INTEGER;
+      return leftTime - rightTime;
+    })
+    .slice(0, 4);
+}
+
+function homeActivityItems() {
+  const items = [];
+  const pendingInvites =
+    socialState.incomingFriendRequests.length + socialState.groupInvitations.length;
+  if (pendingInvites) {
+    items.push({
+      kind: "inbox",
+      value: "true",
+      title: pendingInvites === 1
+        ? localizeText("Có 1 lời mời mới", "1 new invite waiting")
+        : localizeText("Có " + String(pendingInvites) + " cập nhật mới", String(pendingInvites) + " new updates"),
+      meta: localizeText("Mở thông báo để xem ngay.", "Open notifications to review them."),
+    });
+  }
+
+  groups.slice(0, 2).forEach((group) => {
+    items.push({
+      kind: "group",
+      value: group.id,
+      title: group.name || "Study Group",
+      meta: getPreview("group", group.id, group.category || localizeText("Nhóm đang hoạt động", "Group is active")),
+    });
+  });
+
+  socialState.friends.slice(0, Math.max(0, 4 - items.length)).forEach((friend) => {
+    items.push({
+      kind: "direct",
+      value: friend.email,
+      title: displayName(friend),
+      meta: getPreview("direct", normalizeEmail(friend.email), localizeText("Tin nhắn cá nhân", "Direct conversation")),
+    });
+  });
+
+  return items.slice(0, 4);
+}
+
+function homePinnedNotes(limit = 3) {
+  return plannerState.notes
+    .filter((note) => note.pinned)
+    .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
+    .slice(0, limit);
+}
+
+function homeActionAttribute(kind, value) {
+  if (kind === "task") {
+    return 'data-home-open-task="' + escapeHtml(value) + '"';
+  }
+  if (kind === "group") {
+    return 'data-home-open-group="' + escapeHtml(value) + '"';
+  }
+  if (kind === "direct") {
+    return 'data-home-open-direct="' + escapeHtml(value) + '"';
+  }
+  if (kind === "note") {
+    return 'data-home-open-note="' + escapeHtml(value) + '"';
+  }
+  return 'data-home-open-inbox="true"';
+}
+
+function homeContinueCardsHtml(items) {
+  if (!items.length) {
+    return (
+      '<div class="home-block-empty">' +
+      escapeHtml(localizeText("Chưa có nội dung để tiếp tục. Hãy tạo task hoặc tham gia một room.", "Nothing to continue yet. Create a task or join a room.")) +
+      "</div>"
+    );
+  }
+  return items.map((item) =>
+    '<button type="button" class="home-continue-card" ' + homeActionAttribute(item.kind, item.value) + ">" +
+    '<span class="home-card-kicker">' + escapeHtml(item.kicker) + "</span>" +
+    '<strong>' + escapeHtml(item.title) + "</strong>" +
+    '<span class="home-card-meta">' + escapeHtml(item.meta) + "</span>" +
+    '<span class="home-card-detail">' + escapeHtml(item.detail) + "</span>" +
+    "</button>"
+  ).join("");
+}
+
+function homeActivityHtml(items) {
+  if (!items.length) {
+    return (
+      '<div class="home-block-empty">' +
+      escapeHtml(localizeText("Chưa có hoạt động nổi bật. Khi có chat mới hoặc lời mời, phần này sẽ sáng lên.", "No activity yet. New chats and invites will surface here.")) +
+      "</div>"
+    );
+  }
+  return '<div class="home-feed-list">' + items.map((item) =>
+    '<button type="button" class="home-feed-item" ' + homeActionAttribute(item.kind, item.value) + ">" +
+    '<strong>' + escapeHtml(item.title) + "</strong>" +
+    '<span>' + escapeHtml(item.meta) + "</span>" +
+    "</button>"
+  ).join("") + "</div>";
+}
+
+function homeTasksHtml(items) {
+  if (!items.length) {
+    return (
+      '<div class="home-block-empty">' +
+      escapeHtml(localizeText("Hôm nay chưa có task nào. Bạn có thể tạo nhanh từ Notes hoặc Quick Actions.", "No tasks yet today. Create one from Notes or Quick Actions.")) +
+      "</div>"
+    );
+  }
+  return '<div class="home-task-list">' + items.map((task) => {
+    const deadline = plannerDeadlineState(task);
+    return (
+      '<article class="home-task-item' + (task.status === "done" ? " is-done" : "") + '">' +
+      '<button type="button" class="home-task-check' + (task.status === "done" ? " is-done" : "") + '" data-home-task-toggle="' + escapeHtml(task.id) + '">' +
+      '<span aria-hidden="true"></span></button>' +
+      '<div class="home-task-copy">' +
+      '<strong>' + escapeHtml(task.title) + "</strong>" +
+      '<span>' + escapeHtml(plannerPriorityLabel(task.priority) + " • " + (deadline.kind === "none" ? localizeText("Không có deadline", "No deadline") : deadline.copy)) + "</span>" +
+      "</div>" +
+      '<button type="button" class="home-inline-btn" data-home-open-task="' + escapeHtml(task.id) + '">' +
+      escapeHtml(localizeText("Mở", "Open")) +
+      "</button></article>"
+    );
+  }).join("") + "</div>";
+}
+
+function homeTimelineHtml(items) {
+  if (!items.length) {
+    return (
+      '<div class="home-note-empty">' +
+      escapeHtml(localizeText("Chưa có mốc giờ nào cho hôm nay.", "No scheduled slots for today yet.")) +
+      "</div>"
+    );
+  }
+  return '<div class="home-timeline-list">' + items.map((task) => {
+    const stamp = task.scheduledAt || task.deadline;
+    return (
+      '<button type="button" class="home-timeline-item" data-home-open-task="' + escapeHtml(task.id) + '">' +
+      '<span>' + escapeHtml(plannerDateTimeLabel(stamp)) + "</span>" +
+      '<strong>' + escapeHtml(task.title) + "</strong>" +
+      '<small>' + escapeHtml(task.project || plannerStatusLabel(task.status)) + "</small>" +
+      "</button>"
+    );
+  }).join("") + "</div>";
+}
+
+function homeHeatmapHtml(cells) {
+  return (
+    '<div class="home-heatmap-grid">' +
+    cells.map((cell) =>
+      '<span class="home-heatmap-cell" data-level="' + String(cell.level) + '" title="' +
+      escapeHtml(cell.label + " • " + formatDashboardDuration(cell.studyMs)) + '"></span>'
+    ).join("") +
+    "</div>"
+  );
+}
+
+function homeQuickNotePanelHtml() {
+  return (
+    '<div class="home-note-capture">' +
+    '<div class="home-mini-head"><strong>' + escapeHtml(localizeText("Quick note", "Quick note")) +
+    "</strong><button type=\"button\" class=\"home-inline-btn\" data-home-quick=\"note\">" +
+    escapeHtml(localizeText("Open planner", "Open planner")) +
+    "</button></div>" +
+    '<textarea class="home-quick-note-input" data-home-quick-note-input="true" rows="5" maxlength="1200" placeholder="' +
+    escapeHtml(localizeText("Ghi nhanh ý tưởng, deadline hoặc việc vừa nảy ra khi đang học...", "Capture ideas, deadlines, or next steps while you are studying...")) +
+    '">' + escapeHtml(plannerState.quickNote) + '</textarea>' +
+    '<div class="home-note-capture-foot"><span>' +
+    escapeHtml(localizeText("Autosave vào planner", "Autosaved into planner")) +
+    '</span><button type="button" class="home-inline-btn" data-home-quick="task">' +
+    escapeHtml(localizeText("New task", "New task")) +
+    "</button></div></div>"
+  );
+}
+
+function homePinnedNotesHtml(notes) {
+  if (!notes.length) {
+    return (
+      '<div class="home-note-empty">' +
+      escapeHtml(localizeText("Ghim note quan trọng từ Notes để hiện ở đây.", "Pin important notes from Notes to surface them here.")) +
+      "</div>"
+    );
+  }
+  return '<div class="home-note-list">' + notes.map((note) =>
+    '<button type="button" class="home-note-chip" ' + homeActionAttribute("note", note.id) + ">" +
+    '<strong>' + escapeHtml(note.title) + "</strong>" +
+    '<span>' + escapeHtml((note.content || localizeText("Mở note để viết thêm.", "Open note to keep writing.")).slice(0, 84)) + "</span>" +
+    "</button>"
+  ).join("") + "</div>";
+}
+
+function homeDashboardMarkup() {
+  const todayStudyMs = dashboardStudyMsForDay();
+  const streak = dashboardStudyStreak();
+  const todayTasks = homeTodayTasksSnapshot();
+  const continueItems = homeContinueLearningItems();
+  const activityItems = homeActivityItems();
+  const plannerOverview = plannerOverviewSnapshot();
+  const weekStudyMs = dashboardStudyMsForRecentDays(7);
+  const heatmapCells = dashboardStudyHeatmapCells(21);
+  const pinnedNotes = homePinnedNotes();
+  const timelineItems = homeTimelineItems();
+  const todayTaskTotal = Math.max(todayTasks.total, todayTasks.tasks.length);
+  const name = currentUser ? displayName(currentUser) : localizeText("bạn", "there");
+  return (
+    '<section class="home-overview home-dashboard">' +
+    '<section class="home-welcome">' +
+    '<div class="home-welcome-copy"><div class="eyebrow">Dashboard</div>' +
+    '<h2>' + escapeHtml(localizeText("Xin chào " + name, "Hello " + name)) + "</h2>" +
+    '<p>' + escapeHtml(localizeText("Quay lại đúng việc cần làm, tiếp tục phòng học dở dang và biến note thành hành động ngay trong một vòng làm việc.", "Jump back into the right task, continue active rooms, and turn notes into action in one flow.")) + "</p></div>" +
+    '<div class="home-stat-grid">' +
+    '<article class="home-stat-card primary"><span>' + escapeHtml(localizeText("Hôm nay đã học", "Studied today")) + "</span><strong>" + escapeHtml(formatDashboardDuration(todayStudyMs)) + "</strong></article>" +
+    '<article class="home-stat-card"><span>' + escapeHtml(localizeText("Streak", "Streak")) + "</span><strong>" + escapeHtml(String(streak)) + "</strong><small>" + escapeHtml(localizeText("ngày liên tiếp", "day streak")) + "</small></article>" +
+    '<article class="home-stat-card"><span>' + escapeHtml(localizeText("Task hôm nay", "Today tasks")) + "</span><strong>" + escapeHtml(String(todayTasks.done) + "/" + String(todayTaskTotal)) + "</strong><small>" + escapeHtml(localizeText("hoàn thành", "completed")) + "</small></article>" +
+    '<article class="home-stat-card"><span>' + escapeHtml(localizeText("Sắp đến hạn", "Due soon")) + "</span><strong>" + escapeHtml(String(plannerOverview.dueSoon)) + "</strong><small>" + escapeHtml(localizeText("task cần chú ý", "tasks to review")) + "</small></article>" +
+    "</div></section>" +
+    '<div class="home-dashboard-grid">' +
+    '<section class="home-block continue"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Continue Learning", "Continue Learning")) + "</strong><span>" + escapeHtml(localizeText("Quay lại nội dung đang học", "Resume what matters")) + "</span></div>" +
+    '<div class="home-continue-grid">' + homeContinueCardsHtml(continueItems) + "</div></section>" +
+    '<section class="home-block activity"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Chat / Activity", "Chat / Activity")) + "</strong><span>" + escapeHtml(localizeText("Những gì cần bạn chú ý", "Important updates")) + "</span></div>" +
+    homeActivityHtml(activityItems) + "</section>" +
+    '<section class="home-block tasks"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Tasks Today", "Tasks Today")) + "</strong><span>" + escapeHtml(localizeText("Checklist trong ngày", "Daily checklist")) + "</span></div>" +
+    homeTasksHtml(todayTasks.tasks) + "</section>" +
+    '<section class="home-block progress"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Stats / Progress", "Stats / Progress")) + "</strong><span>" + escapeHtml(localizeText("Heatmap, progress và note đã ghim", "Heatmap, progress, and pinned notes")) + "</span></div>" +
+    '<div class="home-progress-grid">' +
+    '<article class="home-progress-card"><span>' + escapeHtml(localizeText("Tuần này", "This week")) + "</span><strong>" + escapeHtml(formatDashboardDuration(weekStudyMs)) + "</strong></article>" +
+    '<article class="home-progress-card"><span>' + escapeHtml(localizeText("Task xong", "Tasks done")) + "</span><strong>" + escapeHtml(String(plannerOverview.done)) + "</strong></article>" +
+    '<article class="home-progress-card"><span>' + escapeHtml(localizeText("Đang làm", "In progress")) + "</span><strong>" + escapeHtml(String(plannerOverview.active)) + "</strong></article>" +
+    "</div>" +
+    '<div class="home-support-grid">' +
+    '<div class="home-heatmap-panel"><div class="home-mini-head"><strong>' + escapeHtml(localizeText("Study Heatmap", "Study Heatmap")) + "</strong><span>" + escapeHtml(localizeText("21 ngày gần nhất", "Last 21 days")) + "</span></div>" +
+    homeHeatmapHtml(heatmapCells) + "</div>" +
+    '<div class="home-timeline-panel"><div class="home-mini-head"><strong>' + escapeHtml(localizeText("Timeline hôm nay", "Today timeline")) + "</strong><span>" + escapeHtml(localizeText("Theo giờ", "By hour")) + "</span></div>" +
+    homeTimelineHtml(timelineItems) + "</div>" +
+    homeQuickNotePanelHtml() +
+    '<div class="home-pinned-panel"><div class="home-mini-head"><strong>' + escapeHtml(localizeText("Pinned Notes", "Pinned Notes")) + "</strong><span>" + escapeHtml(localizeText("Từ sticky notes", "From sticky notes")) + "</span></div>" +
+    homePinnedNotesHtml(pinnedNotes) + "</div></div></section>" +
+    "</div>" +
+    '<div class="home-quick-dock">' +
+    '<button type="button" class="home-quick-btn" data-home-quick="note">' + escapeHtml(localizeText("Quick Note", "Quick Note")) + "</button>" +
+    '<button type="button" class="home-quick-btn" data-home-quick="task">' + escapeHtml(localizeText("New Task", "New Task")) + "</button>" +
+    '<button type="button" class="home-quick-btn primary" data-home-quick="focus">' + escapeHtml(localizeText("Start 25m Focus", "Start 25m Focus")) + "</button>" +
+    '<button type="button" class="home-quick-btn" data-home-quick="continue">' + escapeHtml(localizeText("Continue", "Continue")) + "</button>" +
+    "</div></section>"
+  );
+}
+
+function openDashboardTaskPlanner(taskId) {
+  if (taskId) {
+    selectPlannerTask(taskId);
+  } else {
+    resetPlannerTaskSelection();
+  }
+  setStudyNotesPopoverOpen(true);
+}
+
+function openDashboardQuickNote() {
+  createPlannerStickyNote("", "");
+  setStudyNotesPopoverOpen(true);
+}
+
+function openDashboardContinue() {
+  const [firstItem] = homeContinueLearningItems();
+  if (firstItem) {
+    handleDashboardOpen(firstItem.kind, firstItem.value);
+    return;
+  }
+  if (!selectDefaultConversation()) {
+    setStudyNotesPopoverOpen(true);
+  }
+}
+
+function startDashboardFocusMode() {
+  setStudyTimerMode("pomodoro");
+  setStudyTimerPopoverOpen(true);
+  if (!studyTimerState.isRunning) {
+    startStudyTimer(Date.now());
+  }
+}
+
+function handleDashboardOpen(kind, value) {
+  if (kind === "task") {
+    openDashboardTaskPlanner(value);
+    return;
+  }
+  if (kind === "note") {
+    openPlannerNoteWindow(value);
+    setStudyNotesPopoverOpen(true);
+    return;
+  }
+  if (kind === "group") {
+    const group = groups.find((item) => String((item && item.id) || "") === String(value || ""));
+    if (group) {
+      selectGroup(group);
+      return;
+    }
+  }
+  if (kind === "direct") {
+    const friend = socialState.friends.find((item) =>
+      normalizeEmail(item.email) === normalizeEmail(value || "")
+    );
+    if (friend) {
+      selectDirect(friend);
+      return;
+    }
+  }
+  openInboxPanel();
+}
+
+function renderHomeOverview(options = {}) {
+  if (!el.messagesArea) return;
+  const preserveScroll = Boolean(options.preserveScroll);
+  const nextScrollTop = preserveScroll ? el.messagesArea.scrollTop : 0;
+  el.messagesArea.innerHTML = homeDashboardMarkup();
+  el.messagesArea.scrollTop = nextScrollTop;
 }
 
 function refreshHomeOverviewIfNeeded() {
-  if (activeChannel.type === "home") renderHomeOverview();
+  if (activeChannel.type !== "home" || !el.messagesArea) return;
+  const activeElement = document.activeElement;
+  const isQuickNoteActive =
+    activeElement instanceof HTMLTextAreaElement &&
+    activeElement.matches("[data-home-quick-note-input]");
+  const selectionStart = isQuickNoteActive ? activeElement.selectionStart : null;
+  const selectionEnd = isQuickNoteActive ? activeElement.selectionEnd : null;
+  const value = isQuickNoteActive ? activeElement.value : "";
+  renderHomeOverview({ preserveScroll: true });
+  if (!isQuickNoteActive) return;
+  const quickNoteField = el.messagesArea.querySelector("[data-home-quick-note-input]");
+  if (!(quickNoteField instanceof HTMLTextAreaElement)) return;
+  quickNoteField.value = value;
+  quickNoteField.focus({ preventScroll: true });
+  if (selectionStart !== null && selectionEnd !== null) {
+    quickNoteField.setSelectionRange(selectionStart, selectionEnd);
+  }
 }
 
 function selectDefaultConversation() {
@@ -3575,9 +5288,12 @@ function selectHome() {
   activeChannel = { type: "home" };
   closePreviewDetails();
   syncSurfaceMode();
-  el.chatKicker.textContent = "Inbox";
-  el.chatTitle.textContent = "Select a conversation";
-  el.chatSubtitle.textContent = "Choose a friend or group from the inbox to get started.";
+  el.chatKicker.textContent = "Dashboard";
+  el.chatTitle.textContent = localizeText("Nhịp học hôm nay", "Today's flow");
+  el.chatSubtitle.textContent = localizeText(
+    "Continue, notes, task và focus trong cùng một màn hình.",
+    "Continue learning, notes, tasks, and focus in one place.",
+  );
   syncAvatarNode(el.chatAvatar, displayName(currentUser), currentUser && currentUser.avatarUrl);
   showBanner("", "info");
   disconnectSubscription();
@@ -4414,7 +6130,8 @@ async function bootstrap() {
     }
     if (!el.studyNotesPanelMount.firstChild) {
       el.studyNotesPanelMount.appendChild(createStudyNotesPanel());
-      refreshStudyNotebookUi();
+      refreshPlannerStudioUi();
+      renderPlannerFloatingNotes();
     }
     syncCurrentUserUi();
     setFriendCardCollapsed(true);
@@ -4434,7 +6151,7 @@ async function bootstrap() {
     selectHome();
     clearMessages("Loading conversations", "Preparing your inbox.", "Inbox");
     await refreshWorkspace();
-    selectDefaultConversation();
+    selectHome();
     handlePanelQuery();
     connectWs();
     if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
@@ -4470,7 +6187,11 @@ if (el.previewCloseProfile) {
 if (el.profileToggleButton) {
   el.profileToggleButton.addEventListener("click", () => {
     const isOpen = Boolean(el.previewApp && el.previewApp.classList.contains("details-open"));
-    setPreviewDetailsOpen(!isOpen);
+    if (isOpen && previewDetailsMode === "self") {
+      closePreviewDetails();
+      return;
+    }
+    openCurrentUserProfile();
   });
 }
 
@@ -4522,7 +6243,7 @@ if (el.dashboardNavButton) {
     closeCreateGroupPopover();
     closePreviewDetails();
     setRosterFilter("all");
-    selectDefaultConversation();
+    selectHome();
   });
 }
 
@@ -4659,21 +6380,80 @@ el.studyNotesPanelMount.addEventListener("click", (event) => {
   const target = asElement(event.target);
   if (!target) return;
 
-  const clearCompletedButton = target.closest("[data-study-todo-clear]");
-  if (clearCompletedButton) {
-    clearCompletedStudyTodos();
+  const quickNoteButton = target.closest("[data-planner-note-new]");
+  if (quickNoteButton) {
+    createPlannerStickyNote("", "");
     return;
   }
 
-  const todoToggleButton = target.closest("[data-study-todo-toggle]");
-  if (todoToggleButton) {
-    toggleStudyTodo(todoToggleButton.dataset.studyTodoToggle || "");
+  const filterResetButton = target.closest("[data-planner-filter-reset]");
+  if (filterResetButton) {
+    resetPlannerFilters();
     return;
   }
 
-  const todoRemoveButton = target.closest("[data-study-todo-remove]");
-  if (todoRemoveButton) {
-    removeStudyTodo(todoRemoveButton.dataset.studyTodoRemove || "");
+  const viewToggleButton = target.closest("[data-planner-view]");
+  if (viewToggleButton) {
+    plannerState.viewMode = viewToggleButton.dataset.plannerView === "list" ? "list" : "board";
+    persistPlannerState();
+    refreshPlannerStudioUi();
+    return;
+  }
+
+  const taskToggleButton = target.closest("[data-planner-task-toggle]");
+  if (taskToggleButton) {
+    togglePlannerTaskDone(taskToggleButton.dataset.plannerTaskToggle || "");
+    return;
+  }
+
+  const taskTrackButton = target.closest("[data-planner-task-track]");
+  if (taskTrackButton) {
+    togglePlannerTaskTimer(taskTrackButton.dataset.plannerTaskTrack || "");
+    refreshPlannerStudioUi();
+    return;
+  }
+
+  const taskSelectButton = target.closest("[data-planner-task-select]");
+  if (taskSelectButton) {
+    selectPlannerTask(taskSelectButton.dataset.plannerTaskSelect || "");
+    return;
+  }
+
+  const taskRemoveButton = target.closest("[data-planner-task-remove]");
+  if (taskRemoveButton) {
+    removePlannerTask(taskRemoveButton.dataset.plannerTaskRemove || "");
+    return;
+  }
+
+  const taskResetButton = target.closest("[data-planner-task-reset]");
+  if (taskResetButton) {
+    resetPlannerTaskSelection();
+    return;
+  }
+
+  const noteOpenButton = target.closest("[data-planner-note-open]");
+  if (noteOpenButton) {
+    openPlannerNoteWindow(noteOpenButton.dataset.plannerNoteOpen || "");
+    return;
+  }
+
+  const notePinButton = target.closest("[data-planner-note-pin]");
+  if (notePinButton) {
+    togglePlannerNotePinned(notePinButton.dataset.plannerNotePin || "");
+    return;
+  }
+
+  const noteConvertButton = target.closest("[data-planner-note-convert]");
+  if (noteConvertButton) {
+    if (convertPlannerNoteToTask(noteConvertButton.dataset.plannerNoteConvert || "")) {
+      showToast(localizeText("Đã chuyển note thành task.", "Note converted into a task."));
+    }
+    return;
+  }
+
+  const noteDeleteButton = target.closest("[data-planner-note-delete]");
+  if (noteDeleteButton) {
+    deletePlannerNote(noteDeleteButton.dataset.plannerNoteDelete || "");
   }
 });
 
@@ -4681,16 +6461,264 @@ el.studyNotesPanelMount.addEventListener("input", (event) => {
   const target = asElement(event.target);
   if (!target) return;
 
-  const noteField = target.closest("[data-study-note-input]");
-  if (!noteField) return;
-  updateStudyNotebookText(/** @type {HTMLTextAreaElement} */ (noteField).value);
+  const quickNoteField = target.closest("[data-planner-quick-note]");
+  if (quickNoteField) {
+    plannerState.quickNote = normalizePlannerTextBlock(
+      /** @type {HTMLTextAreaElement} */ (quickNoteField).value,
+      1200,
+    );
+    persistPlannerState();
+    return;
+  }
+
+  const searchField = target.closest("[data-planner-search]");
+  if (searchField) {
+    plannerState.searchText = normalizePlannerSingleLine(
+      /** @type {HTMLInputElement} */ (searchField).value,
+      80,
+    );
+    persistPlannerState();
+    refreshPlannerStudioUi();
+  }
+});
+
+el.studyNotesPanelMount.addEventListener("change", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
+  const filterField = target.closest("[data-planner-filter]");
+  if (!filterField) return;
+  const key = filterField.dataset.plannerFilter || "";
+  const value = /** @type {HTMLSelectElement} */ (filterField).value || "all";
+  if (key === "priority") plannerState.priorityFilter = value;
+  if (key === "status") plannerState.statusFilter = value;
+  if (key === "deadline") plannerState.deadlineFilter = value;
+  if (key === "project") plannerState.projectFilter = value;
+  persistPlannerState();
+  refreshPlannerStudioUi();
 });
 
 el.studyNotesPanelMount.addEventListener("submit", (event) => {
   const form = asElement(event.target);
-  if (!form || !form.matches("[data-study-todo-form]")) return;
+  if (!form) return;
   event.preventDefault();
-  addStudyTodo();
+  if (form.matches("[data-planner-quick-add-form]")) {
+    const quickInput = /** @type {HTMLInputElement | null} */ (form.querySelector("[name='quickAdd']"));
+    const submitter = /** @type {HTMLButtonElement | null} */ (event.submitter);
+    const kind = submitter && submitter.dataset.plannerQuickSubmit === "note" ? "note" : "task";
+    if (quickInput && quickAddPlannerItem(kind, quickInput.value)) {
+      quickInput.value = "";
+    }
+    return;
+  }
+  if (!form.matches("[data-planner-task-form]")) return;
+  const title = /** @type {HTMLInputElement | null} */ (form.querySelector("[name='title']"));
+  if (!title || !normalizePlannerSingleLine(title.value, 120)) return;
+  const payload = {
+    taskId: /** @type {HTMLInputElement | null} */ (form.querySelector("[name='taskId']"))?.value || "",
+    title: title.value,
+    description: /** @type {HTMLTextAreaElement | null} */ (form.querySelector("[name='description']"))?.value || "",
+    deadline: /** @type {HTMLInputElement | null} */ (form.querySelector("[name='deadline']"))?.value || "",
+    scheduledAt: /** @type {HTMLInputElement | null} */ (form.querySelector("[name='scheduledAt']"))?.value || "",
+    priority: /** @type {HTMLSelectElement | null} */ (form.querySelector("[name='priority']"))?.value || "medium",
+    status: /** @type {HTMLSelectElement | null} */ (form.querySelector("[name='status']"))?.value || "todo",
+    project: /** @type {HTMLInputElement | null} */ (form.querySelector("[name='project']"))?.value || "",
+    tag: /** @type {HTMLInputElement | null} */ (form.querySelector("[name='tag']"))?.value || "",
+    estimateMinutes: /** @type {HTMLInputElement | null} */ (form.querySelector("[name='estimateMinutes']"))?.value || 30,
+  };
+  upsertPlannerTask(payload);
+});
+
+el.studyNotesPanelMount.addEventListener("dragstart", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
+  const taskCard = target.closest("[data-planner-task-drag]");
+  if (!taskCard) return;
+  plannerDraggedTaskId = taskCard.dataset.plannerTaskDrag || "";
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", plannerDraggedTaskId);
+  }
+});
+
+el.studyNotesPanelMount.addEventListener("dragover", (event) => {
+  const target = asElement(event.target);
+  if (!target || !target.closest("[data-planner-drop-zone]")) return;
+  event.preventDefault();
+});
+
+el.studyNotesPanelMount.addEventListener("drop", (event) => {
+  const target = asElement(event.target);
+  const dropZone = target && target.closest("[data-planner-drop-zone]");
+  if (!dropZone) return;
+  event.preventDefault();
+  const nextStatus = dropZone.dataset.plannerDropZone || "";
+  if (!plannerDraggedTaskId || !PLANNER_STATUS_OPTIONS.includes(nextStatus)) return;
+  setPlannerTaskStatus(plannerDraggedTaskId, nextStatus);
+  plannerDraggedTaskId = "";
+});
+
+document.addEventListener("click", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
+
+  const noteCloseButton = target.closest("[data-planner-note-close]");
+  if (noteCloseButton) {
+    closePlannerNoteWindow(noteCloseButton.dataset.plannerNoteClose || "");
+    return;
+  }
+
+  const noteMinimizeButton = target.closest("[data-planner-note-minimize]");
+  if (noteMinimizeButton) {
+    togglePlannerNoteMinimized(noteMinimizeButton.dataset.plannerNoteMinimize || "");
+    return;
+  }
+
+  const notePinButton = target.closest("[data-planner-note-pin]");
+  if (notePinButton && notePinButton.closest("[data-planner-note-window]")) {
+    togglePlannerNotePinned(notePinButton.dataset.plannerNotePin || "");
+    return;
+  }
+
+  const noteColorButton = target.closest("[data-planner-note-color]");
+  if (noteColorButton) {
+    updatePlannerNoteField(
+      noteColorButton.dataset.plannerNoteColor || "",
+      "color",
+      noteColorButton.dataset.colorValue || "amber",
+    );
+    renderPlannerFloatingNotes();
+    refreshPlannerStudioUi();
+  }
+});
+
+document.addEventListener("input", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
+
+  const noteTitleInput = target.closest("[data-planner-note-title]");
+  if (noteTitleInput) {
+    updatePlannerNoteField(
+      noteTitleInput.dataset.plannerNoteTitle || "",
+      "title",
+      /** @type {HTMLInputElement} */ (noteTitleInput).value,
+    );
+    return;
+  }
+
+  const noteBodyInput = target.closest("[data-planner-note-content]");
+  if (noteBodyInput) {
+    updatePlannerNoteField(
+      noteBodyInput.dataset.plannerNoteContent || "",
+      "content",
+      /** @type {HTMLTextAreaElement} */ (noteBodyInput).value,
+    );
+  }
+});
+
+document.addEventListener("pointerdown", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
+  const noteWindow = target.closest("[data-planner-note-window]");
+  if (!noteWindow) return;
+  const noteId = noteWindow.dataset.plannerNoteWindow || "";
+  bringPlannerNoteToFront(noteId);
+  const note = getPlannerNoteById(noteId);
+  if (note) {
+    noteWindow.style.zIndex = String(note.z);
+  }
+  if (
+    target.closest("button") ||
+    target.closest("input") ||
+    target.closest("textarea") ||
+    target.closest(".planner-note-palette")
+  ) {
+    return;
+  }
+  const dragHandle = target.closest("[data-planner-note-drag]");
+  if (!dragHandle) return;
+  event.preventDefault();
+  startPlannerNoteDrag(dragHandle.dataset.plannerNoteDrag || "", event.clientX, event.clientY);
+});
+
+document.addEventListener("pointermove", (event) => {
+  if (!plannerNoteDragState) return;
+  event.preventDefault();
+  updatePlannerNoteDrag(event.clientX, event.clientY);
+});
+
+document.addEventListener("pointerup", () => {
+  stopPlannerNoteDrag();
+});
+
+el.messagesArea.addEventListener("click", (event) => {
+  if (activeChannel.type !== "home") return;
+  const target = asElement(event.target);
+  if (!target) return;
+
+  const taskToggleButton = target.closest("[data-home-task-toggle]");
+  if (taskToggleButton) {
+    togglePlannerTaskDone(taskToggleButton.dataset.homeTaskToggle || "");
+    return;
+  }
+
+  const openTaskButton = target.closest("[data-home-open-task]");
+  if (openTaskButton) {
+    handleDashboardOpen("task", openTaskButton.dataset.homeOpenTask || "");
+    return;
+  }
+
+  const openGroupButton = target.closest("[data-home-open-group]");
+  if (openGroupButton) {
+    handleDashboardOpen("group", openGroupButton.dataset.homeOpenGroup || "");
+    return;
+  }
+
+  const openDirectButton = target.closest("[data-home-open-direct]");
+  if (openDirectButton) {
+    handleDashboardOpen("direct", openDirectButton.dataset.homeOpenDirect || "");
+    return;
+  }
+
+  const openNoteButton = target.closest("[data-home-open-note]");
+  if (openNoteButton) {
+    handleDashboardOpen("note", openNoteButton.dataset.homeOpenNote || "");
+    return;
+  }
+
+  const openInboxButton = target.closest("[data-home-open-inbox]");
+  if (openInboxButton) {
+    openInboxPanel();
+    return;
+  }
+
+  const quickActionButton = target.closest("[data-home-quick]");
+  if (!quickActionButton) return;
+
+  const action = quickActionButton.dataset.homeQuick || "";
+  if (action === "note") {
+    openDashboardQuickNote();
+    return;
+  }
+  if (action === "task") {
+    openDashboardTaskPlanner("");
+    return;
+  }
+  if (action === "focus") {
+    startDashboardFocusMode();
+    return;
+  }
+  if (action === "continue") {
+    openDashboardContinue();
+  }
+});
+
+el.messagesArea.addEventListener("input", (event) => {
+  if (activeChannel.type !== "home") return;
+  const target = asElement(event.target);
+  const quickNoteField = target && target.closest("[data-home-quick-note-input]");
+  if (!(quickNoteField instanceof HTMLTextAreaElement)) return;
+  plannerState.quickNote = normalizePlannerTextBlock(quickNoteField.value, 1200);
+  persistPlannerState();
 });
 
 el.friendRequestForm.addEventListener("submit", async (event) => {
@@ -4817,7 +6845,11 @@ if (el.createGroupSidebarBtn) {
 if (el.headerInboxButton) {
   el.headerInboxButton.addEventListener("click", () => {
     const isOpen = Boolean(el.previewApp && el.previewApp.classList.contains("details-open"));
-    setPreviewDetailsOpen(!isOpen);
+    if (isOpen && previewDetailsMode === "channel") {
+      closePreviewDetails();
+      return;
+    }
+    openActiveChannelDetails();
   });
 }
 el.notificationToggleButton.addEventListener("click", toggleInboxPanel);

@@ -4,4 +4,14 @@ target/
 .vscode/
 *.iml
 *.log
+*.dump
+*.dumpstream
+
+# Local workspace docs / agent files
+AGENTS.md
+HELP.md
+
+# Dev-only sources not needed in deployment image
+src/test/
+database/
 

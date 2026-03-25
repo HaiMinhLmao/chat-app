@@ -1,16 +1,21 @@
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:21-jdk AS build
 
 WORKDIR /app
 
-COPY . .
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+COPY src/main/ src/main/
 
-# mvnw (Linux) needs execute permission
 RUN chmod +x mvnw
+RUN ./mvnw -q clean package -Dmaven.test.skip=true
 
-RUN ./mvnw clean package -DskipTests
+FROM eclipse-temurin:21-jre
+
+WORKDIR /app
+
+COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
 
-# Use shell form so wildcard works
-CMD java -jar target/*.jar
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
 
