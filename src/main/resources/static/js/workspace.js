@@ -91,7 +91,7 @@ const el = {
   newGroupBtn: mustGetElement("newGroupBtn"),
   newGroupToggleInput: mustGetInput("newGroupToggleInput"),
   studyTimerToggleButton: mustGetButton("studyTimerToggleButton"),
-  studyNotesToggleButton: mustGetButton("studyNotesToggleButton"),
+  studyNotesToggleButton: getOptionalButton("studyNotesToggleButton"),
   profileToggleButton: getOptionalButton("profileToggleButton"),
   settingsToggleButton: mustGetButton("settingsToggleButton"),
   dashboardNavButton: getOptionalButton("dashboardNavButton"),
@@ -117,9 +117,9 @@ const el = {
   studyTimerPopover: mustGetElement("studyTimerPopover"),
   studyTimerCloseButton: mustGetButton("studyTimerCloseButton"),
   studyTimerPanelMount: mustGetElement("studyTimerPanelMount"),
-  studyNotesPopover: mustGetElement("studyNotesPopover"),
-  studyNotesCloseButton: mustGetButton("studyNotesCloseButton"),
-  studyNotesPanelMount: mustGetElement("studyNotesPanelMount"),
+  studyNotesPopover: getOptionalElement("studyNotesPopover"),
+  studyNotesCloseButton: getOptionalButton("studyNotesCloseButton"),
+  studyNotesPanelMount: getOptionalElement("studyNotesPanelMount"),
   settingsUserName: mustGetElement("settingsUserName"),
   settingsUserEmail: mustGetElement("settingsUserEmail"),
   settingsAvatarPreview: mustGetElement("settingsAvatarPreview"),
@@ -704,11 +704,11 @@ function syncCurrentUserUi() {
   }
   document.documentElement.lang = activeLanguage();
   if (activeChannel.type === "home") {
-    el.chatKicker.textContent = "Dashboard";
-    el.chatTitle.textContent = localizeText("Nhịp học hôm nay", "Today's flow");
+    el.chatKicker.textContent = "Inbox";
+    el.chatTitle.textContent = localizeText("Hộp chat", "Inbox");
     el.chatSubtitle.textContent = localizeText(
-      "Continue, notes, task và focus trong cùng một màn hình.",
-      "Continue learning, notes, tasks, and focus in one place.",
+      "Chọn một cuộc trò chuyện hoặc nhóm để bắt đầu.",
+      "Pick a conversation or group to get started.",
     );
     syncAvatarNode(el.chatAvatar, name, currentUser.avatarUrl);
     refreshHomeOverviewIfNeeded();
@@ -4562,6 +4562,11 @@ function toggleStudyTimerPopover() {
 }
 
 function setStudyNotesPopoverOpen(nextOpen) {
+  if (!el.studyNotesPopover || !el.studyNotesToggleButton) {
+    document.body.classList.remove("study-notes-open");
+    syncFlyoutScrim();
+    return;
+  }
   if (nextOpen && isInboxPanelOpen()) {
     setInboxPanelOpen(false);
   }
@@ -5080,31 +5085,20 @@ function handleDashboardOpen(kind, value) {
 }
 
 function renderHomeOverview(options = {}) {
-  if (!el.messagesArea) return;
-  const preserveScroll = Boolean(options.preserveScroll);
-  const nextScrollTop = preserveScroll ? el.messagesArea.scrollTop : 0;
-  el.messagesArea.innerHTML = homeDashboardMarkup();
-  el.messagesArea.scrollTop = nextScrollTop;
+  void options;
+  clearMessages(
+    localizeText("Chưa chọn cuộc trò chuyện", "No conversation selected"),
+    localizeText(
+      "Hãy chọn một đoạn chat hoặc nhóm ở danh sách bên trái để bắt đầu.",
+      "Choose a chat or group from the left to start messaging.",
+    ),
+    "Inbox",
+  );
 }
 
 function refreshHomeOverviewIfNeeded() {
   if (activeChannel.type !== "home" || !el.messagesArea) return;
-  const activeElement = document.activeElement;
-  const isQuickNoteActive =
-    activeElement instanceof HTMLTextAreaElement &&
-    activeElement.matches("[data-home-quick-note-input]");
-  const selectionStart = isQuickNoteActive ? activeElement.selectionStart : null;
-  const selectionEnd = isQuickNoteActive ? activeElement.selectionEnd : null;
-  const value = isQuickNoteActive ? activeElement.value : "";
   renderHomeOverview({ preserveScroll: true });
-  if (!isQuickNoteActive) return;
-  const quickNoteField = el.messagesArea.querySelector("[data-home-quick-note-input]");
-  if (!(quickNoteField instanceof HTMLTextAreaElement)) return;
-  quickNoteField.value = value;
-  quickNoteField.focus({ preventScroll: true });
-  if (selectionStart !== null && selectionEnd !== null) {
-    quickNoteField.setSelectionRange(selectionStart, selectionEnd);
-  }
 }
 
 function selectDefaultConversation() {
@@ -5649,11 +5643,11 @@ function selectHome() {
   activeChannel = { type: "home" };
   closePreviewDetails();
   syncSurfaceMode();
-  el.chatKicker.textContent = "Dashboard";
-  el.chatTitle.textContent = localizeText("Nhịp học hôm nay", "Today's flow");
+  el.chatKicker.textContent = "Inbox";
+  el.chatTitle.textContent = localizeText("Hộp chat", "Inbox");
   el.chatSubtitle.textContent = localizeText(
-    "Continue, notes, task và focus trong cùng một màn hình.",
-    "Continue learning, notes, tasks, and focus in one place.",
+    "Chọn một cuộc trò chuyện hoặc nhóm để bắt đầu.",
+    "Pick a conversation or group to get started.",
   );
   syncAvatarNode(el.chatAvatar, displayName(currentUser), currentUser && currentUser.avatarUrl);
   showBanner("", "info");
@@ -6489,12 +6483,11 @@ async function bootstrap() {
       el.studyTimerPanelMount.appendChild(createStudyTimerPanel());
       refreshStudyTimerUi();
     }
-    if (!el.studyNotesPanelMount.firstChild) {
+    if (el.studyNotesPanelMount && !el.studyNotesPanelMount.firstChild) {
       el.studyNotesPanelMount.appendChild(createStudyNotesPanel());
       refreshPlannerStudioUi();
       renderPlannerFloatingNotes();
     }
-    await hydratePlannerStateFromPersistence();
     syncCurrentUserUi();
     setFriendCardCollapsed(true);
     setFriendsCardCollapsed(false);
@@ -6513,7 +6506,7 @@ async function bootstrap() {
     selectHome();
     clearMessages("Loading conversations", "Preparing your inbox.", "Inbox");
     await refreshWorkspace();
-    selectHome();
+    selectDefaultConversation();
     handlePanelQuery();
     connectWs();
     if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
@@ -6744,6 +6737,7 @@ el.studyTimerPanelMount.addEventListener("input", (event) => {
   );
 });
 
+if (el.studyNotesPanelMount) {
 el.studyNotesPanelMount.addEventListener("click", (event) => {
   const target = asElement(event.target);
   if (!target) return;
@@ -6912,6 +6906,7 @@ el.studyNotesPanelMount.addEventListener("drop", (event) => {
   setPlannerTaskStatus(plannerDraggedTaskId, nextStatus);
   plannerDraggedTaskId = "";
 });
+}
 
 document.addEventListener("click", (event) => {
   const target = asElement(event.target);
@@ -7180,13 +7175,17 @@ el.homeRailButton.addEventListener("click", () => {
 });
 el.newGroupToggleInput.addEventListener("click", toggleCreateGroupPopover);
 el.studyTimerToggleButton.addEventListener("click", toggleStudyTimerPopover);
-el.studyNotesToggleButton.addEventListener("click", toggleStudyNotesPopover);
 el.settingsToggleButton.addEventListener("click", toggleSettingsPopover);
 el.settingsCloseButton.addEventListener("click", closeSettingsPopover);
 el.studyTimerCloseButton.addEventListener("click", closeStudyTimerPopover);
-el.studyNotesCloseButton.addEventListener("click", closeStudyNotesPopover);
 el.createGroupCloseButton.addEventListener("click", closeCreateGroupPopover);
 el.createGroupCancelBtn.addEventListener("click", closeCreateGroupPopover);
+if (el.studyNotesToggleButton) {
+  el.studyNotesToggleButton.addEventListener("click", toggleStudyNotesPopover);
+}
+if (el.studyNotesCloseButton) {
+  el.studyNotesCloseButton.addEventListener("click", closeStudyNotesPopover);
+}
 el.settingsScrim.addEventListener("click", () => {
   closeMessageActionMenu();
   closeInboxPanel();
