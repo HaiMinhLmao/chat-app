@@ -516,6 +516,17 @@
 
     <div class="toast" id="toast"></div>
 
+    <script>
+      window.__WORKSPACE_PLANNER_PERSISTENCE__ = Object.assign(
+        {
+          hydrateFromRemote: false,
+          saveToRemote: false,
+          endpoint: "/api/users/me/planner",
+          debounceMs: 700
+        },
+        window.__WORKSPACE_PLANNER_PERSISTENCE__ || {}
+      );
+    </script>
     <script src="js/workspace.js"></script>
   </body>
 </html>

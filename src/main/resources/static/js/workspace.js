@@ -244,6 +244,8 @@ const THEME_STORAGE_KEY = "workspaceTheme";
 const STUDY_TIMER_STORAGE_KEY = "workspaceStudyTimer";
 const DASHBOARD_PROGRESS_STORAGE_KEY = "workspaceDashboardProgress";
 const PLANNER_STORAGE_KEY = "workspacePlannerDesk";
+const DEFAULT_PLANNER_REMOTE_ENDPOINT = "/api/users/me/planner";
+const PLANNER_REMOTE_SAVE_DEBOUNCE_MS = 700;
 const SETTINGS_DRAWER_BREAKPOINT = 760;
 const MINUTE_MS = 60000;
 const REQUEST_TIMEOUT_MS = 10000;
@@ -260,6 +262,9 @@ let plannerFloatingLayer = null;
 let plannerNoteDragState = null;
 let plannerLiveSecond = -1;
 let plannerDraggedTaskId = "";
+let plannerRemoteSaveTimer = null;
+let plannerPendingRemoteSnapshot = null;
+let plannerRemoteSaveInFlight = null;
 const workspaceBootStartedAt = Date.now();
 
 if (hasWorkspaceBootLoader() && el.workspaceBootLoader) {
@@ -1920,59 +1925,207 @@ function buildDefaultPlannerState() {
   };
 }
 
-function loadPlannerState() {
-  const defaults = buildDefaultPlannerState();
-  try {
-    const parsed = parseJson(window.localStorage.getItem(PLANNER_STORAGE_KEY));
-    if (!parsed || typeof parsed !== "object") return defaults;
-    const tasks = sanitizePlannerTasks(parsed.tasks);
-    const notes = sanitizePlannerNotes(parsed.notes);
-    const zCounter = Math.max(
-      Number(parsed.noteZCounter) || defaults.noteZCounter,
-      ...notes.map((note) => Math.max(1, Number(note.z) || 1)),
-      1,
-    );
-    return {
-      viewMode: parsed.viewMode === "list" ? "list" : "board",
-      searchText: normalizePlannerSingleLine(parsed.searchText, 80),
-      priorityFilter:
-        parsed.priorityFilter === "all" || PLANNER_PRIORITY_OPTIONS.includes(parsed.priorityFilter)
-          ? parsed.priorityFilter
-          : "all",
-      statusFilter:
-        parsed.statusFilter === "all" || PLANNER_STATUS_OPTIONS.includes(parsed.statusFilter)
-          ? parsed.statusFilter
-          : "all",
-      deadlineFilter: ["all", "today", "upcoming", "overdue"].includes(parsed.deadlineFilter)
-        ? parsed.deadlineFilter
+function plannerStateSnapshot(source = buildDefaultPlannerState()) {
+  const tasks = sanitizePlannerTasks(source.tasks);
+  const notes = sanitizePlannerNotes(source.notes);
+  const zCounter = Math.max(
+    Number(source.noteZCounter) || 1,
+    ...notes.map((note) => Math.max(1, Number(note.z) || 1)),
+    1,
+  );
+  return {
+    viewMode: source.viewMode === "list" ? "list" : "board",
+    searchText: normalizePlannerSingleLine(source.searchText, 80),
+    priorityFilter:
+      source.priorityFilter === "all" || PLANNER_PRIORITY_OPTIONS.includes(source.priorityFilter)
+        ? source.priorityFilter
         : "all",
-      projectFilter: parsed.projectFilter === "all"
-        ? "all"
-        : normalizePlannerSingleLine(parsed.projectFilter, 64),
-      quickNote: normalizePlannerTextBlock(parsed.quickNote, 1200),
-      selectedTaskId: String(parsed.selectedTaskId || ""),
-      activeTaskId: String(parsed.activeTaskId || ""),
-      activeTaskStartedAt: Number.isFinite(Number(parsed.activeTaskStartedAt))
-        ? Number(parsed.activeTaskStartedAt)
-        : null,
-      noteZCounter: zCounter,
-      tasks: tasks.length ? tasks : defaults.tasks,
-      notes: notes.length ? notes : defaults.notes,
-    };
+    statusFilter:
+      source.statusFilter === "all" || PLANNER_STATUS_OPTIONS.includes(source.statusFilter)
+        ? source.statusFilter
+        : "all",
+    deadlineFilter: ["all", "today", "upcoming", "overdue"].includes(source.deadlineFilter)
+      ? source.deadlineFilter
+      : "all",
+    projectFilter: source.projectFilter === "all"
+      ? "all"
+      : normalizePlannerSingleLine(source.projectFilter, 64),
+    quickNote: normalizePlannerTextBlock(source.quickNote, 1200),
+    selectedTaskId: String(source.selectedTaskId || ""),
+    activeTaskId: String(source.activeTaskId || ""),
+    activeTaskStartedAt: Number.isFinite(Number(source.activeTaskStartedAt))
+      ? Number(source.activeTaskStartedAt)
+      : null,
+    noteZCounter: zCounter,
+    tasks,
+    notes,
+  };
+}
+
+function sanitizePlannerStatePayload(value, defaults = buildDefaultPlannerState()) {
+  if (!value || typeof value !== "object") return plannerStateSnapshot(defaults);
+  const parsed = value;
+  const tasks = sanitizePlannerTasks(parsed.tasks);
+  const notes = sanitizePlannerNotes(parsed.notes);
+  const zCounter = Math.max(
+    Number(parsed.noteZCounter) || defaults.noteZCounter,
+    ...notes.map((note) => Math.max(1, Number(note.z) || 1)),
+    1,
+  );
+  return {
+    viewMode: parsed.viewMode === "list" ? "list" : "board",
+    searchText: normalizePlannerSingleLine(parsed.searchText, 80),
+    priorityFilter:
+      parsed.priorityFilter === "all" || PLANNER_PRIORITY_OPTIONS.includes(parsed.priorityFilter)
+        ? parsed.priorityFilter
+        : "all",
+    statusFilter:
+      parsed.statusFilter === "all" || PLANNER_STATUS_OPTIONS.includes(parsed.statusFilter)
+        ? parsed.statusFilter
+        : "all",
+    deadlineFilter: ["all", "today", "upcoming", "overdue"].includes(parsed.deadlineFilter)
+      ? parsed.deadlineFilter
+      : "all",
+    projectFilter: parsed.projectFilter === "all"
+      ? "all"
+      : normalizePlannerSingleLine(parsed.projectFilter, 64),
+    quickNote: normalizePlannerTextBlock(parsed.quickNote, 1200),
+    selectedTaskId: String(parsed.selectedTaskId || ""),
+    activeTaskId: String(parsed.activeTaskId || ""),
+    activeTaskStartedAt: Number.isFinite(Number(parsed.activeTaskStartedAt))
+      ? Number(parsed.activeTaskStartedAt)
+      : null,
+    noteZCounter: zCounter,
+    tasks: tasks.length ? tasks : defaults.tasks,
+    notes: notes.length ? notes : defaults.notes,
+  };
+}
+
+function readPlannerLocalSnapshot() {
+  try {
+    return parseJson(window.localStorage.getItem(PLANNER_STORAGE_KEY));
   } catch (_) {
-    return defaults;
+    return null;
   }
+}
+
+function writePlannerLocalSnapshot(snapshot) {
+  try {
+    window.localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch (_) {
+    // no-op
+  }
+}
+
+function getPlannerPersistenceConfig() {
+  const raw = window.__WORKSPACE_PLANNER_PERSISTENCE__;
+  const config = raw && typeof raw === "object" ? raw : {};
+  const endpoint = normalizePlannerSingleLine(config.endpoint, 240) || DEFAULT_PLANNER_REMOTE_ENDPOINT;
+  const debounceMs = Number(config.debounceMs);
+  return {
+    endpoint,
+    hydrateFromRemote: Boolean(config.hydrateFromRemote),
+    saveToRemote: Boolean(config.saveToRemote),
+    debounceMs:
+      Number.isFinite(debounceMs) && debounceMs >= 0
+        ? debounceMs
+        : PLANNER_REMOTE_SAVE_DEBOUNCE_MS,
+  };
+}
+
+function extractPlannerPersistencePayload(data) {
+  const looksLikePlannerState = (value) => Boolean(
+    value &&
+    typeof value === "object" &&
+    ("tasks" in value || "notes" in value || "selectedTaskId" in value || "viewMode" in value),
+  );
+  if (looksLikePlannerState(data)) return data;
+  if (!data || typeof data !== "object") return null;
+  if (looksLikePlannerState(data.planner)) return data.planner;
+  if (looksLikePlannerState(data.state)) return data.state;
+  if (looksLikePlannerState(data.snapshot)) return data.snapshot;
+  return null;
+}
+
+function loadPlannerState() {
+  return sanitizePlannerStatePayload(readPlannerLocalSnapshot(), buildDefaultPlannerState());
 }
 
 const plannerState = loadPlannerState();
 
 function persistPlannerState() {
-  try {
-    window.localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(plannerState));
-  } catch (_) {
-    // no-op
-  }
+  const snapshot = plannerStateSnapshot(plannerState);
+  writePlannerLocalSnapshot(snapshot);
+  schedulePlannerRemoteSave(snapshot);
 }
+
+function applyPlannerState(nextState) {
+  Object.assign(plannerState, plannerStateSnapshot(nextState));
+}
+
+function schedulePlannerRemoteSave(snapshot = plannerStateSnapshot(plannerState)) {
+  const config = getPlannerPersistenceConfig();
+  if (!config.saveToRemote || !config.endpoint) return;
+  plannerPendingRemoteSnapshot = snapshot;
+  if (plannerRemoteSaveTimer) {
+    window.clearTimeout(plannerRemoteSaveTimer);
+  }
+  plannerRemoteSaveTimer = window.setTimeout(() => {
+    plannerRemoteSaveTimer = null;
+    void flushPlannerRemoteSave();
+  }, config.debounceMs);
+}
+
+async function flushPlannerRemoteSave() {
+  const config = getPlannerPersistenceConfig();
+  if (!config.saveToRemote || !config.endpoint || plannerRemoteSaveInFlight || !plannerPendingRemoteSnapshot) {
+    return false;
+  }
+  const snapshot = plannerPendingRemoteSnapshot;
+  plannerPendingRemoteSnapshot = null;
+  plannerRemoteSaveInFlight = authorizedRequest(config.endpoint, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ planner: snapshot }),
+  });
+  const result = await plannerRemoteSaveInFlight;
+  plannerRemoteSaveInFlight = null;
+  if (!result.ok) {
+    console.warn("Could not sync planner state to remote persistence.", result.data);
+  }
+  if (plannerPendingRemoteSnapshot) {
+    void flushPlannerRemoteSave();
+  }
+  return result.ok;
+}
+
+async function hydratePlannerStateFromPersistence() {
+  const config = getPlannerPersistenceConfig();
+  if (!config.hydrateFromRemote || !config.endpoint) return false;
+  const result = await authorizedRequest(config.endpoint);
+  if (!result.ok) {
+    console.warn("Could not load planner state from remote persistence.", result.data);
+    return false;
+  }
+  const payload = extractPlannerPersistencePayload(result.data);
+  if (!payload) return false;
+  applyPlannerState(sanitizePlannerStatePayload(payload, buildDefaultPlannerState()));
+  writePlannerLocalSnapshot(plannerStateSnapshot(plannerState));
+  refreshPlannerStudioUi();
+  renderPlannerFloatingNotes();
+  refreshPlannerLiveUi();
+  refreshHomeOverviewIfNeeded();
+  return true;
+}
+
+window.workspacePlannerPersistence = {
+  getConfig: () => ({ ...getPlannerPersistenceConfig() }),
+  getSnapshot: () => plannerStateSnapshot(plannerState),
+  hydrate: () => hydratePlannerStateFromPersistence(),
+  flush: () => flushPlannerRemoteSave(),
+};
 
 function sanitizeDashboardStudyByDay(value) {
   const safe = {};
@@ -3481,6 +3634,307 @@ function plannerOverviewHtml() {
   );
 }
 
+function plannerDashboardSortedTasks() {
+  return plannerState.tasks
+    .slice()
+    .sort((left, right) => {
+      const leftStatus = PLANNER_STATUS_OPTIONS.indexOf(left.status);
+      const rightStatus = PLANNER_STATUS_OPTIONS.indexOf(right.status);
+      if (leftStatus !== rightStatus) return leftStatus - rightStatus;
+      const leftDeadline = Date.parse(left.deadline || left.scheduledAt || "") || Number.MAX_SAFE_INTEGER;
+      const rightDeadline = Date.parse(right.deadline || right.scheduledAt || "") || Number.MAX_SAFE_INTEGER;
+      if (leftDeadline !== rightDeadline) return leftDeadline - rightDeadline;
+      return Number(right.updatedAt || 0) - Number(left.updatedAt || 0);
+    });
+}
+
+function plannerDashboardTasksByStatus(status) {
+  return plannerDashboardSortedTasks().filter((task) => task.status === status);
+}
+
+function plannerDashboardUpcomingTasks(limit = 4) {
+  const now = Date.now();
+  return plannerDashboardSortedTasks()
+    .filter((task) => task.status !== "done" && plannerDeadlineState(task, now).kind !== "none")
+    .sort((left, right) => (Date.parse(left.deadline || "") || 0) - (Date.parse(right.deadline || "") || 0))
+    .slice(0, limit);
+}
+
+function plannerDashboardTimelineTasks(limit = 6) {
+  const todayKey = plannerDayKey();
+  return plannerDashboardSortedTasks()
+    .filter((task) => {
+      if (task.status === "done") return false;
+      return plannerDayKey(task.scheduledAt) === todayKey || plannerDayKey(task.deadline) === todayKey;
+    })
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.scheduledAt || left.deadline || "") || Number.MAX_SAFE_INTEGER;
+      const rightTime = Date.parse(right.scheduledAt || right.deadline || "") || Number.MAX_SAFE_INTEGER;
+      return leftTime - rightTime;
+    })
+    .slice(0, limit);
+}
+
+function plannerActiveNote() {
+  const sortedNotes = plannerState.notes
+    .slice()
+    .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0));
+  const openNotes = sortedNotes
+    .filter((note) => note.isOpen)
+    .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0));
+  return openNotes[0] || sortedNotes[0] || null;
+}
+
+function plannerDashboardTaskRowHtml(task) {
+  const now = Date.now();
+  const deadline = plannerDeadlineState(task, now);
+  const taskId = escapeHtml(task.id);
+  const isSelected = plannerState.selectedTaskId === task.id;
+  const meta = [task.project, task.tag].filter(Boolean).join(" • ") || plannerStatusLabel(task.status);
+  return (
+    '<article class="home-task-item planner-dashboard-task' +
+    (task.status === "done" ? " is-done" : "") +
+    (isSelected ? " is-active" : "") +
+    '" draggable="true" data-planner-task-drag="' + taskId + '">' +
+    '<button type="button" class="home-task-check' + (task.status === "done" ? " is-done" : "") +
+    '" data-planner-task-toggle="' + taskId + '" aria-pressed="' + String(task.status === "done") + '">' +
+    "<span></span></button>" +
+    '<button type="button" class="planner-dashboard-task-open" data-planner-task-select="' + taskId + '">' +
+    '<div class="home-task-copy"><strong>' + escapeHtml(task.title) + "</strong>" +
+    "<span>" + escapeHtml(meta) + "</span>" +
+    '<span data-planner-task-deadline="' + taskId + '">' + escapeHtml(deadline.copy) + "</span></div></button>" +
+    '<button type="button" class="home-inline-btn" data-planner-task-select="' + taskId + '">' +
+    escapeHtml(localizeText("Chi tiết", "Details")) +
+    "</button></article>"
+  );
+}
+
+function plannerDashboardStatusColumnHtml(status) {
+  const items = plannerDashboardTasksByStatus(status);
+  return (
+    '<section class="planner-dashboard-status-column" data-planner-drop-zone="' + escapeHtml(status) + '">' +
+    '<div class="home-mini-head"><strong>' + escapeHtml(plannerStatusLabel(status)) + "</strong><span>" +
+    String(items.length) + "</span></div>" +
+    (items.length
+      ? '<div class="planner-dashboard-task-list">' + items.map((task) => plannerDashboardTaskRowHtml(task)).join("") + "</div>"
+      : '<div class="home-note-empty planner-dashboard-empty">' +
+        escapeHtml(localizeText("Chưa có task ở cột này.", "No tasks in this column yet.")) +
+        "</div>") +
+    "</section>"
+  );
+}
+
+function plannerDashboardDueSoonHtml() {
+  const items = plannerDashboardUpcomingTasks(4);
+  return (
+    '<div class="planner-dashboard-support-card">' +
+    '<div class="home-mini-head"><strong>' + escapeHtml(localizeText("Sắp đến hạn", "Due soon")) + "</strong><span>" +
+    escapeHtml(localizeText("Ưu tiên", "Priority")) + "</span></div>" +
+    (items.length
+      ? '<div class="home-note-list">' + items.map((task) =>
+        '<button type="button" class="home-note-chip" data-planner-task-select="' + escapeHtml(task.id) + '">' +
+        '<strong>' + escapeHtml(task.title) + "</strong>" +
+        "<span>" + escapeHtml(plannerDeadlineState(task).copy) + "</span></button>"
+      ).join("") + "</div>"
+      : '<div class="home-note-empty">' +
+        escapeHtml(localizeText("Không có task nào cần ưu tiên gấp.", "Nothing urgent is coming up.")) +
+        "</div>") +
+    "</div>"
+  );
+}
+
+function plannerDashboardTimelineHtml() {
+  const items = plannerDashboardTimelineTasks(6);
+  return (
+    '<div class="planner-dashboard-support-card">' +
+    '<div class="home-mini-head"><strong>' + escapeHtml(localizeText("Timeline hôm nay", "Today timeline")) + "</strong><span>" +
+    escapeHtml(localizeText("Theo giờ", "By hour")) + "</span></div>" +
+    (items.length
+      ? '<div class="home-timeline-list">' + items.map((task) => {
+        const stamp = task.scheduledAt || task.deadline;
+        return (
+          '<button type="button" class="home-timeline-item" data-planner-task-select="' + escapeHtml(task.id) + '">' +
+          "<span>" + escapeHtml(plannerDateTimeLabel(stamp)) + "</span>" +
+          "<strong>" + escapeHtml(task.title) + "</strong>" +
+          "<small>" + escapeHtml(task.project || plannerStatusLabel(task.status)) + "</small>" +
+          "</button>"
+        );
+      }).join("") + "</div>"
+      : '<div class="home-note-empty">' +
+        escapeHtml(localizeText("Chưa có mốc giờ nào cho hôm nay.", "No scheduled slots for today yet.")) +
+        "</div>") +
+    "</div>"
+  );
+}
+
+function plannerDashboardTaskFormHtml() {
+  const selected = getPlannerTaskById(plannerState.selectedTaskId);
+  const tracked = selected
+    ? formatPlannerTrackedMs(getPlannerTaskTrackedMs(selected))
+    : localizeText("Chưa có", "No data");
+  return (
+    '<form class="planner-dashboard-form" data-planner-task-form="true">' +
+    '<input type="hidden" name="taskId" value="' + escapeHtml(selected ? selected.id : "") + '">' +
+    '<label><span>' + escapeHtml(localizeText("Tên task", "Task name")) + '</span>' +
+    '<input class="settings-text-input" type="text" name="title" maxlength="120" value="' +
+    escapeHtml(selected ? selected.title : "") + '" placeholder="' +
+    escapeHtml(localizeText("Ví dụ: soạn báo cáo sprint", "Example: draft sprint report")) + '"></label>' +
+    '<label><span>' + escapeHtml(localizeText("Mô tả ngắn", "Short description")) + '</span>' +
+    '<textarea class="settings-text-input" name="description" rows="4" maxlength="600" placeholder="' +
+    escapeHtml(localizeText("Thêm context, checklist hoặc link liên quan...", "Add context, checklist, or reference links...")) +
+    '">' + escapeHtml(selected ? selected.description : "") + "</textarea></label>" +
+    '<div class="planner-dashboard-form-grid">' +
+    '<label><span>Deadline</span><input class="settings-text-input" type="datetime-local" name="deadline" value="' +
+    escapeHtml(selected ? selected.deadline : "") + '"></label>' +
+    '<label><span>' + escapeHtml(localizeText("Lịch làm", "Schedule")) + '</span><input class="settings-text-input" type="datetime-local" name="scheduledAt" value="' +
+    escapeHtml(selected ? selected.scheduledAt : "") + '"></label>' +
+    '<label><span>' + escapeHtml(localizeText("Ưu tiên", "Priority")) + '</span><select class="settings-select-input" name="priority">' +
+    PLANNER_PRIORITY_OPTIONS.map((priority) =>
+      '<option value="' + priority + '"' + ((selected ? selected.priority : "medium") === priority ? " selected" : "") + ">" +
+      escapeHtml(plannerPriorityLabel(priority)) + "</option>"
+    ).join("") + "</select></label>" +
+    '<label><span>Status</span><select class="settings-select-input" name="status">' +
+    PLANNER_STATUS_OPTIONS.map((status) =>
+      '<option value="' + status + '"' + ((selected ? selected.status : "todo") === status ? " selected" : "") + ">" +
+      escapeHtml(plannerStatusLabel(status)) + "</option>"
+    ).join("") + "</select></label>" +
+    '<label><span>Project</span><input class="settings-text-input" type="text" name="project" maxlength="64" value="' +
+    escapeHtml(selected ? selected.project : "") + '" placeholder="' +
+    escapeHtml(localizeText("Ví dụ: Marketing", "Example: Marketing")) + '"></label>' +
+    '<label><span>Tag</span><input class="settings-text-input" type="text" name="tag" maxlength="48" value="' +
+    escapeHtml(selected ? selected.tag : "") + '" placeholder="' +
+    escapeHtml(localizeText("Ví dụ: nội bộ", "Example: internal")) + '"></label>' +
+    '<label><span>' + escapeHtml(localizeText("Ước tính (phút)", "Estimate (minutes)")) + '</span><input class="settings-text-input" type="number" name="estimateMinutes" min="5" max="720" step="5" value="' +
+    escapeHtml(String(selected ? selected.estimateMinutes : 30)) + '"></label>' +
+    '<div class="planner-dashboard-inline-cards">' +
+    '<article class="home-progress-card"><span>' + escapeHtml(localizeText("Đã track", "Tracked")) + '</span><strong data-planner-task-tracked="' +
+    escapeHtml(selected ? selected.id : "") + '">' + escapeHtml(tracked) + "</strong></article>" +
+    '<article class="home-progress-card"><span>' + escapeHtml(localizeText("Tiến độ", "Status")) + "</span><strong>" +
+    escapeHtml(selected ? plannerStatusLabel(selected.status) : plannerStatusLabel("todo")) + "</strong></article>" +
+    "</div></div>" +
+    '<div class="planner-dashboard-inline-actions">' +
+    (selected
+      ? '<button type="button" class="home-inline-btn" data-planner-task-track="' + escapeHtml(selected.id) + '">' +
+        escapeHtml(plannerState.activeTaskId === selected.id ? localizeText("Dừng track", "Stop tracking") : localizeText("Track task", "Track task")) +
+        "</button>"
+      : "") +
+    '<button type="button" class="home-inline-btn" data-planner-task-reset="true">' + escapeHtml(localizeText("Task mới", "New task")) + "</button>" +
+    (selected
+      ? '<button type="button" class="home-inline-btn" data-planner-task-remove="' + escapeHtml(selected.id) + '">' +
+        escapeHtml(localizeText("Xoa task", "Delete task")) +
+        "</button>"
+      : "") +
+    '<button type="submit" class="home-quick-btn primary">' +
+    escapeHtml(selected ? localizeText("Lưu task", "Save task") : localizeText("Tạo task", "Create task")) +
+    "</button></div></form>"
+  );
+}
+
+function plannerDashboardNotesListHtml() {
+  const activeNote = plannerActiveNote();
+  if (!plannerState.notes.length) {
+    return (
+      '<div class="home-note-empty">' +
+      escapeHtml(localizeText("Chưa có note nào. Tạo note mới để bắt đầu.", "No notes yet. Create one to start writing.")) +
+      "</div>"
+    );
+  }
+  return (
+    '<div class="home-note-list planner-dashboard-note-list">' +
+    plannerState.notes
+      .slice()
+      .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
+      .map((note) =>
+        '<button type="button" class="home-note-chip' + (activeNote && activeNote.id === note.id ? " is-active" : "") + '" data-planner-note-open="' + escapeHtml(note.id) + '">' +
+        '<strong>' + escapeHtml(note.title) + "</strong>" +
+        '<span>' + escapeHtml((note.content || localizeText("Note trống, bấm để viết.", "Empty note, click to edit.")).slice(0, 96)) + "</span>" +
+        "</button>"
+      ).join("") +
+    "</div>"
+  );
+}
+
+function plannerDashboardNoteEditorHtml() {
+  const note = plannerActiveNote();
+  if (!note) {
+    return (
+      '<div class="home-note-empty">' +
+      escapeHtml(localizeText("Chọn một note để chỉnh sửa hoặc tạo note mới.", "Pick a note to edit or create a new one.")) +
+      "</div>"
+    );
+  }
+  return (
+    '<div class="planner-dashboard-note-editor">' +
+    '<div class="home-mini-head"><strong>' + escapeHtml(localizeText("Đang chỉnh note", "Editing note")) + "</strong><span>" +
+    escapeHtml(note.pinned ? localizeText("Đã ghim", "Pinned") : localizeText("Bản nháp", "Draft")) + "</span></div>" +
+    '<input class="settings-text-input planner-dashboard-note-title" data-planner-note-title="' + escapeHtml(note.id) +
+    '" maxlength="80" value="' + escapeHtml(note.title) + '" placeholder="' +
+    escapeHtml(localizeText("Tiêu đề note", "Note title")) + '">' +
+    '<textarea class="home-quick-note-input planner-dashboard-note-body" data-planner-note-content="' + escapeHtml(note.id) +
+    '" rows="8" maxlength="5000" placeholder="' +
+    escapeHtml(localizeText("Viết note, checklist hoặc ý tưởng ở đây...", "Write notes, checklists, or ideas here...")) +
+    '">' + escapeHtml(note.content) + "</textarea>" +
+    '<div class="planner-dashboard-inline-actions">' +
+    '<button type="button" class="home-inline-btn" data-planner-note-new="true">' + escapeHtml(localizeText("Note mới", "New note")) + "</button>" +
+    '<button type="button" class="home-inline-btn" data-planner-note-pin="' + escapeHtml(note.id) + '">' +
+    escapeHtml(note.pinned ? localizeText("Bỏ ghim", "Unpin") : localizeText("Ghim note", "Pin note")) + "</button>" +
+    '<button type="button" class="home-inline-btn" data-planner-note-convert="' + escapeHtml(note.id) + '">' +
+    escapeHtml(localizeText("Ra task", "To task")) + "</button>" +
+    '<button type="button" class="home-inline-btn" data-planner-note-delete="' + escapeHtml(note.id) + '">' +
+    escapeHtml(localizeText("Xóa", "Delete")) + "</button>" +
+    "</div></div>"
+  );
+}
+
+function plannerDashboardMarkup() {
+  const snapshot = plannerOverviewSnapshot();
+  return (
+    '<section class="home-overview home-dashboard planner-dashboard" data-planner-studio="true">' +
+    '<section class="home-welcome planner-dashboard-hero">' +
+    '<div class="home-welcome-copy"><div class="eyebrow">Dashboard</div>' +
+    '<h2>' + escapeHtml(localizeText("Task và note gọn theo kiểu dashboard", "Tasks and notes in the dashboard style")) + "</h2>" +
+    '<p>' + escapeHtml(localizeText(
+      "Bỏ Flow Desk riêng lẻ để phần ghi chú, task và timeline đi cùng một ngôn ngữ giao diện với dashboard.",
+      "The old Flow Desk module is replaced so notes, tasks, and timeline follow the same visual language as the dashboard.",
+    )) + "</p></div>" +
+    '<div class="planner-dashboard-hero-actions">' +
+    '<form class="planner-quick-add-form planner-dashboard-quick-add" data-planner-quick-add-form="true">' +
+    '<input class="settings-text-input planner-quick-add-input" name="quickAdd" maxlength="160" placeholder="' +
+    escapeHtml(localizeText("Nhập nhanh tên task để tạo mới", "Type a task title for quick capture")) + '">' +
+    '<button type="submit" class="home-quick-btn primary">' + escapeHtml(localizeText("Thêm task", "Add task")) + "</button>" +
+    "</form>" +
+    '<button type="button" class="home-quick-btn" data-planner-note-new="true">' + escapeHtml(localizeText("Tạo note", "New note")) + "</button>" +
+    "</div>" +
+    '<div class="home-stat-grid planner-dashboard-summary">' +
+    '<article class="home-stat-card primary"><span>' + escapeHtml(localizeText("Tổng task", "Total tasks")) + "</span><strong>" + String(snapshot.total) + "</strong></article>" +
+    '<article class="home-stat-card"><span>' + escapeHtml(localizeText("Hoàn thành", "Done")) + "</span><strong>" + String(snapshot.done) + "</strong><small>" + escapeHtml(localizeText("task đã xong", "tasks finished")) + "</small></article>" +
+    '<article class="home-stat-card"><span>' + escapeHtml(localizeText("Đang làm", "In progress")) + "</span><strong>" + String(snapshot.active) + "</strong><small>" + escapeHtml(localizeText("task đang chạy", "tasks active")) + "</small></article>" +
+    '<article class="home-stat-card"><span>' + escapeHtml(localizeText("Sắp đến hạn", "Due soon")) + "</span><strong>" + String(snapshot.dueSoon) + "</strong><small>" + escapeHtml(localizeText("cần ưu tiên", "need attention")) + "</small></article>" +
+    "</div></section>" +
+    '<div class="planner-dashboard-grid">' +
+    '<div class="planner-dashboard-main">' +
+    '<section class="home-block planner-dashboard-block"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Task queue", "Task queue")) + "</strong><span>" +
+    escapeHtml(localizeText("Nhóm theo trạng thái, mở chi tiết ở panel bên phải", "Grouped by status, edit details in the side panel")) + "</span></div>" +
+    '<div class="planner-dashboard-status-grid">' +
+    plannerDashboardStatusColumnHtml("todo") +
+    plannerDashboardStatusColumnHtml("progress") +
+    plannerDashboardStatusColumnHtml("done") +
+    "</div></section>" +
+    '<section class="home-block planner-dashboard-block"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Nhịp hôm nay", "Today's flow")) + "</strong><span>" +
+    escapeHtml(localizeText("Timeline và việc sắp tới hạn", "Timeline and near-deadline tasks")) + "</span></div>" +
+    '<div class="home-support-grid">' + plannerDashboardDueSoonHtml() + plannerDashboardTimelineHtml() + "</div></section>" +
+    "</div>" +
+    '<aside class="planner-dashboard-side">' +
+    '<section class="home-block planner-dashboard-block"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Chi tiết task", "Task details")) + "</strong><span>" +
+    escapeHtml(localizeText("Tạo mới hoặc chỉnh task đang chọn", "Create a new task or edit the selected one")) + "</span></div>" +
+    plannerDashboardTaskFormHtml() + "</section>" +
+    '<section class="home-block planner-dashboard-block"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Notes", "Notes")) + "</strong><span>" +
+    escapeHtml(localizeText(String(plannerState.notes.length) + " note đang lưu", String(plannerState.notes.length) + " saved notes")) + "</span></div>" +
+    plannerDashboardNotesListHtml() + plannerDashboardNoteEditorHtml() + "</section>" +
+    "</aside></div></section>"
+  );
+}
+
 function plannerStudioMarkup() {
   return (
     '<section class="planner-studio" data-planner-studio="true">' +
@@ -3547,12 +4001,15 @@ function plannerStudioMarkup() {
 
 function refreshPlannerStudioUi(panel = getPlannerStudioPanel()) {
   if (!panel) return;
-  panel.innerHTML = plannerStudioMarkup();
+  panel.innerHTML = plannerDashboardMarkup();
   refreshPlannerLiveUi();
 }
 
 function renderPlannerFloatingNotes() {
   const layer = ensurePlannerFloatingLayer();
+  layer.innerHTML = "";
+  document.body.classList.remove("planner-note-layer-open");
+  return;
   const openNotes = plannerState.notes
     .filter((note) => note.isOpen)
     .sort((left, right) => Number(left.z || 0) - Number(right.z || 0));
@@ -3610,6 +4067,10 @@ function refreshPlannerLiveUi(now = Date.now()) {
 function openPlannerNoteWindow(noteId) {
   const note = getPlannerNoteById(noteId);
   if (!note) return;
+  plannerState.notes.forEach((item) => {
+    item.isOpen = item.id === note.id;
+    item.minimized = false;
+  });
   note.isOpen = true;
   note.minimized = false;
   if (!Number.isFinite(note.x) || !Number.isFinite(note.y) || (!note.x && !note.y)) {
@@ -3687,6 +4148,10 @@ function convertPlannerNoteToTask(noteId) {
 function createPlannerStickyNote(seedTitle, seedContent) {
   const nextPosition = nextPlannerNotePosition();
   plannerState.noteZCounter = Math.max(1, Number(plannerState.noteZCounter) || 1) + 1;
+  plannerState.notes.forEach((note) => {
+    note.isOpen = false;
+    note.minimized = false;
+  });
   plannerState.notes.unshift(
     createPlannerNote({
       title: seedTitle,
@@ -3718,9 +4183,7 @@ function updatePlannerNoteField(noteId, field, value) {
   }
   note.updatedAt = Date.now();
   persistPlannerState();
-  if (isStudyNotesPopoverOpen()) {
-    refreshPlannerStudioUi();
-  }
+  refreshHomeOverviewIfNeeded();
 }
 
 function selectPlannerTask(taskId) {
@@ -4930,6 +5393,24 @@ function messagePreview(message, sent, sender) {
   return prefix + ": " + messageSummaryText(message);
 }
 
+function isOwnMessage(message, sent) {
+  if (sent) return true;
+  if (!message || !currentUser || !currentUser.email) return false;
+  const currentEmail = normalizeEmail(currentUser.email);
+  const senderEmail = normalizeEmail(message.senderEmail);
+  if (senderEmail && senderEmail === currentEmail) {
+    return true;
+  }
+  if (activeChannel.type === "direct") {
+    const recipientEmail = normalizeEmail(message.recipientEmail);
+    const channelEmail = normalizeEmail(activeChannel.email);
+    if (recipientEmail && channelEmail && recipientEmail === channelEmail) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function canToggleMessagePin(message, sent) {
   return Boolean(message) && !message.recalled;
 }
@@ -4990,8 +5471,9 @@ function buildMessageActionMenu(message, sent, sender) {
   const menu = document.createElement("div");
   menu.className = "message-action-menu";
   menu.setAttribute("role", "menu");
+  const ownMessage = isOwnMessage(message, sent);
 
-  if (sent && !message.recalled) {
+  if (ownMessage && !message.recalled) {
     menu.appendChild(
       createMessageActionItem(
         localizeText("Thu hồi", "Recall"),
@@ -5081,7 +5563,8 @@ function buildMessageActions(message, sent, sender) {
     return null;
   }
 
-  const hasRecall = sent && !message.recalled;
+  const ownMessage = isOwnMessage(message, sent);
+  const hasRecall = ownMessage && !message.recalled;
   const hasPin = canToggleMessagePin(message, sent);
   if (!hasRecall && !hasPin) {
     return null;
@@ -5119,20 +5602,21 @@ function addMessage(message, sent, sender, timestamp, autoScroll = true) {
     el.messagesArea.innerHTML = "";
   }
   setMessagesSurfaceMode("conversation");
+  const ownMessage = isOwnMessage(message, sent);
   const row = document.createElement("div");
-  row.className = "message-row" + (sent ? " sent" : "") + (message && message.recalled ? " recalled" : "");
+  row.className = "message-row" + (ownMessage ? " sent" : "") + (message && message.recalled ? " recalled" : "");
   if (message && message.id) {
     row.dataset.messageId = String(message.id);
   }
-  const identity = resolveMessageIdentity(message, sent, sender);
+  const identity = resolveMessageIdentity(message, ownMessage, sender);
   row.innerHTML =
     '<div class="message-stack"><div class="message-meta"><strong>' +
     (identity.name || sender) +
     "</strong><span>" +
     formatTime(timestamp) +
-    '</span></div><div class="message-bubble"></div></div>';
+    '</span></div><div class="message-content-row"><div class="message-bubble"></div></div></div>';
   const bubble = row.querySelector(".message-bubble");
-  const stack = row.querySelector(".message-stack");
+  const contentRow = row.querySelector(".message-content-row");
   const text = String((message && message.content) || "").trim();
   if (message && message.recalled) {
     const copy = document.createElement("div");
@@ -5149,9 +5633,9 @@ function addMessage(message, sent, sender, timestamp, autoScroll = true) {
   if (attachment) {
     bubble.appendChild(attachment);
   }
-  const tools = buildMessageActions(message, sent, sender);
-  if (tools && stack) {
-    stack.appendChild(tools);
+  const tools = buildMessageActions(message, ownMessage, sender);
+  if (tools && contentRow) {
+    contentRow.appendChild(tools);
   }
   el.messagesArea.appendChild(row);
   if (autoScroll) {
@@ -6010,6 +6494,7 @@ async function bootstrap() {
       refreshPlannerStudioUi();
       renderPlannerFloatingNotes();
     }
+    await hydratePlannerStateFromPersistence();
     syncCurrentUserUi();
     setFriendCardCollapsed(true);
     setFriendsCardCollapsed(false);

@@ -6426,8 +6426,20 @@ html.workspace-booting .preview-shell {
   justify-content: flex-end;
 }
 
+.preview-chat-panel .message-content-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.preview-chat-panel .message-row.sent .message-content-row {
+  flex-direction: row-reverse;
+}
+
 .preview-chat-panel .message-bubble {
   min-width: 0;
+  max-width: 100%;
   padding: 16px 18px;
   border-radius: 24px;
   border: 1px solid rgba(148, 163, 184, 0.14);
@@ -6456,9 +6468,10 @@ html.workspace-booting .preview-shell {
 
 .preview-chat-panel .message-tools {
   display: flex;
-  width: 100%;
-  justify-content: flex-end;
-  margin-top: 8px;
+  width: auto;
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  margin-top: 0;
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.18s ease, transform 0.18s ease;
@@ -7445,6 +7458,200 @@ html.workspace-booting .preview-shell {
   background: linear-gradient(135deg, rgba(29, 78, 216, 0.98), rgba(67, 56, 202, 0.94));
 }
 
+.planner-dashboard {
+  gap: 18px;
+}
+
+.planner-dashboard-hero {
+  gap: 20px;
+}
+
+.planner-dashboard-hero-actions,
+.planner-dashboard-quick-add,
+.planner-dashboard-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.planner-dashboard-hero-actions {
+  justify-content: space-between;
+}
+
+.planner-dashboard-quick-add {
+  flex: 1 1 340px;
+}
+
+.planner-dashboard-quick-add .planner-quick-add-input {
+  flex: 1 1 auto;
+  min-width: 220px;
+}
+
+.planner-dashboard-summary {
+  margin-top: 4px;
+}
+
+.planner-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.14fr) minmax(320px, 0.86fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.planner-dashboard-main,
+.planner-dashboard-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.planner-dashboard-block {
+  min-width: 0;
+}
+
+.planner-dashboard-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.planner-dashboard-status-column,
+.planner-dashboard-support-card,
+.planner-dashboard-note-editor {
+  min-width: 0;
+  min-height: 100%;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(248, 250, 252, 0.88);
+}
+
+.planner-dashboard-status-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.planner-dashboard-status-column:hover {
+  border-color: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 16px 34px rgba(37, 99, 235, 0.06);
+}
+
+.planner-dashboard-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planner-dashboard-task {
+  cursor: grab;
+}
+
+.planner-dashboard-task.is-active {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.08);
+}
+
+.planner-dashboard-task-open {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planner-dashboard-task-open .home-task-copy {
+  min-width: 0;
+}
+
+.planner-dashboard-task-open .home-task-copy strong,
+.planner-dashboard-task-open .home-task-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planner-dashboard-empty {
+  min-height: 96px;
+}
+
+.planner-dashboard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.planner-dashboard-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planner-dashboard-form label > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.planner-dashboard-form textarea {
+  min-height: 122px;
+  resize: vertical;
+}
+
+.planner-dashboard-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.planner-dashboard-inline-cards {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.planner-dashboard-inline-cards .home-progress-card {
+  min-height: 108px;
+}
+
+.planner-dashboard-inline-actions {
+  justify-content: flex-end;
+}
+
+.planner-dashboard-note-list {
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.planner-dashboard-note-list .home-note-chip.is-active {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 34px rgba(37, 99, 235, 0.08);
+}
+
+.planner-dashboard-note-editor {
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planner-dashboard-note-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.planner-dashboard-note-body {
+  min-height: 180px;
+}
+
 body.theme-dark .home-dashboard .home-welcome,
 body.theme-dark .home-dashboard .home-block {
   border-color: rgba(148, 163, 184, 0.14);
@@ -7493,6 +7700,26 @@ body.theme-dark .home-quick-btn.primary {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.92), rgba(79, 70, 229, 0.9));
 }
 
+body.theme-dark .planner-dashboard-status-column,
+body.theme-dark .planner-dashboard-support-card,
+body.theme-dark .planner-dashboard-note-editor,
+body.theme-dark .planner-dashboard-task.is-active {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.88);
+  box-shadow: none;
+}
+
+body.theme-dark .planner-dashboard-status-column:hover {
+  border-color: rgba(96, 165, 250, 0.22);
+  box-shadow: none;
+}
+
+body.theme-dark .planner-dashboard-note-list .home-note-chip.is-active {
+  border-color: rgba(96, 165, 250, 0.24);
+  background: rgba(30, 41, 59, 0.92);
+  box-shadow: none;
+}
+
 body.theme-dark .home-task-check span {
   border-color: rgba(96, 165, 250, 0.42);
 }
@@ -7510,6 +7737,15 @@ body.theme-dark .home-heatmap-cell[data-level="0"] {
   .home-dashboard-grid {
     grid-template-columns: 1fr;
   }
+
+  .planner-dashboard-grid,
+  .planner-dashboard-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-dashboard-note-list {
+    max-height: none;
+  }
 }
 
 @media (max-width: 860px) {
@@ -7525,6 +7761,18 @@ body.theme-dark .home-heatmap-cell[data-level="0"] {
   }
 
   .home-block-head {
+    flex-direction: column;
+  }
+
+  .planner-dashboard-form-grid,
+  .planner-dashboard-inline-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-dashboard-hero-actions,
+  .planner-dashboard-quick-add,
+  .planner-dashboard-inline-actions {
+    align-items: stretch;
     flex-direction: column;
   }
 
