@@ -162,7 +162,7 @@ class SocialServiceTest {
 
         assertThatThrownBy(() -> service.sendFriendRequest("alice@example.com", "ghost@example.com"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("No MyClassRoom account found for ghost@example.com.");
+                .hasMessage("Not found.");
     }
 
     @Test

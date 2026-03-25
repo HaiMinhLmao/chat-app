@@ -4850,8 +4850,6 @@ html.workspace-booting .preview-shell {
   display: grid;
   grid-auto-rows: max-content;
   align-content: start;
-  height: 100%;
-  max-height: 100%;
   min-height: 0;
   margin-top: 18px;
   gap: 18px;
@@ -5096,7 +5094,7 @@ html.workspace-booting .preview-shell {
 
 .preview-chat-panel .message-row.sent .message-meta,
 .preview-chat-panel .message-row.sent .message-meta strong {
-  color: rgba(255, 255, 255, 0.82);
+  color: #7d8faf;
 }
 
 .preview-chat-panel .message-row.sent .message-meta {

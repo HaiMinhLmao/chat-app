@@ -179,7 +179,7 @@ class GroupServiceTest {
                 )
         ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("No MyClassRoom account found for friend@example.com.");
+                .hasMessage("Not found.");
     }
 
     @Test

@@ -34,7 +34,7 @@ public class SocialService {
 
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
-    private static final String UNKNOWN_ACCOUNT_PREFIX = "No MyClassRoom account found for ";
+    private static final String UNKNOWN_ACCOUNT_MESSAGE = "Not found.";
 
     private final FriendRequestRepository friendRequestRepository;
     private final GroupInvitationRepository groupInvitationRepository;
@@ -300,7 +300,7 @@ public class SocialService {
     }
 
     private String unknownAccountMessage(String email) {
-        return UNKNOWN_ACCOUNT_PREFIX + email + ".";
+        return UNKNOWN_ACCOUNT_MESSAGE;
     }
 
     private String normalizeRequiredEmail(String email) {

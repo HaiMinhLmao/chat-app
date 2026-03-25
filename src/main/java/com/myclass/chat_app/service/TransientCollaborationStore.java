@@ -576,9 +576,7 @@ public class TransientCollaborationStore {
     }
 
     private static String missingAccountMessage(List<String> emails) {
-        return emails.size() == 1
-                ? "No MyClassRoom account found for " + emails.get(0) + "."
-                : "No MyClassRoom accounts found for: " + String.join(", ", emails) + ".";
+        return "Not found.";
     }
 
     private static boolean samePair(StoredFriendRequest request, String first, String second) {
