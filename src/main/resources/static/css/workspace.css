@@ -4847,9 +4847,9 @@ html.workspace-booting .preview-shell {
 
 .preview-chat-stream.messages-body {
   flex: 1;
-  display: grid;
-  grid-auto-rows: max-content;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   min-height: 0;
   margin-top: 18px;
   gap: 18px;
@@ -4862,26 +4862,29 @@ html.workspace-booting .preview-shell {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(125, 143, 175, 0.65) transparent;
   scrollbar-gutter: stable;
 }
 
-.preview-chat-stream.messages-body.conversation-mode {
-  align-content: end;
+.preview-chat-stream.messages-body::-webkit-scrollbar {
+  width: 10px;
 }
 
-.preview-chat-stream.messages-body.conversation-mode > .message-row {
-  width: fit-content;
-  max-width: 100%;
-  justify-self: start;
+.preview-chat-stream.messages-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(125, 143, 175, 0.55);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
-.preview-chat-stream.messages-body.conversation-mode > .message-row.sent {
-  justify-self: end;
+.preview-chat-stream.messages-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .preview-chat-stream.messages-body.empty-mode,
 .preview-chat-stream.messages-body.home-mode {
-  align-content: stretch;
+  justify-content: flex-start;
 }
 
 .preview-chat-panel .empty-state,
