@@ -110,7 +110,7 @@ const el = {
   friendEmailInput: mustGetInput("friendEmailInput"),
   friendSubmitBtn: mustGetButton("friendSubmitBtn"),
   friendRequestFeedback: mustGetElement("friendRequestFeedback"),
-  friendsSearchInput: mustGetInput("friendsSearchInput"),
+  friendsSearchInput: getOptionalInput("friendsSearchInput"),
   settingsPopover: mustGetElement("settingsPopover"),
   settingsCloseButton: mustGetButton("settingsCloseButton"),
   settingsScrim: mustGetElement("settingsScrim"),
@@ -3355,7 +3355,7 @@ function plannerNotesLibraryHtml() {
     '<section class="planner-panel notes">' +
     '<div class="planner-panel-head"><strong>' + escapeHtml(localizeText("Sticky notes", "Sticky notes")) +
     "</strong><button type=\"button\" class=\"planner-mini-btn\" data-planner-note-new=\"true\">" +
-    escapeHtml(localizeText("Tạo note", "New note")) +
+    escapeHtml(localizeText("Sticky note mới", "New sticky note")) +
     "</button></div>" +
     '<div class="planner-note-library">' +
     (plannerState.notes.length
@@ -3475,12 +3475,6 @@ function plannerOverviewHtml() {
     String(snapshot.active) + "</strong><small>" +
     escapeHtml(localizeText("task đang làm", "tasks in progress")) + "</small></div>" +
     "</section>" +
-    '<section class="planner-panel quick-note">' +
-    '<div class="planner-panel-head"><strong>' + escapeHtml(localizeText("Ghi chú nhanh", "Quick note")) + "</strong><span>" +
-    escapeHtml(localizeText("Auto save", "Autosave")) + "</span></div>" +
-    '<textarea class="planner-quick-note-input" data-planner-quick-note="true" rows="5" maxlength="1200" placeholder="' +
-    escapeHtml(localizeText("Ghi ý tưởng, việc vụn hoặc mốc cần nhớ cho hôm nay...", "Drop ideas, loose thoughts, or key checkpoints for today...")) +
-    '">' + escapeHtml(plannerState.quickNote) + "</textarea></section>" +
     plannerUpcomingHtml() +
     plannerTimelineHtml() +
     "</div>"
@@ -3502,14 +3496,13 @@ function plannerStudioMarkup() {
     '<div class="planner-hero-actions">' +
     '<form class="planner-quick-add-form" data-planner-quick-add-form="true">' +
     '<input class="settings-text-input planner-quick-add-input" name="quickAdd" maxlength="160" placeholder="' +
-    escapeHtml(localizeText("Quick Add: nhập tiêu đề rồi chọn Task hoặc Note", "Quick Add: type a title then choose Task or Note")) +
+    escapeHtml(localizeText("Quick Add: nhập tiêu đề task để tạo nhanh", "Quick Add: type a task title for quick capture")) +
     '">' +
     '<div class="planner-quick-add-actions">' +
     '<button type="submit" class="btn" data-planner-quick-submit="task">' + escapeHtml(localizeText("Task", "Task")) + "</button>" +
-    '<button type="submit" class="btn secondary" data-planner-quick-submit="note">' + escapeHtml(localizeText("Note", "Note")) + "</button>" +
     "</div></form>" +
     '<button type="button" class="planner-note-launch-btn" data-planner-note-new="true">' +
-    escapeHtml(localizeText("New Note", "New Note")) +
+    escapeHtml(localizeText("Sticky note", "Sticky note")) +
     "</button></div></section>" +
     plannerOverviewHtml() +
     '<section class="planner-toolbar">' +
@@ -3798,13 +3791,9 @@ function removePlannerTask(taskId) {
   refreshHomeOverviewIfNeeded();
 }
 
-function quickAddPlannerItem(kind, rawValue) {
+function quickAddPlannerTask(rawValue) {
   const text = normalizePlannerSingleLine(rawValue, 160);
   if (!text) return false;
-  if (kind === "note") {
-    createPlannerStickyNote(text, "");
-    return true;
-  }
   plannerState.tasks.unshift(
     createPlannerTask({
       title: text,
@@ -4327,45 +4316,25 @@ function homeTodayTasksSnapshot() {
 }
 
 function homeContinueLearningItems() {
-  const items = [];
-  plannerState.tasks
+  return plannerState.tasks
     .filter((task) => task.status !== "done")
     .sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))
-    .slice(0, 2)
-    .forEach((task) => {
-      items.push({
-        kind: "task",
-        value: task.id,
-        kicker: localizeText("Study plan", "Study plan"),
-        title: task.project || task.title,
-        meta: task.project && task.project !== task.title ? task.title : (task.tag || plannerStatusLabel(task.status)),
-        detail: task.deadline ? plannerDeadlineState(task).copy : localizeText("Continue from your planner", "Continue from your planner"),
-      });
-    });
-
-  groups.slice(0, Math.max(0, 3 - items.length)).forEach((group) => {
-    items.push({
-      kind: "group",
-      value: group.id,
-      kicker: localizeText("Room", "Room"),
-      title: group.name || "Study Group",
-      meta: getPreview("group", group.id, group.category || localizeText("Active room", "Active room")),
-      detail: localizeText("Continue", "Continue"),
-    });
-  });
-
-  socialState.friends.slice(0, Math.max(0, 3 - items.length)).forEach((friend) => {
-    items.push({
-      kind: "direct",
-      value: friend.email,
-      kicker: localizeText("Chat", "Chat"),
-      title: displayName(friend),
-      meta: getPreview("direct", normalizeEmail(friend.email), friend.email || localizeText("Direct chat", "Direct chat")),
-      detail: localizeText("Continue", "Continue"),
-    });
-  });
-
-  return items.slice(0, 3);
+    .slice(0, 3)
+    .map((task) => ({
+      kind: "task",
+      value: task.id,
+      kicker:
+        task.status === "progress"
+          ? localizeText("Đang làm", "In progress")
+          : localizeText("Todo", "Todo"),
+      title: task.title || task.project || localizeText("Untitled task", "Untitled task"),
+      meta: [task.project, task.tag].filter(Boolean).join(" / ") || plannerStatusLabel(task.status),
+      detail: task.deadline
+        ? plannerDeadlineState(task).copy
+        : task.status === "progress"
+          ? localizeText("Đang thực hiện", "Currently in progress")
+          : localizeText("Chưa hoàn thành", "Pending"),
+    }));
 }
 
 function homeTimelineItems() {
@@ -4446,7 +4415,7 @@ function homeContinueCardsHtml(items) {
   if (!items.length) {
     return (
       '<div class="home-block-empty">' +
-      escapeHtml(localizeText("Chưa có nội dung để tiếp tục. Hãy tạo task hoặc tham gia một room.", "Nothing to continue yet. Create a task or join a room.")) +
+      escapeHtml(localizeText("Chưa có việc nào chưa hoàn thành. Hãy tạo task mới từ Quick Actions.", "No unfinished tasks yet. Create one from Quick Actions.")) +
       "</div>"
     );
   }
@@ -4474,31 +4443,6 @@ function homeActivityHtml(items) {
     '<span>' + escapeHtml(item.meta) + "</span>" +
     "</button>"
   ).join("") + "</div>";
-}
-
-function homeTasksHtml(items) {
-  if (!items.length) {
-    return (
-      '<div class="home-block-empty">' +
-      escapeHtml(localizeText("Hôm nay chưa có task nào. Bạn có thể tạo nhanh từ Notes hoặc Quick Actions.", "No tasks yet today. Create one from Notes or Quick Actions.")) +
-      "</div>"
-    );
-  }
-  return '<div class="home-task-list">' + items.map((task) => {
-    const deadline = plannerDeadlineState(task);
-    return (
-      '<article class="home-task-item' + (task.status === "done" ? " is-done" : "") + '">' +
-      '<button type="button" class="home-task-check' + (task.status === "done" ? " is-done" : "") + '" data-home-task-toggle="' + escapeHtml(task.id) + '">' +
-      '<span aria-hidden="true"></span></button>' +
-      '<div class="home-task-copy">' +
-      '<strong>' + escapeHtml(task.title) + "</strong>" +
-      '<span>' + escapeHtml(plannerPriorityLabel(task.priority) + " • " + (deadline.kind === "none" ? localizeText("Không có deadline", "No deadline") : deadline.copy)) + "</span>" +
-      "</div>" +
-      '<button type="button" class="home-inline-btn" data-home-open-task="' + escapeHtml(task.id) + '">' +
-      escapeHtml(localizeText("Mở", "Open")) +
-      "</button></article>"
-    );
-  }).join("") + "</div>";
 }
 
 function homeTimelineHtml(items) {
@@ -4536,7 +4480,7 @@ function homeQuickNotePanelHtml() {
   return (
     '<div class="home-note-capture">' +
     '<div class="home-mini-head"><strong>' + escapeHtml(localizeText("Quick note", "Quick note")) +
-    "</strong><button type=\"button\" class=\"home-inline-btn\" data-home-quick=\"note\">" +
+    "</strong><button type=\"button\" class=\"home-inline-btn\" data-home-quick=\"planner\">" +
     escapeHtml(localizeText("Open planner", "Open planner")) +
     "</button></div>" +
     '<textarea class="home-quick-note-input" data-home-quick-note-input="true" rows="5" maxlength="1200" placeholder="' +
@@ -4544,9 +4488,7 @@ function homeQuickNotePanelHtml() {
     '">' + escapeHtml(plannerState.quickNote) + '</textarea>' +
     '<div class="home-note-capture-foot"><span>' +
     escapeHtml(localizeText("Autosave vào planner", "Autosaved into planner")) +
-    '</span><button type="button" class="home-inline-btn" data-home-quick="task">' +
-    escapeHtml(localizeText("New task", "New task")) +
-    "</button></div></div>"
+    "</span></div></div>"
   );
 }
 
@@ -4584,7 +4526,8 @@ function homeDashboardMarkup() {
     '<section class="home-welcome">' +
     '<div class="home-welcome-copy"><div class="eyebrow">Dashboard</div>' +
     '<h2>' + escapeHtml(localizeText("Xin chào " + name, "Hello " + name)) + "</h2>" +
-    '<p>' + escapeHtml(localizeText("Quay lại đúng việc cần làm, tiếp tục phòng học dở dang và biến note thành hành động ngay trong một vòng làm việc.", "Jump back into the right task, continue active rooms, and turn notes into action in one flow.")) + "</p></div>" +
+    '<p>' + escapeHtml(localizeText("Quay lại đúng việc cần làm, theo dõi tiến độ và giữ note bám sát luồng học trong một màn hình gọn.", "Jump back into the right tasks, track progress, and keep notes close in one clean view.")) + "</p>" +
+    '<div class="home-welcome-actions"><button type="button" class="home-quick-btn primary" data-home-quick="focus">' + escapeHtml(localizeText("Start 25m Focus", "Start 25m Focus")) + "</button></div></div>" +
     '<div class="home-stat-grid">' +
     '<article class="home-stat-card primary"><span>' + escapeHtml(localizeText("Hôm nay đã học", "Studied today")) + "</span><strong>" + escapeHtml(formatDashboardDuration(todayStudyMs)) + "</strong></article>" +
     '<article class="home-stat-card"><span>' + escapeHtml(localizeText("Streak", "Streak")) + "</span><strong>" + escapeHtml(String(streak)) + "</strong><small>" + escapeHtml(localizeText("ngày liên tiếp", "day streak")) + "</small></article>" +
@@ -4592,12 +4535,10 @@ function homeDashboardMarkup() {
     '<article class="home-stat-card"><span>' + escapeHtml(localizeText("Sắp đến hạn", "Due soon")) + "</span><strong>" + escapeHtml(String(plannerOverview.dueSoon)) + "</strong><small>" + escapeHtml(localizeText("task cần chú ý", "tasks to review")) + "</small></article>" +
     "</div></section>" +
     '<div class="home-dashboard-grid">' +
-    '<section class="home-block continue"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Continue Learning", "Continue Learning")) + "</strong><span>" + escapeHtml(localizeText("Quay lại nội dung đang học", "Resume what matters")) + "</span></div>" +
+    '<section class="home-block continue"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Việc cần làm", "Todo")) + "</strong><span>" + escapeHtml(localizeText("Các mục chưa hoàn thành", "Unfinished items")) + "</span></div>" +
     '<div class="home-continue-grid">' + homeContinueCardsHtml(continueItems) + "</div></section>" +
     '<section class="home-block activity"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Chat / Activity", "Chat / Activity")) + "</strong><span>" + escapeHtml(localizeText("Những gì cần bạn chú ý", "Important updates")) + "</span></div>" +
     homeActivityHtml(activityItems) + "</section>" +
-    '<section class="home-block tasks"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Tasks Today", "Tasks Today")) + "</strong><span>" + escapeHtml(localizeText("Checklist trong ngày", "Daily checklist")) + "</span></div>" +
-    homeTasksHtml(todayTasks.tasks) + "</section>" +
     '<section class="home-block progress"><div class="home-block-head"><strong>' + escapeHtml(localizeText("Stats / Progress", "Stats / Progress")) + "</strong><span>" + escapeHtml(localizeText("Heatmap, progress và note đã ghim", "Heatmap, progress, and pinned notes")) + "</span></div>" +
     '<div class="home-progress-grid">' +
     '<article class="home-progress-card"><span>' + escapeHtml(localizeText("Tuần này", "This week")) + "</span><strong>" + escapeHtml(formatDashboardDuration(weekStudyMs)) + "</strong></article>" +
@@ -4612,12 +4553,6 @@ function homeDashboardMarkup() {
     homeQuickNotePanelHtml() +
     '<div class="home-pinned-panel"><div class="home-mini-head"><strong>' + escapeHtml(localizeText("Pinned Notes", "Pinned Notes")) + "</strong><span>" + escapeHtml(localizeText("Từ sticky notes", "From sticky notes")) + "</span></div>" +
     homePinnedNotesHtml(pinnedNotes) + "</div></div></section>" +
-    "</div>" +
-    '<div class="home-quick-dock">' +
-    '<button type="button" class="home-quick-btn" data-home-quick="note">' + escapeHtml(localizeText("Quick Note", "Quick Note")) + "</button>" +
-    '<button type="button" class="home-quick-btn" data-home-quick="task">' + escapeHtml(localizeText("New Task", "New Task")) + "</button>" +
-    '<button type="button" class="home-quick-btn primary" data-home-quick="focus">' + escapeHtml(localizeText("Start 25m Focus", "Start 25m Focus")) + "</button>" +
-    '<button type="button" class="home-quick-btn" data-home-quick="continue">' + escapeHtml(localizeText("Continue", "Continue")) + "</button>" +
     "</div></section>"
   );
 }
@@ -4631,8 +4566,7 @@ function openDashboardTaskPlanner(taskId) {
   setStudyNotesPopoverOpen(true);
 }
 
-function openDashboardQuickNote() {
-  createPlannerStickyNote("", "");
+function openDashboardPlanner() {
   setStudyNotesPopoverOpen(true);
 }
 
@@ -4642,9 +4576,7 @@ function openDashboardContinue() {
     handleDashboardOpen(firstItem.kind, firstItem.value);
     return;
   }
-  if (!selectDefaultConversation()) {
-    setStudyNotesPopoverOpen(true);
-  }
+  openDashboardTaskPlanner("");
 }
 
 function startDashboardFocusMode() {
@@ -5245,17 +5177,13 @@ function addMessage(message, sent, sender, timestamp, autoScroll = true) {
   }
   const identity = resolveMessageIdentity(message, sent, sender);
   row.innerHTML =
-    '<div class="channel-avatar">' +
-    initials(identity.name || sender) +
-    '</div><div class="message-stack"><div class="message-meta"><strong>' +
+    '<div class="message-stack"><div class="message-meta"><strong>' +
     (identity.name || sender) +
     "</strong><span>" +
     formatTime(timestamp) +
     '</span></div><div class="message-bubble"></div></div>';
-  const avatar = row.querySelector(".channel-avatar");
   const bubble = row.querySelector(".message-bubble");
   const stack = row.querySelector(".message-stack");
-  syncAvatarNode(avatar, identity.name || sender, identity.avatarUrl || "");
   const text = String((message && message.content) || "").trim();
   if (message && message.recalled) {
     const copy = document.createElement("div");
@@ -6173,12 +6101,14 @@ el.friendsCardToggle.addEventListener("click", () =>
   setFriendsCardCollapsed(!el.friendsCard.classList.contains("is-collapsed")),
 );
 
-el.friendsSearchInput.addEventListener("input", (event) => {
-  const input = /** @type {HTMLInputElement} */ (event.currentTarget);
-  friendSearchQuery = input.value || "";
-  renderFriends();
-  renderGroups();
-});
+if (el.friendsSearchInput) {
+  el.friendsSearchInput.addEventListener("input", (event) => {
+    const input = /** @type {HTMLInputElement} */ (event.currentTarget);
+    friendSearchQuery = input.value || "";
+    renderFriends();
+    renderGroups();
+  });
+}
 
 if (el.previewCloseProfile) {
   el.previewCloseProfile.addEventListener("click", closePreviewDetails);
@@ -6256,7 +6186,11 @@ if (el.friendsNavButton) {
     if (matches.length) {
       selectDirect(matches[0]);
     }
-    el.friendsSearchInput.focus();
+    if (el.friendsSearchInput) {
+      el.friendsSearchInput.focus();
+    } else if (el.filterPersonalButton) {
+      el.filterPersonalButton.focus();
+    }
   });
 }
 
@@ -6461,16 +6395,6 @@ el.studyNotesPanelMount.addEventListener("input", (event) => {
   const target = asElement(event.target);
   if (!target) return;
 
-  const quickNoteField = target.closest("[data-planner-quick-note]");
-  if (quickNoteField) {
-    plannerState.quickNote = normalizePlannerTextBlock(
-      /** @type {HTMLTextAreaElement} */ (quickNoteField).value,
-      1200,
-    );
-    persistPlannerState();
-    return;
-  }
-
   const searchField = target.closest("[data-planner-search]");
   if (searchField) {
     plannerState.searchText = normalizePlannerSingleLine(
@@ -6503,9 +6427,7 @@ el.studyNotesPanelMount.addEventListener("submit", (event) => {
   event.preventDefault();
   if (form.matches("[data-planner-quick-add-form]")) {
     const quickInput = /** @type {HTMLInputElement | null} */ (form.querySelector("[name='quickAdd']"));
-    const submitter = /** @type {HTMLButtonElement | null} */ (event.submitter);
-    const kind = submitter && submitter.dataset.plannerQuickSubmit === "note" ? "note" : "task";
-    if (quickInput && quickAddPlannerItem(kind, quickInput.value)) {
+    if (quickInput && quickAddPlannerTask(quickInput.value)) {
       quickInput.value = "";
     }
     return;
@@ -6695,8 +6617,8 @@ el.messagesArea.addEventListener("click", (event) => {
   if (!quickActionButton) return;
 
   const action = quickActionButton.dataset.homeQuick || "";
-  if (action === "note") {
-    openDashboardQuickNote();
+  if (action === "planner") {
+    openDashboardPlanner();
     return;
   }
   if (action === "task") {
