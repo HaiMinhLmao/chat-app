@@ -7116,6 +7116,18 @@ html.workspace-booting .preview-shell {
   align-items: start;
 }
 
+.home-block.continue {
+  order: 1;
+}
+
+.home-block.progress {
+  order: 2;
+}
+
+.home-block.activity {
+  order: 3;
+}
+
 .home-block {
   padding: 22px;
   border-radius: 28px;

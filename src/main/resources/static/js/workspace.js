@@ -4931,11 +4931,7 @@ function messagePreview(message, sent, sender) {
 }
 
 function canToggleMessagePin(message, sent) {
-  return Boolean(message) && !message.recalled && (!sent || Boolean(message.pinned));
-}
-
-function canForwardMessage(message) {
-  return Boolean(message) && !message.recalled && Boolean(messageSummaryText(message));
+  return Boolean(message) && !message.recalled;
 }
 
 function closeMessageActionMenu() {
@@ -4980,40 +4976,6 @@ function positionMessageActionMenu(menu, trigger) {
   menu.style.setProperty("--message-menu-arrow-left", arrowLeft + "px");
 }
 
-function buildForwardDraft(message, sent, sender) {
-  const summary = messageSummaryText(message);
-  if (!summary) return "";
-  const identity = resolveMessageIdentity(message, sent, sender);
-  const sourceName =
-    (identity && identity.name) ||
-    sender ||
-    localizeText("Người dùng", "User");
-  return localizeText("Chuyển tiếp từ ", "Forwarded from ") + sourceName + ":\n" + summary;
-}
-
-function queueForwardedMessageDraft(message, sent, sender) {
-  const draft = buildForwardDraft(message, sent, sender);
-  closeMessageActionMenu();
-  if (!draft) {
-    showToast(localizeText("Tin nhắn này chưa thể chuyển tiếp.", "This message cannot be forwarded yet."));
-    return;
-  }
-  const existing = String(el.messageInput.value || "").trim();
-  el.messageInput.value = existing ? existing + "\n\n" + draft : draft;
-  syncComposer();
-  el.messageInput.focus();
-  const caret = el.messageInput.value.length;
-  if (typeof el.messageInput.setSelectionRange === "function") {
-    el.messageInput.setSelectionRange(caret, caret);
-  }
-  showToast(
-    localizeText(
-      "Đã đưa tin vào ô soạn. Mở đoạn chat cần chuyển tiếp rồi gửi.",
-      "Added to the composer. Open the chat you want to forward to, then send it.",
-    ),
-  );
-}
-
 function createMessageActionItem(label, onClick, danger) {
   const button = document.createElement("button");
   button.type = "button";
@@ -5032,22 +4994,10 @@ function buildMessageActionMenu(message, sent, sender) {
   if (sent && !message.recalled) {
     menu.appendChild(
       createMessageActionItem(
-        localizeText("Gỡ", "Unsend"),
+        localizeText("Thu hồi", "Recall"),
         () => {
           closeMessageActionMenu();
           void recallMessage(message);
-        },
-        false,
-      ),
-    );
-  }
-
-  if (canForwardMessage(message)) {
-    menu.appendChild(
-      createMessageActionItem(
-        localizeText("Chuyển tiếp", "Forward"),
-        () => {
-          queueForwardedMessageDraft(message, sent, sender);
         },
         false,
       ),
@@ -5132,9 +5082,8 @@ function buildMessageActions(message, sent, sender) {
   }
 
   const hasRecall = sent && !message.recalled;
-  const hasForward = canForwardMessage(message);
   const hasPin = canToggleMessagePin(message, sent);
-  if (!hasRecall && !hasForward && !hasPin) {
+  if (!hasRecall && !hasPin) {
     return null;
   }
 
