@@ -757,6 +757,45 @@ function workspaceIdentityByEmail(email) {
   };
 }
 
+function resolveMessageIdentity(message, sent, fallbackSender) {
+  const senderEmail = normalizeEmail(message && message.senderEmail);
+  if (senderEmail) {
+    const info = workspaceIdentityByEmail(senderEmail);
+    if (info && (info.name || info.avatarUrl)) {
+      return {
+        name: info.name || fallbackSender || defaultName(senderEmail),
+        email: info.email || senderEmail,
+        avatarUrl: info.avatarUrl || "",
+      };
+    }
+  }
+
+  if (sent && currentUser) {
+    return {
+      name: displayName(currentUser),
+      email: currentUser.email || senderEmail || "",
+      avatarUrl: currentUser.avatarUrl || "",
+    };
+  }
+
+  if (activeChannel.type === "direct") {
+    const friend = activeFriendRecord();
+    if (friend) {
+      return {
+        name: displayName(friend),
+        email: friend.email || senderEmail || "",
+        avatarUrl: friend.avatarUrl || "",
+      };
+    }
+  }
+
+  return {
+    name: fallbackSender || defaultName(senderEmail),
+    email: senderEmail || "",
+    avatarUrl: "",
+  };
+}
+
 function mergeGroupDetails(detail) {
   if (!detail || !detail.id) return null;
   const group = groups.find((item) => String(item.id) === String(detail.id));
@@ -1573,6 +1612,32 @@ function normalizeStudyMinutes(value, fallback, maximum) {
   return Math.min(maximum || 180, Math.max(1, Math.round(numeric)));
 }
 
+function normalizeStudyNotebookText(value) {
+  return String(value || "").slice(0, 4000);
+}
+
+function normalizeStudyTodoText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+}
+
+function sanitizeStudyTodos(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item, index) => ({
+      id: String((item && item.id) || "todo-" + index),
+      text: normalizeStudyTodoText(item && item.text),
+      done: Boolean(item && item.done),
+    }))
+    .filter((item) => item.text);
+}
+
+function buildStudyTodoId() {
+  return "todo-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+}
+
 function loadStudyTimerState() {
   const defaults = {
     mode: "stopwatch",
@@ -1587,6 +1652,8 @@ function loadStudyTimerState() {
     pomodoroPhase: "focus",
     pomodoroPhaseElapsedMs: 0,
     pomodoroCompletedCycles: 0,
+    noteText: "",
+    todos: [],
   };
   try {
     const parsed = parseJson(window.localStorage.getItem(STUDY_TIMER_STORAGE_KEY));
@@ -1611,6 +1678,8 @@ function loadStudyTimerState() {
       pomodoroPhase: parsed.pomodoroPhase === "break" ? "break" : "focus",
       pomodoroPhaseElapsedMs: Math.max(0, Number(parsed.pomodoroPhaseElapsedMs) || 0),
       pomodoroCompletedCycles: Math.max(0, Math.round(Number(parsed.pomodoroCompletedCycles) || 0)),
+      noteText: normalizeStudyNotebookText(parsed.noteText),
+      todos: sanitizeStudyTodos(parsed.todos),
     };
   } catch (_) {
     return defaults;
@@ -1629,6 +1698,138 @@ function persistStudyTimerState() {
 
 function getStudyTimerPanel() {
   return document.querySelector("[data-study-timer]");
+}
+
+function studyTodoSummary() {
+  const total = studyTimerState.todos.length;
+  const completed = studyTimerState.todos.filter((item) => item.done).length;
+  const open = total - completed;
+  if (!total) {
+    return localizeText("Chưa có mục nào", "No items yet");
+  }
+  return localizeText(
+    open + " việc mở • " + completed + " xong",
+    open + " open • " + completed + " done",
+  );
+}
+
+function refreshStudyNotebookUi(panel = getStudyTimerPanel()) {
+  if (!panel) return;
+
+  const noteInput = panel.querySelector("[data-study-note-input]");
+  if (noteInput && document.activeElement !== noteInput) {
+    noteInput.value = studyTimerState.noteText;
+  }
+
+  const summary = panel.querySelector("[data-study-todo-summary]");
+  if (summary) {
+    summary.textContent = studyTodoSummary();
+  }
+
+  const clearButton = panel.querySelector("[data-study-todo-clear]");
+  if (clearButton) {
+    clearButton.hidden = !studyTimerState.todos.some((item) => item.done);
+  }
+
+  const list = panel.querySelector("[data-study-todo-list]");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (!studyTimerState.todos.length) {
+    const empty = document.createElement("div");
+    empty.className = "study-timer-todo-empty";
+    empty.textContent = localizeText(
+      "Chưa có việc nào. Thêm một dòng nhỏ để bám nhịp học như trong Notion.",
+      "No tasks yet. Add a small line item to keep the session moving like Notion.",
+    );
+    list.appendChild(empty);
+    return;
+  }
+
+  studyTimerState.todos.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "study-timer-todo-item" + (item.done ? " is-done" : "");
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "study-timer-todo-toggle";
+    toggle.dataset.studyTodoToggle = item.id;
+    toggle.setAttribute("aria-pressed", String(item.done));
+    toggle.setAttribute(
+      "aria-label",
+      item.done
+        ? localizeText("Đánh dấu chưa xong", "Mark as not done")
+        : localizeText("Đánh dấu hoàn thành", "Mark as done"),
+    );
+    toggle.innerHTML = '<span class="study-timer-todo-check" aria-hidden="true"></span>';
+
+    const copy = document.createElement("div");
+    copy.className = "study-timer-todo-copy";
+    copy.textContent = item.text;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "study-timer-todo-remove";
+    remove.dataset.studyTodoRemove = item.id;
+    remove.setAttribute(
+      "aria-label",
+      localizeText("Xóa việc này", "Remove this task"),
+    );
+    remove.textContent = "×";
+
+    row.append(toggle, copy, remove);
+    list.appendChild(row);
+  });
+}
+
+function updateStudyNotebookText(value) {
+  studyTimerState.noteText = normalizeStudyNotebookText(value);
+  persistStudyTimerState();
+}
+
+function addStudyTodo() {
+  const panel = getStudyTimerPanel();
+  if (!panel) return;
+  const input = panel.querySelector("[data-study-todo-input]");
+  if (!input) return;
+
+  const text = normalizeStudyTodoText(input.value);
+  if (!text) return;
+
+  studyTimerState.todos.unshift({
+    id: buildStudyTodoId(),
+    text,
+    done: false,
+  });
+  persistStudyTimerState();
+  input.value = "";
+  refreshStudyNotebookUi(panel);
+  input.focus();
+}
+
+function toggleStudyTodo(id) {
+  const targetId = String(id || "");
+  const todo = studyTimerState.todos.find((item) => item.id === targetId);
+  if (!todo) return;
+  todo.done = !todo.done;
+  persistStudyTimerState();
+  refreshStudyNotebookUi();
+}
+
+function removeStudyTodo(id) {
+  const targetId = String(id || "");
+  const next = studyTimerState.todos.filter((item) => item.id !== targetId);
+  if (next.length === studyTimerState.todos.length) return;
+  studyTimerState.todos = next;
+  persistStudyTimerState();
+  refreshStudyNotebookUi();
+}
+
+function clearCompletedStudyTodos() {
+  if (!studyTimerState.todos.some((item) => item.done)) return;
+  studyTimerState.todos = studyTimerState.todos.filter((item) => !item.done);
+  persistStudyTimerState();
+  refreshStudyNotebookUi();
 }
 
 function getPomodoroDurationMs(phase) {
@@ -2257,6 +2458,34 @@ function createStudyTimerPanel() {
   config.className = "study-timer-config";
   config.dataset.studyConfig = "true";
 
+  const notebook = document.createElement("section");
+  notebook.className = "study-timer-notebook";
+  notebook.innerHTML =
+    '<div class="study-timer-section-head">' +
+    '<div><strong>' +
+    localizeText("Notes & To-do", "Notes & To-do") +
+    '</strong><span data-study-todo-summary="true"></span></div>' +
+    '<button type="button" class="study-timer-clear-btn" data-study-todo-clear="true">' +
+    localizeText("Xóa xong", "Clear done") +
+    "</button></div>" +
+    '<label class="study-timer-note-editor">' +
+    '<span class="study-timer-note-editor-label">' +
+    localizeText("Ghi chú nhanh", "Quick note") +
+    "</span>" +
+    '<textarea class="study-timer-note-input" data-study-note-input="true" rows="4" maxlength="4000" placeholder="' +
+    localizeText(
+      "Ghi mục tiêu, ý tưởng hoặc tài nguyên cho phiên học này...",
+      "Capture goals, ideas, or resources for this study block...",
+    ) +
+    '"></textarea></label>' +
+    '<form class="study-timer-todo-form" data-study-todo-form="true">' +
+    '<input class="settings-text-input study-timer-todo-input" data-study-todo-input="true" type="text" maxlength="160" placeholder="' +
+    localizeText("Thêm một việc cần làm...", "Add a task...") +
+    '">' +
+    '<button type="submit" class="btn secondary study-timer-todo-add">' +
+    localizeText("Thêm", "Add") +
+    '</button></form><div class="study-timer-todo-list" data-study-todo-list="true"></div>';
+
   const actions = document.createElement("div");
   actions.className = "study-timer-actions";
   actions.innerHTML =
@@ -2308,7 +2537,7 @@ function createStudyTimerPanel() {
 
   const stage = document.createElement("div");
   stage.className = "study-timer-stage";
-  stage.append(display, actions, shortcuts);
+  stage.append(display, notebook, actions, shortcuts);
 
   const side = document.createElement("div");
   side.className = "study-timer-side";
@@ -2317,6 +2546,7 @@ function createStudyTimerPanel() {
   layout.append(stage, side);
 
   panel.append(head, modes, layout);
+  refreshStudyNotebookUi(panel);
   refreshStudyTimerUi();
   return panel;
 }
@@ -3154,16 +3384,19 @@ function addMessage(message, sent, sender, timestamp, autoScroll = true) {
   if (message && message.id) {
     row.dataset.messageId = String(message.id);
   }
+  const identity = resolveMessageIdentity(message, sent, sender);
   row.innerHTML =
     '<div class="channel-avatar">' +
-    initials(sender) +
+    initials(identity.name || sender) +
     '</div><div class="message-stack"><div class="message-meta"><strong>' +
-    sender +
+    (identity.name || sender) +
     "</strong><span>" +
     formatTime(timestamp) +
     '</span></div><div class="message-bubble"></div></div>';
+  const avatar = row.querySelector(".channel-avatar");
   const bubble = row.querySelector(".message-bubble");
   const stack = row.querySelector(".message-stack");
+  syncAvatarNode(avatar, identity.name || sender, identity.avatarUrl || "");
   const text = String((message && message.content) || "").trim();
   if (message && message.recalled) {
     const copy = document.createElement("div");
@@ -4227,6 +4460,24 @@ el.studyTimerPanelMount.addEventListener("click", (event) => {
   const target = asElement(event.target);
   if (!target) return;
 
+  const clearCompletedButton = target.closest("[data-study-todo-clear]");
+  if (clearCompletedButton) {
+    clearCompletedStudyTodos();
+    return;
+  }
+
+  const todoToggleButton = target.closest("[data-study-todo-toggle]");
+  if (todoToggleButton) {
+    toggleStudyTodo(todoToggleButton.dataset.studyTodoToggle || "");
+    return;
+  }
+
+  const todoRemoveButton = target.closest("[data-study-todo-remove]");
+  if (todoRemoveButton) {
+    removeStudyTodo(todoRemoveButton.dataset.studyTodoRemove || "");
+    return;
+  }
+
   const studyModeButton = target.closest("[data-study-mode]");
   if (studyModeButton) {
     setStudyTimerMode(studyModeButton.dataset.studyMode || "stopwatch");
@@ -4255,12 +4506,25 @@ el.studyTimerPanelMount.addEventListener("input", (event) => {
   const target = asElement(event.target);
   if (!target) return;
 
+  const noteField = target.closest("[data-study-note-input]");
+  if (noteField) {
+    updateStudyNotebookText(/** @type {HTMLTextAreaElement} */ (noteField).value);
+    return;
+  }
+
   const studyField = target.closest("[data-study-field]");
   if (!studyField) return;
   updateStudyTimerField(
     studyField.dataset.studyField || "",
     /** @type {HTMLInputElement} */ (studyField).value,
   );
+});
+
+el.studyTimerPanelMount.addEventListener("submit", (event) => {
+  const form = asElement(event.target);
+  if (!form || !form.matches("[data-study-todo-form]")) return;
+  event.preventDefault();
+  addStudyTodo();
 });
 
 el.messagesArea.addEventListener("click", (event) => {

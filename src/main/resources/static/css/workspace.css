@@ -1953,6 +1953,7 @@ body.theme-dark .message-attachment {
 
 body.theme-dark .study-timer-display,
 body.theme-dark .study-timer-note,
+body.theme-dark .study-timer-notebook,
 body.theme-dark .study-timer-stat,
 body.theme-dark .study-timer-shortcut,
 body.theme-dark .study-timer-laps {
@@ -2019,6 +2020,13 @@ body.theme-dark .study-timer-shortcut:hover:not(:disabled) {
 body.theme-dark .study-timer-shortcut-key {
   background: rgba(148, 163, 184, 0.05);
   border-color: rgba(148, 163, 184, 0.14);
+}
+
+body.theme-dark .study-timer-note-input,
+body.theme-dark .study-timer-todo-item {
+  background: rgba(15, 23, 42, 0.84);
+  border-color: rgba(148, 163, 184, 0.14);
+  color: var(--text);
 }
 
 .home-action-card {
@@ -2139,6 +2147,7 @@ body.theme-dark .study-timer-shortcut-key {
 
 .study-timer-display,
 .study-timer-note,
+.study-timer-notebook,
 .study-timer-stat,
 .study-timer-shortcut,
 .study-timer-laps {
@@ -2289,6 +2298,201 @@ body.theme-dark .study-timer-shortcut-key {
   padding: 16px 18px;
   color: var(--muted);
   line-height: 1.6;
+}
+
+.study-timer-notebook {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.study-timer-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.study-timer-section-head strong {
+  display: block;
+  font-size: 16px;
+  letter-spacing: -0.03em;
+}
+
+.study-timer-section-head span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.study-timer-clear-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.study-timer-clear-btn:hover {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent);
+}
+
+.study-timer-clear-btn[hidden] {
+  display: none;
+}
+
+.study-timer-note-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-timer-note-editor-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.study-timer-note-input {
+  min-height: 104px;
+  padding: 14px 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  border-radius: 18px;
+  resize: vertical;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.96));
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.study-timer-note-input:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.study-timer-todo-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.study-timer-todo-input {
+  min-width: 0;
+}
+
+.study-timer-todo-add {
+  min-height: 42px;
+  padding-inline: 16px;
+  border-radius: 16px;
+}
+
+.study-timer-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.study-timer-todo-empty {
+  padding: 4px 2px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.study-timer-todo-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.study-timer-todo-item.is-done {
+  background: rgba(236, 253, 245, 0.9);
+}
+
+.study-timer-todo-toggle {
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.study-timer-todo-item.is-done .study-timer-todo-toggle {
+  border-color: rgba(5, 150, 105, 0.28);
+  background: linear-gradient(135deg, #10b981, #34d399);
+}
+
+.study-timer-todo-check {
+  width: 10px;
+  height: 6px;
+  border-left: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  transform: rotate(-45deg) scale(0.2);
+  transform-origin: center;
+  opacity: 0;
+  transition: transform 0.16s ease, opacity 0.16s ease, border-color 0.16s ease;
+}
+
+.study-timer-todo-item.is-done .study-timer-todo-check {
+  border-color: #fff;
+  transform: rotate(-45deg) scale(1);
+  opacity: 1;
+}
+
+.study-timer-todo-copy {
+  min-width: 0;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.study-timer-todo-item.is-done .study-timer-todo-copy {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.study-timer-todo-remove {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.study-timer-todo-remove:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
 }
 
 .study-timer-field-grid {
@@ -3064,6 +3268,10 @@ body.compact-chat .empty-state h2 {
     padding: 0 12px;
   }
 
+  .study-timer-todo-form {
+    grid-template-columns: 1fr;
+  }
+
   .inbox {
     top: 10px !important;
     right: 10px;
@@ -3229,10 +3437,7 @@ body.preview-page {
   display: grid;
   place-items: center;
   padding: 24px;
-  background:
-    radial-gradient(circle at top left, rgba(88, 107, 255, 0.22), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.16), transparent 24%),
-    linear-gradient(180deg, rgba(245, 248, 255, 0.96), rgba(238, 243, 255, 0.98));
+  background: rgba(34, 34, 34, 0.98);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.26s ease, visibility 0.26s ease;
@@ -3240,37 +3445,40 @@ body.preview-page {
 }
 
 .workspace-boot-loader-card {
-  min-width: min(100%, 360px);
-  padding: 28px 32px;
-  border-radius: 30px;
-  background: rgba(13, 27, 68, 0.92);
-  box-shadow:
-    0 30px 70px rgba(30, 50, 100, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  min-width: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   display: grid;
   justify-items: center;
-  gap: 22px;
+  gap: 0;
 }
 
 .workspace-boot-loader-wrapper {
   position: relative;
-  width: 126px;
-  height: 52px;
+  width: 116px;
+  height: 28px;
+  margin: auto;
+}
+
+.workspace-boot-packman {
+  position: absolute;
+  top: 9px;
+  left: 25px;
 }
 
 .workspace-boot-packman::before,
 .workspace-boot-packman::after {
   content: "";
   position: absolute;
-  left: 26px;
-  width: 52px;
-  height: 26px;
+  width: 50px;
+  height: 25px;
   background: #eff107;
-  box-shadow: 0 0 18px rgba(239, 241, 7, 0.28);
+  box-shadow: none;
 }
 
 .workspace-boot-packman::before {
-  top: 0;
   border-radius: 100px 100px 0 0;
   transform: translate(-50%, -50%);
   transform-origin: center bottom;
@@ -3278,7 +3486,6 @@ body.preview-page {
 }
 
 .workspace-boot-packman::after {
-  bottom: 0;
   border-radius: 0 0 100px 100px;
   transform: translate(-50%, 50%);
   transform-origin: center top;
@@ -3293,12 +3500,12 @@ body.preview-page {
 .workspace-boot-dot {
   position: absolute;
   z-index: -1;
-  top: 21px;
+  top: 8px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.24);
+  box-shadow: none;
 }
 
 .workspace-boot-dot:nth-child(1) {
@@ -3322,22 +3529,7 @@ body.preview-page {
 }
 
 .workspace-boot-copy {
-  display: grid;
-  gap: 8px;
-  text-align: center;
-}
-
-.workspace-boot-copy strong {
-  color: #fff;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 24px;
-  letter-spacing: -0.04em;
-}
-
-.workspace-boot-copy span {
-  color: rgba(226, 232, 240, 0.82);
-  font-size: 14px;
-  line-height: 1.55;
+  display: none;
 }
 
 html.workspace-booting .workspace-boot-loader {
