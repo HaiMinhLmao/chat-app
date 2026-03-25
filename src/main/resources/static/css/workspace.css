@@ -3942,8 +3942,8 @@ html.workspace-booting .preview-shell {
 }
 
 .preview-chat-panel {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
@@ -4774,8 +4774,8 @@ html.workspace-booting .preview-shell {
 }
 
 .preview-chat-panel {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
