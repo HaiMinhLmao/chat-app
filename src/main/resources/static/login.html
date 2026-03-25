@@ -295,14 +295,12 @@
 
     const AUTH_SESSION_KEY = 'authSession';
     const LEGACY_SESSION_KEY = 'supabaseSession';
-    const WORKSPACE_BOOT_LOADER_KEY = 'workspaceBootLoader';
     const loginForm = /** @type {HTMLFormElement} */ (mustGetElement('loginForm'));
     const loginBtn = /** @type {HTMLButtonElement} */ (mustGetElement('loginBtn'));
     const errorMessage = mustGetElement('errorMessage');
     const successMessage = mustGetElement('successMessage');
     const emailInput = /** @type {HTMLInputElement} */ (mustGetElement('email'));
     const passwordInput = /** @type {HTMLInputElement} */ (mustGetElement('password'));
-    const authSuccessLoader = mustGetElement('authSuccessLoader');
 
     const registrationEmail = sessionStorage.getItem('registrationEmail');
     if (registrationEmail) {
@@ -359,15 +357,9 @@
                 email: user?.email || email
             }));
 
-            sessionStorage.setItem(WORKSPACE_BOOT_LOADER_KEY, '1');
-            authSuccessLoader.classList.add('show');
-            authSuccessLoader.setAttribute('aria-hidden', 'false');
-
             const returnTo = new URLSearchParams(window.location.search).get('returnTo');
             const nextUrl = returnTo || '/index.html';
-            window.setTimeout(() => {
-                window.location.replace(nextUrl);
-            }, 220);
+            window.location.replace(nextUrl);
         } catch (err) {
             showError('Lỗi kết nối. Vui lòng thử lại.');
             resetBtn();

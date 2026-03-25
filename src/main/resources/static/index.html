@@ -77,6 +77,19 @@
               </span>
               <span>Time</span>
             </button>
+            <button class="preview-nav-item" id="studyNotesToggleButton" type="button" title="Notes & To-do">
+              <span class="preview-nav-icon">
+                <svg viewBox="0 0 24 24">
+                  <path d="M9 7h10"></path>
+                  <path d="M9 12h10"></path>
+                  <path d="M9 17h10"></path>
+                  <path d="M4.5 7l1.5 1.5L7.8 6.7"></path>
+                  <path d="M4.5 12l1.5 1.5L7.8 11.7"></path>
+                  <path d="M4.5 17l1.5 1.5L7.8 16.7"></path>
+                </svg>
+              </span>
+              <span>Notes</span>
+            </button>
             <button class="preview-nav-item" id="notificationToggleButton" type="button" title="Notifications">
               <span class="preview-active-pill" aria-hidden="true"></span>
               <span class="preview-nav-icon">
@@ -119,7 +132,7 @@
               <h2>Inbox</h2>
               <span class="preview-new-badge" id="previewRosterBadge">0</span>
             </div>
-            <button class="preview-ghost-btn" id="homeRailButton" type="button">Overview</button>
+            <button class="preview-ghost-btn" id="homeRailButton" type="button" hidden>Overview</button>
           </div>
 
           <div class="preview-social-row preview-social-toggle" role="radiogroup" aria-label="Quick actions">
@@ -445,6 +458,21 @@
       </div>
       <div class="settings-popover-body study-timer-popover-body">
         <div class="study-timer-shell" id="studyTimerPanelMount"></div>
+      </div>
+    </aside>
+
+    <aside class="study-notes-popover settings-popover panel" id="studyNotesPopover" aria-hidden="true">
+      <div class="settings-popover-header">
+        <div>
+          <div class="eyebrow">Notes</div>
+          <div class="headline settings-popover-title">Notes & To-do</div>
+        </div>
+        <button class="settings-close-btn" id="studyNotesCloseButton" type="button" aria-label="Close notes">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="settings-popover-body">
+        <div class="study-notes-shell" id="studyNotesPanelMount"></div>
       </div>
     </aside>
 

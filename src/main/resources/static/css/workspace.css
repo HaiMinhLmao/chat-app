@@ -812,6 +812,10 @@ body.theme-dark .rail-group-mark {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
+.study-notes-popover {
+  width: min(440px, calc(100vw - 32px));
+}
+
 .study-timer-popover {
   position: fixed;
   inset: 0;
@@ -907,6 +911,12 @@ body.settings-open .settings-popover {
 }
 
 body.create-group-open .create-group-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+body.study-notes-open .study-notes-popover {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0) scale(1);
@@ -2305,6 +2315,40 @@ body.theme-dark .study-timer-todo-item {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.study-notes-shell {
+  width: 100%;
+}
+
+.study-notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.study-notes-intro {
+  padding: 18px 20px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.94));
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.05);
+}
+
+.study-notes-intro h3 {
+  margin: 8px 0 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.study-notes-intro p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.65;
 }
 
 .study-timer-section-head {

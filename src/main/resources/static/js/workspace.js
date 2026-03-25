@@ -91,6 +91,7 @@ const el = {
   newGroupBtn: mustGetElement("newGroupBtn"),
   newGroupToggleInput: mustGetInput("newGroupToggleInput"),
   studyTimerToggleButton: mustGetButton("studyTimerToggleButton"),
+  studyNotesToggleButton: mustGetButton("studyNotesToggleButton"),
   profileToggleButton: getOptionalButton("profileToggleButton"),
   settingsToggleButton: mustGetButton("settingsToggleButton"),
   dashboardNavButton: getOptionalButton("dashboardNavButton"),
@@ -116,6 +117,9 @@ const el = {
   studyTimerPopover: mustGetElement("studyTimerPopover"),
   studyTimerCloseButton: mustGetButton("studyTimerCloseButton"),
   studyTimerPanelMount: mustGetElement("studyTimerPanelMount"),
+  studyNotesPopover: mustGetElement("studyNotesPopover"),
+  studyNotesCloseButton: mustGetButton("studyNotesCloseButton"),
+  studyNotesPanelMount: mustGetElement("studyNotesPanelMount"),
   settingsUserName: mustGetElement("settingsUserName"),
   settingsUserEmail: mustGetElement("settingsUserEmail"),
   settingsAvatarPreview: mustGetElement("settingsAvatarPreview"),
@@ -1600,7 +1604,7 @@ async function leaveActiveGroup() {
   groupDetailsCache.delete(groupId);
   conversationHistoryCache.delete(channelHistoryKey("group", groupId));
   setPreview("group", groupId, "");
-  selectHome();
+  selectDefaultConversation();
   renderGroups();
   setPreviewGroupLeaveFeedback("", "success");
   showToast("You left the group.");
@@ -1700,6 +1704,10 @@ function getStudyTimerPanel() {
   return document.querySelector("[data-study-timer]");
 }
 
+function getStudyNotesPanel() {
+  return document.querySelector("[data-study-notebook-panel]");
+}
+
 function studyTodoSummary() {
   const total = studyTimerState.todos.length;
   const completed = studyTimerState.todos.filter((item) => item.done).length;
@@ -1713,7 +1721,7 @@ function studyTodoSummary() {
   );
 }
 
-function refreshStudyNotebookUi(panel = getStudyTimerPanel()) {
+function refreshStudyNotebookUi(panel = getStudyNotesPanel()) {
   if (!panel) return;
 
   const noteInput = panel.querySelector("[data-study-note-input]");
@@ -1788,7 +1796,7 @@ function updateStudyNotebookText(value) {
 }
 
 function addStudyTodo() {
-  const panel = getStudyTimerPanel();
+  const panel = getStudyNotesPanel();
   if (!panel) return;
   const input = panel.querySelector("[data-study-todo-input]");
   if (!input) return;
@@ -2381,6 +2389,37 @@ function toggleStudyTimerFullscreen() {
   el.studyTimerPopover.requestFullscreen().catch(() => {});
 }
 
+function createStudyNotebookSection() {
+  const notebook = document.createElement("section");
+  notebook.className = "study-timer-notebook";
+  notebook.innerHTML =
+    '<div class="study-timer-section-head">' +
+    '<div><strong>' +
+    localizeText("Notes & To-do", "Notes & To-do") +
+    '</strong><span data-study-todo-summary="true"></span></div>' +
+    '<button type="button" class="study-timer-clear-btn" data-study-todo-clear="true">' +
+    localizeText("Xóa xong", "Clear done") +
+    "</button></div>" +
+    '<label class="study-timer-note-editor">' +
+    '<span class="study-timer-note-editor-label">' +
+    localizeText("Ghi chú nhanh", "Quick note") +
+    "</span>" +
+    '<textarea class="study-timer-note-input" data-study-note-input="true" rows="4" maxlength="4000" placeholder="' +
+    localizeText(
+      "Ghi mục tiêu, ý tưởng hoặc tài nguyên cho phiên học này...",
+      "Capture goals, ideas, or resources for this study block...",
+    ) +
+    '"></textarea></label>' +
+    '<form class="study-timer-todo-form" data-study-todo-form="true">' +
+    '<input class="settings-text-input study-timer-todo-input" data-study-todo-input="true" type="text" maxlength="160" placeholder="' +
+    localizeText("Thêm một việc cần làm...", "Add a task...") +
+    '">' +
+    '<button type="submit" class="btn secondary study-timer-todo-add">' +
+    localizeText("Thêm", "Add") +
+    '</button></form><div class="study-timer-todo-list" data-study-todo-list="true"></div>';
+  return notebook;
+}
+
 function createStudyTimerPanel() {
   const panel = document.createElement("section");
   panel.className = "study-timer-panel";
@@ -2458,34 +2497,6 @@ function createStudyTimerPanel() {
   config.className = "study-timer-config";
   config.dataset.studyConfig = "true";
 
-  const notebook = document.createElement("section");
-  notebook.className = "study-timer-notebook";
-  notebook.innerHTML =
-    '<div class="study-timer-section-head">' +
-    '<div><strong>' +
-    localizeText("Notes & To-do", "Notes & To-do") +
-    '</strong><span data-study-todo-summary="true"></span></div>' +
-    '<button type="button" class="study-timer-clear-btn" data-study-todo-clear="true">' +
-    localizeText("Xóa xong", "Clear done") +
-    "</button></div>" +
-    '<label class="study-timer-note-editor">' +
-    '<span class="study-timer-note-editor-label">' +
-    localizeText("Ghi chú nhanh", "Quick note") +
-    "</span>" +
-    '<textarea class="study-timer-note-input" data-study-note-input="true" rows="4" maxlength="4000" placeholder="' +
-    localizeText(
-      "Ghi mục tiêu, ý tưởng hoặc tài nguyên cho phiên học này...",
-      "Capture goals, ideas, or resources for this study block...",
-    ) +
-    '"></textarea></label>' +
-    '<form class="study-timer-todo-form" data-study-todo-form="true">' +
-    '<input class="settings-text-input study-timer-todo-input" data-study-todo-input="true" type="text" maxlength="160" placeholder="' +
-    localizeText("Thêm một việc cần làm...", "Add a task...") +
-    '">' +
-    '<button type="submit" class="btn secondary study-timer-todo-add">' +
-    localizeText("Thêm", "Add") +
-    '</button></form><div class="study-timer-todo-list" data-study-todo-list="true"></div>';
-
   const actions = document.createElement("div");
   actions.className = "study-timer-actions";
   actions.innerHTML =
@@ -2537,7 +2548,7 @@ function createStudyTimerPanel() {
 
   const stage = document.createElement("div");
   stage.className = "study-timer-stage";
-  stage.append(display, notebook, actions, shortcuts);
+  stage.append(display, actions, shortcuts);
 
   const side = document.createElement("div");
   side.className = "study-timer-side";
@@ -2546,8 +2557,29 @@ function createStudyTimerPanel() {
   layout.append(stage, side);
 
   panel.append(head, modes, layout);
-  refreshStudyNotebookUi(panel);
   refreshStudyTimerUi();
+  return panel;
+}
+
+function createStudyNotesPanel() {
+  const panel = document.createElement("section");
+  panel.className = "study-notes-panel";
+  panel.dataset.studyNotebookPanel = "true";
+
+  const intro = document.createElement("section");
+  intro.className = "study-notes-intro";
+  intro.innerHTML =
+    '<div class="eyebrow">Workspace notes</div>' +
+    "<h3>Notes & To-do</h3>" +
+    "<p>" +
+    localizeText(
+      "Tách riêng khỏi Time để bạn ghi việc theo kiểu Notion mà không làm rối đồng hồ.",
+      "Kept separate from Time so you can manage Notion-style notes without crowding the timer.",
+    ) +
+    "</p>";
+
+  panel.append(intro, createStudyNotebookSection());
+  refreshStudyNotebookUi(panel);
   return panel;
 }
 
@@ -2627,6 +2659,10 @@ function positionCreateGroupPopover() {
   positionFlyout(el.createGroupPopover, el.newGroupBtn);
 }
 
+function positionStudyNotesPopover() {
+  positionFlyout(el.studyNotesPopover, el.studyNotesToggleButton);
+}
+
 function positionInboxPanel() {
   positionFlyout(el.utilityPanel, el.notificationToggleButton);
 }
@@ -2643,6 +2679,10 @@ function isStudyTimerPopoverOpen() {
   return document.body.classList.contains("study-timer-open");
 }
 
+function isStudyNotesPopoverOpen() {
+  return document.body.classList.contains("study-notes-open");
+}
+
 function isInboxPanelOpen() {
   return document.body.classList.contains("inbox-open");
 }
@@ -2652,6 +2692,7 @@ function syncFlyoutScrim() {
     isSettingsPopoverOpen() ||
     isCreateGroupPopoverOpen() ||
     isStudyTimerPopoverOpen() ||
+    isStudyNotesPopoverOpen() ||
     isInboxPanelOpen();
   document.body.classList.toggle("flyout-open", isOpen);
   el.settingsScrim.hidden = !isOpen;
@@ -2666,6 +2707,9 @@ function setSettingsPopoverOpen(nextOpen) {
   }
   if (nextOpen && isStudyTimerPopoverOpen()) {
     setStudyTimerPopoverOpen(false);
+  }
+  if (nextOpen && isStudyNotesPopoverOpen()) {
+    setStudyNotesPopoverOpen(false);
   }
   document.body.classList.toggle("settings-open", nextOpen);
   el.settingsPopover.setAttribute("aria-hidden", String(!nextOpen));
@@ -2694,6 +2738,9 @@ function setCreateGroupPopoverOpen(nextOpen) {
   }
   if (nextOpen && isStudyTimerPopoverOpen()) {
     setStudyTimerPopoverOpen(false);
+  }
+  if (nextOpen && isStudyNotesPopoverOpen()) {
+    setStudyNotesPopoverOpen(false);
   }
   if (nextOpen && el.friendCard && !el.friendCard.classList.contains("is-collapsed")) {
     setFriendCardCollapsed(true);
@@ -2728,6 +2775,9 @@ function setStudyTimerPopoverOpen(nextOpen) {
   if (nextOpen && isCreateGroupPopoverOpen()) {
     setCreateGroupPopoverOpen(false);
   }
+  if (nextOpen && isStudyNotesPopoverOpen()) {
+    setStudyNotesPopoverOpen(false);
+  }
   document.body.classList.toggle("study-timer-open", nextOpen);
   el.studyTimerPopover.setAttribute("aria-hidden", String(!nextOpen));
   el.studyTimerToggleButton.classList.toggle("active", nextOpen);
@@ -2750,6 +2800,42 @@ function toggleStudyTimerPopover() {
   setStudyTimerPopoverOpen(!isStudyTimerPopoverOpen());
 }
 
+function setStudyNotesPopoverOpen(nextOpen) {
+  if (nextOpen && isInboxPanelOpen()) {
+    setInboxPanelOpen(false);
+  }
+  if (nextOpen && isSettingsPopoverOpen()) {
+    setSettingsPopoverOpen(false);
+  }
+  if (nextOpen && isCreateGroupPopoverOpen()) {
+    setCreateGroupPopoverOpen(false);
+  }
+  if (nextOpen && isStudyTimerPopoverOpen()) {
+    setStudyTimerPopoverOpen(false);
+  }
+  document.body.classList.toggle("study-notes-open", nextOpen);
+  el.studyNotesPopover.setAttribute("aria-hidden", String(!nextOpen));
+  el.studyNotesToggleButton.classList.toggle("active", nextOpen);
+  el.studyNotesToggleButton.setAttribute("aria-pressed", String(nextOpen));
+  syncFlyoutScrim();
+  if (nextOpen) {
+    requestAnimationFrame(() => {
+      positionStudyNotesPopover();
+      refreshStudyNotebookUi();
+      const noteInput = el.studyNotesPopover.querySelector("[data-study-note-input]");
+      if (noteInput) noteInput.focus();
+    });
+  }
+}
+
+function closeStudyNotesPopover() {
+  setStudyNotesPopoverOpen(false);
+}
+
+function toggleStudyNotesPopover() {
+  setStudyNotesPopoverOpen(!isStudyNotesPopoverOpen());
+}
+
 function toggleCreateGroupPopover() {
   setCreateGroupPopoverOpen(!isCreateGroupPopoverOpen());
 }
@@ -2757,6 +2843,7 @@ function toggleCreateGroupPopover() {
 function logout() {
   closeSettingsPopover();
   closeCreateGroupPopover();
+  closeStudyNotesPopover();
   clearSession();
   window.location.href = "/login.html";
 }
@@ -2815,6 +2902,9 @@ function setInboxPanelOpen(nextOpen) {
   }
   if (nextOpen && isStudyTimerPopoverOpen()) {
     setStudyTimerPopoverOpen(false);
+  }
+  if (nextOpen && isStudyNotesPopoverOpen()) {
+    setStudyNotesPopoverOpen(false);
   }
   document.body.classList.toggle("inbox-open", nextOpen);
   el.utilityPanel.setAttribute("aria-hidden", String(!nextOpen));
@@ -2894,179 +2984,34 @@ function clearMessages(title, copy, kicker) {
     "</div></div>";
 }
 
-function createHomeAction(label, copy, action) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "home-action-card";
-  button.dataset.homeAction = action;
-
-  const title = document.createElement("strong");
-  title.textContent = label;
-  const body = document.createElement("span");
-  body.textContent = copy;
-
-  button.append(title, body);
-  return button;
-}
-
-function createHomeMetric(label, value, tone) {
-  const card = document.createElement("div");
-  card.className = "home-metric" + (tone ? " " + tone : "");
-
-  const valueNode = document.createElement("strong");
-  valueNode.textContent = value;
-
-  const labelNode = document.createElement("span");
-  labelNode.textContent = label;
-
-  card.append(valueNode, labelNode);
-  return card;
-}
-
-function createHomeShortcut(name, meta, datasetKey, datasetValue, avatarUrl) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "home-shortcut";
-  button.dataset[datasetKey] = String(datasetValue);
-
-  const avatar = document.createElement("div");
-  avatar.className = "channel-avatar";
-  syncAvatarNode(avatar, name, avatarUrl || "");
-
-  const copy = document.createElement("div");
-  copy.className = "home-shortcut-copy";
-
-  const title = document.createElement("div");
-  title.className = "home-shortcut-title";
-  title.textContent = name;
-
-  const subtitle = document.createElement("div");
-  subtitle.className = "home-shortcut-meta";
-  subtitle.textContent = meta;
-
-  copy.append(title, subtitle);
-  button.append(avatar, copy);
-  return button;
-}
-
-function createHomePanel(title, meta, buttons, emptyCopy) {
-  const panel = document.createElement("section");
-  panel.className = "home-panel";
-
-  const head = document.createElement("div");
-  head.className = "home-section-head";
-  const heading = document.createElement("strong");
-  heading.textContent = title;
-  const detail = document.createElement("span");
-  detail.className = "mini muted";
-  detail.textContent = meta;
-  head.append(heading, detail);
-
-  const body = document.createElement("div");
-  body.className = "home-shortcut-list";
-  if (buttons.length) {
-    buttons.forEach((button) => body.appendChild(button));
-  } else {
-    const empty = document.createElement("div");
-    empty.className = "home-empty";
-    empty.textContent = emptyCopy;
-    body.appendChild(empty);
-  }
-
-  panel.append(head, body);
-  return panel;
-}
-
 function renderHomeOverview() {
-  setMessagesSurfaceMode("home");
-  el.messagesArea.innerHTML = "";
-
-  const wrap = document.createElement("div");
-  wrap.className = "home-overview";
-
-  const frame = document.createElement("section");
-  frame.className = "home-frame";
-
-  const summary = document.createElement("section");
-  summary.className = "home-summary";
-
-  const summaryHead = document.createElement("div");
-  summaryHead.className = "home-summary-head";
-  const kicker = document.createElement("div");
-  kicker.className = "eyebrow";
-  kicker.textContent = "Workspace";
-  const heading = document.createElement("h2");
-  heading.textContent = "Quick access";
-  const copy = document.createElement("p");
-  copy.textContent = "Open a chat, manage requests, or create a new study group.";
-  summaryHead.append(kicker, heading, copy);
-
-  const metrics = document.createElement("div");
-  metrics.className = "home-metrics";
-  const pendingCount =
-    socialState.incomingFriendRequests.length + socialState.groupInvitations.length;
-  metrics.append(
-    createHomeMetric("Friends", String(socialState.friends.length), "primary"),
-    createHomeMetric("Groups", String(groups.length), "soft"),
-    createHomeMetric("Pending", String(pendingCount), "soft"),
+  clearMessages(
+    "Select a conversation",
+    "Choose a friend or study group from the inbox to start chatting.",
+    "Inbox",
   );
-
-  const actions = document.createElement("div");
-  actions.className = "home-actions";
-  actions.append(
-    createHomeAction("Add Friend", "Send a request and unlock direct chat.", "add-friend"),
-    createHomeAction("Open Notifications", "Review invites and friend requests.", "notifications"),
-    createHomeAction("Create Group", "Start a fresh study group for your class or team.", "create-group"),
-  );
-  summary.append(summaryHead, metrics, actions);
-
-  const sections = document.createElement("div");
-  sections.className = "home-sections";
-
-  const friendButtons = socialState.friends.slice(0, 4).map((friend) => {
-    const email = normalizeEmail(friend.email);
-    return createHomeShortcut(
-      displayName(friend),
-      getPreview("direct", email, friend.email || "Ready to chat"),
-      "homeFriend",
-      email,
-      friend.avatarUrl || "",
-    );
-  });
-
-  const groupButtons = groups.slice(0, 4).map((group) =>
-    createHomeShortcut(
-      group.name || "Study Group",
-      getPreview("group", group.id, group.category || "Open study group"),
-      "homeGroup",
-      group.id,
-      "",
-    ),
-  );
-
-  sections.append(
-    createHomePanel(
-      "Recent friends",
-      socialState.friends.length + " total",
-      friendButtons,
-      "Your accepted friends will appear here for quick access.",
-    ),
-    createHomePanel(
-      "Your groups",
-      groups.length + " active",
-      groupButtons,
-      "Join or create a group to see study group shortcuts here.",
-    ),
-  );
-
-  frame.append(summary, sections);
-  wrap.append(frame);
-  el.messagesArea.appendChild(wrap);
   el.messagesArea.scrollTop = 0;
 }
 
 function refreshHomeOverviewIfNeeded() {
   if (activeChannel.type === "home") renderHomeOverview();
+}
+
+function selectDefaultConversation() {
+  const firstFriend = socialState.friends.find((friend) => normalizeEmail(friend.email));
+  if (firstFriend) {
+    selectDirect(firstFriend);
+    return true;
+  }
+
+  const firstGroup = groups.find((group) => String((group && group.id) || ""));
+  if (firstGroup) {
+    selectGroup(firstGroup);
+    return true;
+  }
+
+  selectHome();
+  return false;
 }
 
 function createFavoriteChip(label, avatarUrl, onClick, active) {
@@ -3092,7 +3037,7 @@ function renderFavoritesStrip() {
       createFavoriteChip(
         displayName(currentUser),
         currentUser.avatarUrl,
-        () => selectHome(),
+        () => selectDefaultConversation(),
         activeChannel.type === "home",
       ),
     );
@@ -3428,9 +3373,9 @@ function selectHome() {
   activeChannel = { type: "home" };
   closePreviewDetails();
   syncSurfaceMode();
-  el.chatKicker.textContent = "Overview";
-  el.chatTitle.textContent = displayName(currentUser);
-  el.chatSubtitle.textContent = "Friends, invites, and groups in one place.";
+  el.chatKicker.textContent = "Inbox";
+  el.chatTitle.textContent = "Select a conversation";
+  el.chatSubtitle.textContent = "Choose a friend or group from the inbox to get started.";
   syncAvatarNode(el.chatAvatar, displayName(currentUser), currentUser && currentUser.avatarUrl);
   showBanner("", "info");
   disconnectSubscription();
@@ -4263,6 +4208,10 @@ async function bootstrap() {
       el.studyTimerPanelMount.appendChild(createStudyTimerPanel());
       refreshStudyTimerUi();
     }
+    if (!el.studyNotesPanelMount.firstChild) {
+      el.studyNotesPanelMount.appendChild(createStudyNotesPanel());
+      refreshStudyNotebookUi();
+    }
     syncCurrentUserUi();
     setFriendCardCollapsed(true);
     setFriendsCardCollapsed(false);
@@ -4279,7 +4228,9 @@ async function bootstrap() {
     setCreateGroupFeedback("", "success");
     syncInboxToggleState();
     selectHome();
+    clearMessages("Loading conversations", "Preparing your inbox.", "Inbox");
     await refreshWorkspace();
+    selectDefaultConversation();
     handlePanelQuery();
     connectWs();
     if (workspaceRefreshTimer) window.clearInterval(workspaceRefreshTimer);
@@ -4361,9 +4312,13 @@ if (el.previewGroupLeaveBtn) {
 
 if (el.dashboardNavButton) {
   el.dashboardNavButton.addEventListener("click", () => {
+    closeInboxPanel();
+    closeSettingsPopover();
+    closeStudyTimerPopover();
+    closeCreateGroupPopover();
     closePreviewDetails();
     setRosterFilter("all");
-    selectHome();
+    selectDefaultConversation();
   });
 }
 
@@ -4460,24 +4415,6 @@ el.studyTimerPanelMount.addEventListener("click", (event) => {
   const target = asElement(event.target);
   if (!target) return;
 
-  const clearCompletedButton = target.closest("[data-study-todo-clear]");
-  if (clearCompletedButton) {
-    clearCompletedStudyTodos();
-    return;
-  }
-
-  const todoToggleButton = target.closest("[data-study-todo-toggle]");
-  if (todoToggleButton) {
-    toggleStudyTodo(todoToggleButton.dataset.studyTodoToggle || "");
-    return;
-  }
-
-  const todoRemoveButton = target.closest("[data-study-todo-remove]");
-  if (todoRemoveButton) {
-    removeStudyTodo(todoRemoveButton.dataset.studyTodoRemove || "");
-    return;
-  }
-
   const studyModeButton = target.closest("[data-study-mode]");
   if (studyModeButton) {
     setStudyTimerMode(studyModeButton.dataset.studyMode || "stopwatch");
@@ -4506,12 +4443,6 @@ el.studyTimerPanelMount.addEventListener("input", (event) => {
   const target = asElement(event.target);
   if (!target) return;
 
-  const noteField = target.closest("[data-study-note-input]");
-  if (noteField) {
-    updateStudyNotebookText(/** @type {HTMLTextAreaElement} */ (noteField).value);
-    return;
-  }
-
   const studyField = target.closest("[data-study-field]");
   if (!studyField) return;
   updateStudyTimerField(
@@ -4520,50 +4451,42 @@ el.studyTimerPanelMount.addEventListener("input", (event) => {
   );
 });
 
-el.studyTimerPanelMount.addEventListener("submit", (event) => {
+el.studyNotesPanelMount.addEventListener("click", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
+
+  const clearCompletedButton = target.closest("[data-study-todo-clear]");
+  if (clearCompletedButton) {
+    clearCompletedStudyTodos();
+    return;
+  }
+
+  const todoToggleButton = target.closest("[data-study-todo-toggle]");
+  if (todoToggleButton) {
+    toggleStudyTodo(todoToggleButton.dataset.studyTodoToggle || "");
+    return;
+  }
+
+  const todoRemoveButton = target.closest("[data-study-todo-remove]");
+  if (todoRemoveButton) {
+    removeStudyTodo(todoRemoveButton.dataset.studyTodoRemove || "");
+  }
+});
+
+el.studyNotesPanelMount.addEventListener("input", (event) => {
+  const target = asElement(event.target);
+  if (!target) return;
+
+  const noteField = target.closest("[data-study-note-input]");
+  if (!noteField) return;
+  updateStudyNotebookText(/** @type {HTMLTextAreaElement} */ (noteField).value);
+});
+
+el.studyNotesPanelMount.addEventListener("submit", (event) => {
   const form = asElement(event.target);
   if (!form || !form.matches("[data-study-todo-form]")) return;
   event.preventDefault();
   addStudyTodo();
-});
-
-el.messagesArea.addEventListener("click", (event) => {
-  const target = asElement(event.target);
-  if (!target) return;
-
-  const actionButton = target.closest("[data-home-action]");
-  if (actionButton) {
-    const action = actionButton.dataset.homeAction;
-    if (action === "add-friend") {
-      setFriendCardCollapsed(false);
-      el.friendCard.scrollIntoView({ behavior: "smooth", block: "start" });
-      el.friendEmailInput.focus();
-      return;
-    }
-    if (action === "notifications") {
-      openInboxPanel();
-      return;
-    }
-    if (action === "create-group") {
-      openCreateGroupPopover();
-    }
-    return;
-  }
-
-  const friendShortcut = target.closest("[data-home-friend]");
-  if (friendShortcut) {
-    const email = normalizeEmail(friendShortcut.dataset.homeFriend || "");
-    const friend = socialState.friends.find((item) => normalizeEmail(item.email) === email);
-    if (friend) selectDirect(friend);
-    return;
-  }
-
-  const groupShortcut = target.closest("[data-home-group]");
-  if (groupShortcut) {
-    const groupId = String(groupShortcut.dataset.homeGroup || "");
-    const group = groups.find((item) => String(item.id) === groupId);
-    if (group) selectGroup(group);
-  }
 });
 
 el.friendRequestForm.addEventListener("submit", async (event) => {
@@ -4665,19 +4588,22 @@ el.attachmentInput.addEventListener("change", async (event) => {
 
 el.homeRailButton.addEventListener("click", () => {
   setRosterFilter("all");
-  selectHome();
+  selectDefaultConversation();
 });
 el.newGroupToggleInput.addEventListener("click", toggleCreateGroupPopover);
 el.studyTimerToggleButton.addEventListener("click", toggleStudyTimerPopover);
+el.studyNotesToggleButton.addEventListener("click", toggleStudyNotesPopover);
 el.settingsToggleButton.addEventListener("click", toggleSettingsPopover);
 el.settingsCloseButton.addEventListener("click", closeSettingsPopover);
 el.studyTimerCloseButton.addEventListener("click", closeStudyTimerPopover);
+el.studyNotesCloseButton.addEventListener("click", closeStudyNotesPopover);
 el.createGroupCloseButton.addEventListener("click", closeCreateGroupPopover);
 el.createGroupCancelBtn.addEventListener("click", closeCreateGroupPopover);
 el.settingsScrim.addEventListener("click", () => {
   closeInboxPanel();
   closeSettingsPopover();
   closeStudyTimerPopover();
+  closeStudyNotesPopover();
   closeCreateGroupPopover();
 });
 if (el.createGroupSidebarBtn) {
@@ -4747,6 +4673,10 @@ document.addEventListener("keydown", (event) => {
     closeStudyTimerPopover();
     return;
   }
+  if (isStudyNotesPopoverOpen()) {
+    closeStudyNotesPopover();
+    return;
+  }
   if (isCreateGroupPopoverOpen()) {
     closeCreateGroupPopover();
     return;
@@ -4763,6 +4693,9 @@ window.addEventListener("resize", () => {
   if (isSettingsPopoverOpen()) {
     positionSettingsPopover();
   }
+  if (isStudyNotesPopoverOpen()) {
+    positionStudyNotesPopover();
+  }
   if (isCreateGroupPopoverOpen()) {
     positionCreateGroupPopover();
   }
@@ -4776,6 +4709,9 @@ window.addEventListener(
     }
     if (isSettingsPopoverOpen()) {
       positionSettingsPopover();
+    }
+    if (isStudyNotesPopoverOpen()) {
+      positionStudyNotesPopover();
     }
     if (isCreateGroupPopoverOpen()) {
       positionCreateGroupPopover();
