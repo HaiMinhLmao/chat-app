@@ -5261,24 +5261,24 @@ html.workspace-booting .preview-shell {
 
 @media (max-width: 1180px) {
   body.preview-page {
-    height: auto;
+    height: 100dvh;
     min-width: 0;
-    overflow-y: auto;
+    overflow-y: hidden;
   }
 
   .preview-shell {
     width: 100%;
-    height: auto;
+    height: 100dvh;
     min-width: 0;
-    min-height: 100vh;
+    min-height: 100dvh;
     padding: 10px;
-    overflow: visible;
+    overflow: hidden;
   }
 
   .preview-app {
     grid-template-columns: 88px 280px minmax(0, 1fr);
-    height: auto;
-    min-height: calc(100vh - 20px);
+    height: calc(100dvh - 20px);
+    min-height: calc(100dvh - 20px);
     gap: 14px;
     padding: 14px;
   }
@@ -5290,7 +5290,8 @@ html.workspace-booting .preview-shell {
   .preview-list-panel,
   .preview-chat-panel,
   .preview-details-panel {
-    height: auto;
+    height: 100%;
+    min-height: 0;
   }
 
   .preview-roster-card {

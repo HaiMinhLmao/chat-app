@@ -239,6 +239,7 @@ const THEME_STORAGE_KEY = "workspaceTheme";
 const STUDY_TIMER_STORAGE_KEY = "workspaceStudyTimer";
 const SETTINGS_DRAWER_BREAKPOINT = 760;
 const MINUTE_MS = 60000;
+const REQUEST_TIMEOUT_MS = 10000;
 const WORKSPACE_BOOT_MIN_MS = 650;
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 let studyTimerTicker = null;
@@ -342,18 +343,45 @@ function isTokenExpired(token, skewSeconds = 30) {
     : false;
 }
 
+function requestFailureMessage(error) {
+  return error && error.name === "AbortError"
+    ? "Máy chủ phản hồi quá lâu. Vui lòng thử lại."
+    : "Không thể kết nối tới máy chủ. Vui lòng thử lại.";
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  if (typeof AbortController !== "function" || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return fetch(url, options);
+  }
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function refreshSession() {
   const session = getSession();
   const refreshToken = session && session.refresh_token;
   if (!refreshToken) return null;
-  const response = await fetch("/api/auth/refresh", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+  let response;
+  try {
+    response = await fetchWithTimeout("/api/auth/refresh", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+  } catch (_) {
+    return null;
+  }
   const data = await parseResponsePayload(response);
   if (!response.ok || !data.access_token) return null;
   sessionStorage.setItem(
@@ -383,14 +411,23 @@ async function authorizedRequest(url, options = {}) {
       Authorization: "Bearer " + accessToken,
     },
   });
-  let response = await fetch(url, buildOptions(token));
+  let response;
+  try {
+    response = await fetchWithTimeout(url, buildOptions(token));
+  } catch (error) {
+    return { ok: false, data: { error: requestFailureMessage(error) } };
+  }
   if (response.status === 401) {
     token = await refreshSession();
     if (!token) {
       clearSession();
       return { ok: false, data: { error: "Sign in again." } };
     }
-    response = await fetch(url, buildOptions(token));
+    try {
+      response = await fetchWithTimeout(url, buildOptions(token));
+    } catch (error) {
+      return { ok: false, data: { error: requestFailureMessage(error) } };
+    }
   }
   const data = await parseResponsePayload(response);
   return { ok: response.ok, data };
