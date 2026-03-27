@@ -129,11 +129,16 @@ public class SocialService {
         }
 
         try {
-            return friendRequestRepository.findBetweenUsers(first, second).stream()
+            boolean acceptedInDatabase = friendRequestRepository.findBetweenUsers(first, second).stream()
                     .anyMatch(request -> request.getStatus() == InvitationStatus.ACCEPTED);
+            if (acceptedInDatabase) {
+                return true;
+            }
         } catch (RuntimeException exception) {
             return transientStore.areFriends(first, second);
         }
+
+        return transientStore.areFriends(first, second);
     }
 
     private FriendRequestResponse sendFriendRequestInDatabase(String requesterEmail, String recipientEmail) {

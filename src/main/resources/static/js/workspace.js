@@ -7116,27 +7116,18 @@ el.messageForm.addEventListener("submit", async (event) => {
   }
   if (!stompClient || !stompClient.connected) {
     connectWs();
-    const sent =
-      activeChannel.type === "group"
-        ? await sendGroupMessageFallback(content)
-        : await sendDirectMessageFallback(content);
-    if (sent) {
-      el.messageInput.value = "";
+  }
+  const sent =
+    activeChannel.type === "group"
+      ? await sendGroupMessageFallback(content)
+      : await sendDirectMessageFallback(content);
+  if (sent) {
+    el.messageInput.value = "";
+    if (!stompClient || !stompClient.connected) {
       showToast("Message sent. Live sync is reconnecting.");
     }
-    syncComposer();
-    return;
   }
-  if (activeChannel.type === "group") {
-    sendGroupMessage(content);
-    setPreview("group", activeChannel.id, "You: " + content);
-  } else if (activeChannel.type === "direct") {
-    sendDirectMessage(content);
-    setPreview("direct", activeChannel.id, "You: " + content);
-  } else {
-    return;
-  }
-  el.messageInput.value = "";
+  syncComposer();
 });
 
 el.attachBtn.addEventListener("click", () => {
