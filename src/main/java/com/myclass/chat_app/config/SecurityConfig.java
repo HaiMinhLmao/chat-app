@@ -1,5 +1,7 @@
 package com.myclass.chat_app.config;
 
+import com.myclass.chat_app.service.LocalAdminAuthService;
+import com.myclass.chat_app.service.LocalUserAuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -25,9 +27,15 @@ public class SecurityConfig {
     public JwtDecoder jwtDecoder(
             @Value("${supabase.url}") String supabaseUrl,
             @Value("${supabase.anon.key}") String anonKey,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            LocalAdminAuthService localAdminAuthService,
+            LocalUserAuthService localUserAuthService
     ) {
-        return new SupabaseUserLookupJwtDecoder(supabaseUrl, anonKey, objectMapper);
+        return new CompositeJwtDecoder(
+                localAdminAuthService,
+                localUserAuthService,
+                new SupabaseUserLookupJwtDecoder(supabaseUrl, anonKey, objectMapper)
+        );
     }
 
     @Bean

@@ -16,6 +16,7 @@ import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,8 @@ import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -92,6 +95,14 @@ public class LocalUserAuthService {
         } catch (RuntimeException exception) {
             return false;
         }
+    }
+
+    public Jwt decode(String token) {
+        JWTClaimsSet claims = parseClaims(token);
+        if (!LOCAL_USER_ISSUER.equals(claims.getIssuer())) {
+            throw new IllegalArgumentException("This token does not belong to a local user session.");
+        }
+        return toSpringJwt(token, claims);
     }
 
     public AuthSessionResponse refresh(String refreshToken) {
@@ -188,5 +199,16 @@ public class LocalUserAuthService {
             return Optional.empty();
         }
         return localCredentialRepository.findByUserEmailIgnoreCase(normalized);
+    }
+
+    private Jwt toSpringJwt(String token, JWTClaimsSet claims) {
+        Instant issuedAt = claims.getIssueTime() == null ? Instant.now() : claims.getIssueTime().toInstant();
+        Instant expiresAt = claims.getExpirationTime() == null ? issuedAt.plus(ACCESS_TOKEN_TTL) : claims.getExpirationTime().toInstant();
+        Map<String, Object> headers = Map.of("alg", "HS256", "typ", "JWT");
+        Map<String, Object> mappedClaims = new LinkedHashMap<>(claims.getClaims());
+        if (claims.getSubject() != null) {
+            mappedClaims.put("sub", claims.getSubject());
+        }
+        return new Jwt(token, issuedAt, expiresAt, headers, mappedClaims);
     }
 }
